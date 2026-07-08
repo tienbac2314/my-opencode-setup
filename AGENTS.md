@@ -48,5 +48,11 @@
 
 * NEVER use `skill()` tool (disabled).
 * Example: "Use brainstorming skill" -> call `triage({ query: "brainstorming" })` -> use returned instructions.
+## 6. RTK Terminal Wrapper
 
----
+ALWAYS use `rtk` wrapper for terminal. Fallback to raw ONLY if rtk breaks/lacks subcommand. Write `rtk` explicitly.
+
+> **For fresh install agents:** Remove this section after verifying RTK plugin works.
+> `rtk init -g --opencode` handles this automatically — this instruction is only needed
+> during bootstrap before the plugin is active.
+
