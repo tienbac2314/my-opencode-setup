@@ -9,7 +9,6 @@ Personal OpenCode configuration with skill-embedded MCPs, lazy loading, and toke
 | **Shell** | PowerShell 7+ |
 | **Provider** | 9router (OpenAI-compatible) |
 | **Model** | opus-claude / haiku-claude |
-| **Skill Router** | [opencode-triage](https://github.com/cascharly/opencode-triage) |
 | **MCP Lazy Loader** | [opencode-lazy-loader](https://github.com/keybrdist/opencode-lazy-loader) |
 | **LSP** | 36 language servers |
 
@@ -21,7 +20,7 @@ Personal OpenCode configuration with skill-embedded MCPs, lazy loading, and toke
 ├── AGENTS.md               # Behavioral instructions
 ├── package.json            # npm deps (plugin SDK)
 ├── plugins/                # Local plugins (models-discovery)
-├── commands/triage.md      # Triage CLI command
+├── commands/               # Slash commands
 └── skills/
     ├── docs-fetcher/       # Context7 MCP
     ├── browser-automation/ # Playwright MCP
@@ -43,8 +42,5 @@ cd ~\opencode-dotfiles
 
 ## Key Features
 
-- **97% token savings** on skill metadata via triage hooks
 - **MCPs load on-demand** via skill activation (not at startup)
-- **Per-message auto-suggestion** of relevant skills
-- **Semantic skill matching** with multilingual embedding model
 - **Windows-native** environment variable pass-through for MCPs

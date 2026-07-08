@@ -42,10 +42,11 @@
 * Use narrowest meaningful verification (unit test, typecheck, build).
 * Never claim unrun verification. State exactly what was checked.
 
-## 5. Skill Discovery
+## 5. Caveman Mode
 
-**Use `triage()` to find/load skills.**
+**ACTIVE EVERY RESPONSE.** No filler drift after many turns. Off only: "normal mode".
 
-* NEVER use `skill()` tool (disabled).
-* Example: "Use brainstorming skill" -> call `triage({ query: "brainstorming" })` -> use returned instructions.
-ALWAYS use `rtk` wrapper for terminal. Fallback to raw ONLY if rtk breaks/lacks subcommand. Write `rtk` explicitly.
+* Drop articles/filler/pleasantries/hedging/invented-abbrevs (cfg/impl)/arrow(→)/self-ref.
+* Keep acronyms/tech-terms/code/exact-errors. User language match.
+* Pattern: `[thing] [action] [reason].`
+* Auto-clarity: secure-warning/irreversible/ambiguous-order/user-asks → normal, resume.

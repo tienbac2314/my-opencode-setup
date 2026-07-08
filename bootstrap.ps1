@@ -16,20 +16,7 @@ Copy-Item -Recurse "$PSScriptRoot\skills" $ConfigDir -Force
 Copy-Item -Recurse "$PSScriptRoot\commands" "$ConfigDir\commands" -Force
 Copy-Item "$PSScriptRoot\AGENTS.md" "$ConfigDir\AGENTS.md" -Force
 
-# 2. Install triage plugin
-Write-Output "Installing opencode-triage..."
-$triage = Get-Command opencode-triage -ErrorAction SilentlyContinue
-if (-not $triage) {
-  npm install -g opencode-triage 2>&1
-} else {
-  Write-Output "triage already installed, skipping"
-}
-
-# 3. Activate triage
-Write-Output "Activating triage..."
-npx opencode-triage on --force 2>$null
-
-# 4. Install lazy-loader
+# 2. Install lazy-loader
 Write-Output "Installing opencode-lazy-loader..."
 $lazyOk = npm ls -g opencode-lazy-loader --json 2>$null | ConvertFrom-Json | Select-Object -ExpandProperty dependencies -ErrorAction SilentlyContinue
 if (-not $lazyOk) {
@@ -38,7 +25,7 @@ if (-not $lazyOk) {
   Write-Output "lazy-loader already installed, skipping"
 }
 
-# 5. Install RTK plugin (optional)
+# 3. Install RTK plugin (optional)
 if (-not $SkipRtk) {
   $rtk = Get-Command rtk -ErrorAction SilentlyContinue
   if (-not $rtk) {
@@ -54,7 +41,7 @@ if (-not $SkipRtk) {
   }
 }
 
-# 6. Install npm deps for config dir
+# 4. Install npm deps for config dir
 Write-Output "Installing npm deps..."
 if (Test-Path "$ConfigDir\package.json") {
   Push-Location $ConfigDir
@@ -66,9 +53,4 @@ Write-Output ""
 Write-Output "=== Bootstrap complete ==="
 Write-Output "Restart OpenCode to pick up changes."
 Write-Output ""
-Write-Output "Verify with: npx opencode-triage status"
-Write-Output ""
 Write-Output "=== Post-install cleanup ==="
-Write-Output "If you installed RTK, the AGENTS.md has a 'ALWAYS use rtk wrapper...' line."
-Write-Output "Remove that line once the RTK plugin is verified working —"
-Write-Output "'rtk init -g --opencode' handles it automatically."
