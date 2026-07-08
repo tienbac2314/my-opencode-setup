@@ -9,8 +9,8 @@ Personal OpenCode configuration with skill-embedded MCPs, lazy loading, and toke
 | **Shell** | PowerShell 7+ |
 | **Provider** | 9router (OpenAI-compatible) |
 | **Model** | opus-claude / haiku-claude |
-| **Skill Router** | [opencode-triage](https://github.com/licat2023/opencode-triage) (licat2023 fork) |
-| **MCP Lazy Loader** | [opencode-lazy-loader](https://github.com/licat2023/opencode-lazy-loader) (licat2023 fork) |
+| **Skill Router** | [opencode-triage](https://github.com/cascharly/opencode-triage) |
+| **MCP Lazy Loader** | [opencode-lazy-loader](https://github.com/keybrdist/opencode-lazy-loader) |
 | **LSP** | 36 language servers |
 
 ## Structure
@@ -28,22 +28,17 @@ Personal OpenCode configuration with skill-embedded MCPs, lazy loading, and toke
     └── devtools-debugger/  # Chrome DevTools MCP
 ```
 
-## Quick Install
+## Quick Install (via Bootstrap)
 
 ```powershell
-# 1. Install plugins globally
-npm install -g licat2023/opencode-triage
-npm install -g licat2023/opencode-lazy-loader
+# 1. Clone this repo
+git clone https://github.com/tienbac2314/opencode-dotfiles ~\opencode-dotfiles
+cd ~\opencode-dotfiles
 
-# 2. Activate triage
-npx opencode-triage on
+# 2. Run bootstrap (installs everything)
+.\bootstrap.ps1
 
-# 3. Copy config + skills
-Copy-Item -Recurse config\* ~\.config\opencode\
-Copy-Item -Recurse skills\* ~\.config\opencode\skills\
-Copy-Item AGENTS.md ~\.config\opencode\AGENTS.md
-
-# 4. Restart OpenCode
+# 3. Restart OpenCode
 ```
 
 ## Key Features

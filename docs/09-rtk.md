@@ -1,8 +1,22 @@
 # RTK Auto-Rewrite Hook
 
-[RTK](https://github.com/rtk-ai/rtk) transparently rewrites Bash commands to optimized equivalents before execution — saving tokens and standardizing command usage.
+[RTK](https://github.com/rtk-ai/rtk) (Rust Token Killer) transparently rewrites Bash commands to optimized equivalents before execution — saving tokens and standardizing command usage.
 
 ## Installation
+
+### Prerequisites
+
+Requires the `rtk` Rust binary in PATH. Install it first:
+
+```powershell
+# Option A: Install via Cargo
+cargo install --git https://github.com/rtk-ai/rtk
+
+# Option B: Download pre-built binary from
+# https://github.com/rtk-ai/rtk/releases
+```
+
+### Install OpenCode Plugin
 
 ```powershell
 rtk init -g                 # Install hook + RTK.md (recommended)

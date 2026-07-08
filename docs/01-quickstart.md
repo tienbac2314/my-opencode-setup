@@ -13,10 +13,10 @@
 
 ```powershell
 # Triage — hides skills from prompt, routes on demand
-npm install -g licat2023/opencode-triage
+npm install -g opencode-triage
 
 # Lazy Loader — loads skill-embedded MCPs on demand
-npm install -g licat2023/opencode-lazy-loader
+npm install -g opencode-lazy-loader
 ```
 
 ### 2. Activate Triage
