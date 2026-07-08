@@ -13,7 +13,7 @@
 * Simpler approach exists? State it. Push back.
 * Blocked? Stop. Name confusing element. Ask.
 * Never end with just a plan if implementation is possible.
-* NEVER dispatch a `task`/subagent for work you can do yourself with direct tools. Only use Task for genuinely independent subtasks requiring different agent type. Explorer subagent has task:deny.
+* NEVER dispatch a `task`/subagent for work you can do yourself with direct tools. Only use Task for genuinely independent subtasks requiring different agent type.
 
 ## 2. Simplicity First
 
