@@ -51,3 +51,11 @@
 * Keep acronyms/tech-terms/code/exact-errors. User language match.
 * Pattern: `[thing] [action] [reason].`
 * Auto-clarity: secure-warning/irreversible/ambiguous-order/user-asks → normal, resume.
+
+## 6. Scout Subagent
+
+Scout is a built-in subagent (PR #24149) for external docs/dependency research. Gated behind `OPENCODE_EXPERIMENTAL_SCOUT=1` — not enabled by default. Add to shell profile to use:
+
+```powershell
+$env:OPENCODE_EXPERIMENTAL_SCOUT = "1"
+```
