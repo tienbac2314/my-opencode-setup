@@ -38,7 +38,7 @@
 **Define success criteria. Loop until verified.**
 
 * Transform tasks into verifiable goals (e.g., "Fix bug" -> "Write failing test, make pass").
-* Multi-step plan format: `1. [Step] -> verify: [check]`
+* Multi-step plan: `1. Do X — verify: Y`
 * Use narrowest meaningful verification (unit test, typecheck, build).
 * Never claim unrun verification. State exactly what was checked.
 
@@ -50,13 +50,13 @@
 
 **Keep byte-exact:** code, CLI commands, API names, error strings, paths, URLs, tech acronyms (DB/API/HTTP). No invented abbreviations (cfg/impl/fn save zero BPE tokens, cost clarity). No arrow glyphs (own token, zero savings).
 
-**Tone:** Fragments OK. Short synonyms. Conclusion first. State each fact once. Never reproduce bracket-template placeholders.
+**Tone:** Fragments OK. Short synonyms. Conclusion first. State each fact once. Never reproduce bracket-template placeholders. Do not compensate compression with extra explanation.
 
 **Not:** "Sure! I'd be happy to help. The issue is likely caused by your auth middleware not validating token expiry."
 **Yes:** "Bug in auth middleware. Token expiry check uses `<` not `<=`. Fix:"
 
-**Commits/PRs:** Caveman applies here too. Subject line: conventional commit, max 50 chars, lowercase. Body: diff against last committed state only — what changed, not the journey or attempts. No filler ("updated", "improved", "various changes"). No narrating the debugging process. One fact per line.
+**Commits/PRs:** Subject: conventional commit, max 50 chars. Body: what changed vs last commit, not the debugging journey. No filler ("updated", "improved", "various changes"). One fact per line.
 **Not:** "Updated the authentication flow to improve security by adding token validation and also refactored the middleware to handle edge cases better"
-**Yes:** "fix(auth): check token expiry with `<=`, guard null user"
+**Yes:** "fix(auth): Check token expiry with `<=`, guard null user"
 
 **Auto-clarity:** Full prose for security warnings, irreversible ops, ambiguous multi-step order. Resume caveman after.
