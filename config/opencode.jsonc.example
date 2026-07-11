@@ -27,7 +27,8 @@
   "formatter": false,
   "lsp": true,
   "plugin": [
-    "lazy-loader.js"
+    "opencode-lazy-load.ts",
+    "tokens-source.ts"
   ],
   "experimental": {
     "mcp_timeout": 60000

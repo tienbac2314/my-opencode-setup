@@ -9,7 +9,8 @@ Personal OpenCode configuration with skill-embedded MCPs, lazy loading, and toke
 | **Shell** | PowerShell 7+ |
 | **Provider** | 9router (OpenAI-compatible) |
 | **Model** | deepseek-v4-flash-free (free tier) |
-| **MCP Lazy Loader** | Local build of [licat2023/opencode-lazy-loader](https://github.com/keybrdist/opencode-lazy-loader/compare/main...licat2023:opencode-lazy-loader:main) |
+| **MCP Lazy Loader** | [omarwaly-ai/opencode-lazy-loading](https://github.com/omarwaly-ai/opencode-lazy-loading) |
+| **Token Monitor** | [omarwaly-ai/OpenCode-tokens-source](https://github.com/omarwaly-ai/OpenCode-tokens-source) |
 | **LSP** | Auto-discovered |
 
 ## Structure
@@ -20,9 +21,9 @@ Personal OpenCode configuration with skill-embedded MCPs, lazy loading, and toke
 ├── AGENTS.md                   # Behavioral instructions
 ├── package.json                # npm deps: plugin SDK + lazy-loader
 ├── plugins/
-│   ├── opencode-lazy-loader/   # Local build of lazy-loader plugin
+│   ├── opencode-lazy-load.ts   # Lazy loads tools and MCPs to save tokens
+│   ├── tokens-source.ts        # Breaks down token usage per source
 │   ├── models-discovery.js     # Auto-discovers LLM models from provider
-│   ├── lazy-loader.js          # Bridge plugin (desktop app compat)
 │   └── rtk.ts                  # RTK agent protocol (optional)
 ├── agents/                     # Sub-agents
 │   ├── web-search.md           # Web researcher sub-agent (used by research skills)
@@ -60,9 +61,8 @@ See [docs/opencode-bugs-known.md](docs/opencode-bugs-known.md) for detailed plug
 
 Key points:
 - Desktop app (Electron) loads plugins from `plugins/` dir only — ignores npm config entries
-- `plugins/lazy-loader.js` bridges the gap for both clients
-- `opencode-lazy-loader` is built locally and copied to `plugins/opencode-lazy-loader` (using `licat2023` fork with `skills` path fix)
-- Duplicate tool registration (bridge + config entry) is harmless — SDK allows override
+- We use single-file `.ts` plugins (`opencode-lazy-load.ts` and `tokens-source.ts`) which load cleanly in both CLI and Desktop without needing bridges or transpilation.
+- No NPM dependencies required.
 
 ## OpenCode 2.0 Considerations
 
@@ -76,5 +76,5 @@ Key points:
 - **MCPs load on-demand** via skill activation (not at startup)
 - **Windows-native** environment variable pass-through for MCPs
 - **Dual-client support** — same config works for desktop app and CLI
-- **No NPM package dependencies** — lazy loader is prebuilt in the repo
-- **Automatic bootstrap** patches all paths, installs deps, creates bridge
+- **No NPM package dependencies** — single-file TypeScript plugins
+- **Automatic bootstrap** installs everything simply.

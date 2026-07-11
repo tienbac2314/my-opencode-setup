@@ -43,20 +43,6 @@ Remove-Item package-lock.json -Force -ErrorAction SilentlyContinue
 npm install
 Pop-Location
 
-# 3. Patch global opencode-lazy-loader if present (machine-specific: portable Node.js install)
-$globalLoader = "$env:USERPROFILE\Downloads\w\nodejs\node_modules\opencode-lazy-loader\dist\skill-loader.js"
-if (Test-Path $globalLoader) {
-  $content = Get-Content $globalLoader -Raw
-  $content = $content.Replace(
-    "join(homedir(), '.config', 'opencode', 'skill')",
-    "join(homedir(), '.config', 'opencode', 'skills')"
-  ).Replace(
-    "join(process.cwd(), '.opencode', 'skill')",
-    "join(process.cwd(), '.opencode', 'skills')"
-  )
-  Set-Content $globalLoader $content -NoNewline
-}
-
 # 3. Link .agents/skills/ unique skills into discovery scope
 Write-Output "Linking .agents skills..."
 $agentsDir = "$env:USERPROFILE\.agents\skills"

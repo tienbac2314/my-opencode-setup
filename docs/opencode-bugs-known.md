@@ -17,11 +17,12 @@ Known: 2026-07-11
 
 **Note:** `config/opencode.jsonc` is gitignored (contains API keys). Fix must be applied manually after each `bootstrap.ps1` run, or add a post-bootstrap sed/copy step.
 
-## `opencode-lazy-loader` plugin
+## `opencode-lazy-load` plugin
 
-- Shipped locally in `plugins/opencode-lazy-loader` (built from `licat2023` fork)
-- Provides `skill` + `skill_mcp` tools for lazy-loading skill-embedded MCP servers
-- Has nothing to do with subagent tool restrictions — confirmed independent
+- Shipped locally in `plugins/opencode-lazy-load.ts`
+- Strips tool definitions from request payload to save 85%+ tokens per request.
+- Uses `load_tool` to dynamically load tool schemas and skills on-demand.
+- Replaces the old broken `opencode-lazy-loader` npm package.
 
 ## Desktop app plugin resolution
 
@@ -29,28 +30,7 @@ Known: 2026-07-11
 
 **Root cause:** OpenCode Desktop (Electron) only loads plugins from the `plugins/` directory via filesystem auto-discovery.
 
-**Fix:** A bridge plugin at `plugins/lazy-loader.js`:
-```js
-import { OpenCodeEmbeddedSkillMcp } from './opencode-lazy-loader/index.js'
-export const LazyLoader = (ctx) => OpenCodeEmbeddedSkillMcp(ctx)
-```
-The bridge is auto-discovered by both desktop and TUI.
-
-## Skill directory path mismatch (FIXED in licat2023 fork)
-
-**Symptom:** `discoverSkills()` returns empty.
-
-**Root cause:** `opencode-lazy-loader` npm package (`keybrdist/opencode-lazy-loader@1.0.3`) hardcodes singular `'skill'` in `skill-loader.js`.
-
-**Status:** We use the `licat2023/opencode-lazy-loader` fork (11 commits ahead of original), which includes:
-- `3ef7547` — `skill` → `skills` path fix
-- `b930798` — support both dir names, then drop singular
-- `62a744f` — final cleanup, `skills/` only
-- `9f35dfa` — Windows env vars for MCP processes
-- `f5f54cc` — `~` expansion fix for Windows
-- `416b357` — refactor to `tool.execute.after` hook (no custom `skill` tool)
-
-**Solution:** The fork is precompiled and committed directly into the repo at `plugins/opencode-lazy-loader`. No NPM installation required.
+**Fix:** Since we now use single-file `.ts` plugins (`opencode-lazy-load.ts`, `tokens-source.ts`), they are placed directly in the `plugins/` directory. They are auto-discovered correctly by both Desktop and TUI without needing bridge files.
 
 ## `.agents/skills/` not discovered
 
