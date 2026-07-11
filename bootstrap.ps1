@@ -14,6 +14,7 @@ New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
 Copy-Item -Recurse "$PSScriptRoot\config\*" $ConfigDir -Force
 Copy-Item -Recurse "$PSScriptRoot\skills" $ConfigDir -Force
 Copy-Item -Recurse "$PSScriptRoot\commands" "$ConfigDir\commands" -Force
+Copy-Item -Recurse "$PSScriptRoot\plugins" "$ConfigDir\plugins" -Force
 Copy-Item "$PSScriptRoot\AGENTS.md" "$ConfigDir\AGENTS.md" -Force
 
 # 2. Install lazy-loader
