@@ -5,28 +5,51 @@ param(
 $ErrorActionPreference = "Stop"
 $ConfigDir = "$env:USERPROFILE\.config\opencode"
 $Temp = "$env:TEMP\opencode-bootstrap"
+$RepoDir = $PSScriptRoot
 
 Write-Output "=== OpenCode Dotfiles Bootstrap ==="
 
-# 1. Copy config and skills
+# 1. Copy config, skills, commands, and plugins
 Write-Output "Copying config..."
 New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
-Copy-Item -Recurse "$PSScriptRoot\config\*" $ConfigDir -Force
-Copy-Item -Recurse "$PSScriptRoot\skills" $ConfigDir -Force
-Copy-Item -Recurse "$PSScriptRoot\commands" "$ConfigDir\commands" -Force
-Copy-Item -Recurse "$PSScriptRoot\plugins" "$ConfigDir\plugins" -Force
-Copy-Item "$PSScriptRoot\AGENTS.md" "$ConfigDir\AGENTS.md" -Force
+Copy-Item -Recurse "$RepoDir\config\*" $ConfigDir -Force
+Copy-Item -Recurse "$RepoDir\skills" $ConfigDir -Force
+Copy-Item -Recurse "$RepoDir\commands" "$ConfigDir\commands" -Force
+Copy-Item -Recurse "$RepoDir\plugins" "$ConfigDir\plugins" -Force
+Copy-Item "$RepoDir\AGENTS.md" "$ConfigDir\AGENTS.md" -Force
 
-# 2. Install lazy-loader
-Write-Output "Installing opencode-lazy-loader..."
-$lazyOk = npm ls -g opencode-lazy-loader --json 2>$null | ConvertFrom-Json | Select-Object -ExpandProperty dependencies -ErrorAction SilentlyContinue
-if (-not $lazyOk) {
-  npm install -g opencode-lazy-loader 2>&1
-} else {
-  Write-Output "lazy-loader already installed, skipping"
+# 2. Create package.json with deps & install locally
+Write-Output "Installing npm deps..."
+$pkgPath = "$ConfigDir\package.json"
+if (-not (Test-Path $pkgPath)) {
+  @{
+    dependencies = @{
+      "@opencode-ai/plugin" = "latest"
+      "opencode-lazy-loader" = "^1.0.3"
+    }
+  } | ConvertTo-Json | Set-Content $pkgPath -Encoding UTF8
+}
+Push-Location $ConfigDir
+npm install
+Pop-Location
+
+# 3. Patch opencode-lazy-loader to use plural 'skills' path
+#    (keybrdist fork fix — npm package still uses singular 'skill')
+Write-Output "Patching lazy-loader path to 'skills' (plural)..."
+$loaderPath = "$ConfigDir\node_modules\opencode-lazy-loader\dist\skill-loader.js"
+if (Test-Path $loaderPath) {
+  $content = Get-Content $loaderPath -Raw
+  $content = $content.Replace(
+    "join(homedir(), '.config', 'opencode', 'skill')",
+    "join(homedir(), '.config', 'opencode', 'skills')"
+  ).Replace(
+    "join(process.cwd(), '.opencode', 'skill')",
+    "join(process.cwd(), '.opencode', 'skills')"
+  )
+  Set-Content $loaderPath $content -NoNewline
 }
 
-# 3. Install RTK plugin (optional)
+# 4. Install RTK plugin (optional)
 if (-not $SkipRtk) {
   $rtk = Get-Command rtk -ErrorAction SilentlyContinue
   if (-not $rtk) {
@@ -42,16 +65,6 @@ if (-not $SkipRtk) {
   }
 }
 
-# 4. Install npm deps for config dir
-Write-Output "Installing npm deps..."
-if (Test-Path "$ConfigDir\package.json") {
-  Push-Location $ConfigDir
-  npm install
-  Pop-Location
-}
-
 Write-Output ""
 Write-Output "=== Bootstrap complete ==="
 Write-Output "Restart OpenCode to pick up changes."
-Write-Output ""
-Write-Output "=== Post-install cleanup ==="

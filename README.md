@@ -18,13 +18,16 @@ Personal OpenCode configuration with skill-embedded MCPs, lazy loading, and toke
 ~/.config/opencode/
 ├── opencode.jsonc          # Main config
 ├── AGENTS.md               # Behavioral instructions
-├── package.json            # npm deps (plugin SDK)
-├── plugins/                # Local plugins (models-discovery)
+├── package.json            # npm deps (plugin SDK + lazy-loader)
+├── plugins/                # Local plugins (models-discovery, rtk)
 ├── commands/               # Slash commands
-└── skills/
-    ├── docs-fetcher/       # Context7 MCP
+└── skills/                 # 25 skill-embedded MCP servers
     ├── browser-automation/ # Playwright MCP
-    └── devtools-debugger/  # Chrome DevTools MCP
+    ├── devtools-debugger/  # Chrome DevTools MCP
+    ├── docs-fetcher/       # Context7 MCP
+    ├── brainstorming/      # Creative work workflow
+    ├── codex-security-*/   # 10 security scanning skills
+    └── ...                 # planning, review, git, testing, etc
 ```
 
 ## Quick Install (via Bootstrap)

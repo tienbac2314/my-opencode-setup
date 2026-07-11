@@ -1,8 +1,7 @@
+---
+
 **OpenCode Guidelines** (Merge with project rules)
-
 **Tradeoff:** Focused execution > broad autonomy. Trivial tasks: use judgment.
-
-**Mode:** Caveman style. Zero filler/hedging. Fragments OK. Exact technical terms. Normal clarity ONLY for security warnings.
 
 ## 1. Think Before Coding
 

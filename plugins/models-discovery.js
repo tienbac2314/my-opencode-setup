@@ -4,13 +4,6 @@ export const ModelDiscovery = async ({ client }) => {
       const providers = config?.provider
       if (!providers) return
 
-      // Fire discovery in background — never block server startup
-      discoverModels(providers, client).catch(() => {})
-    },
-  }
-}
-
-async function discoverModels(providers, client) {
       for (const [providerId, p] of Object.entries(providers)) {
         const opts = p.options || {}
         const dc = opts.modelsDiscovery || {}
@@ -19,12 +12,12 @@ async function discoverModels(providers, client) {
         const baseURL = opts.baseURL
         if (!baseURL) continue
 
-        const timeout = dc.timeout ?? 10000
+        const timeout = dc.timeout ?? 3000
         const include = dc.include ? new RegExp(dc.include, 'i') : null
         const exclude = dc.exclude ? new RegExp(dc.exclude, 'i') : null
 
         let models = []
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < 2; attempt++) {
           try {
             const url = `${baseURL.replace(/\/+$/, '')}/models`
             const res = await fetch(url, {
@@ -32,19 +25,19 @@ async function discoverModels(providers, client) {
               signal: AbortSignal.timeout(timeout),
             })
             if (!res.ok) {
-              if (attempt < 2) continue
+              if (attempt < 1) continue
               break
             }
             const body = await res.json()
             models = body?.data || []
             break
           } catch {
-            if (attempt === 2) {
+            if (attempt === 1) {
               await client?.app?.log?.({
                 body: {
                   service: 'models-discovery',
                   level: 'warn',
-                  message: `Failed to fetch models for ${providerId} after 3 attempts`,
+                  message: `Failed to fetch models for ${providerId} — keeping existing`,
                 },
               })
             }
@@ -54,7 +47,7 @@ async function discoverModels(providers, client) {
         if (!models.length) continue
 
         const userMeta = p.models || {}
-        const built = {}
+        const built = { ...userMeta }
         const added = []
         const removed = []
 
@@ -90,6 +83,8 @@ async function discoverModels(providers, client) {
           })
         }
       }
+    },
+  }
 }
 
 function inferContext(id) {

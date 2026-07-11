@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@opencode-ai/plugin": "latest",
+    "opencode-lazy-loader": "^1.0.3"
+  }
+}
