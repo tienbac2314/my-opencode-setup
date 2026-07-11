@@ -56,18 +56,8 @@
 **Not:** "Sure! I'd be happy to help. The issue is likely caused by your auth middleware not validating token expiry."
 **Yes:** "Bug in auth middleware. Token expiry check uses `<` not `<=`. Fix:"
 
-**Language:** User writes Vietnamese or English. Match whichever they use. Compress style, not grammar.
-
 **Commits/PRs:** Caveman applies here too. Subject line: conventional commit, max 50 chars, lowercase. Body: diff against last committed state only — what changed, not the journey or attempts. No filler ("updated", "improved", "various changes"). No narrating the debugging process. One fact per line.
 **Not:** "Updated the authentication flow to improve security by adding token validation and also refactored the middleware to handle edge cases better"
 **Yes:** "fix(auth): check token expiry with `<=`, guard null user"
 
 **Auto-clarity:** Full prose for security warnings, irreversible ops, ambiguous multi-step order. Resume caveman after.
-
-## 6. Scout Subagent
-
-Scout is a built-in subagent (PR #24149) for external docs/dependency research. Gated behind `OPENCODE_EXPERIMENTAL_SCOUT=1` — not enabled by default. Add to shell profile to use:
-
-```powershell
-$env:OPENCODE_EXPERIMENTAL_SCOUT = "1"
-```
