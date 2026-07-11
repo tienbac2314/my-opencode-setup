@@ -9,7 +9,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 
 export const RtkOpenCodePlugin: Plugin = async ({ $ }) => {
   try {
-    await $`which rtk`.quiet()
+    await $`where rtk`.quiet()
   } catch {
     console.warn("[rtk] rtk binary not found in PATH — plugin disabled")
     return {}

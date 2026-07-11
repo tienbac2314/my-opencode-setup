@@ -9,36 +9,44 @@ $RepoDir = $PSScriptRoot
 
 Write-Output "=== OpenCode Dotfiles Bootstrap ==="
 
-# 1. Copy config, skills, commands, and plugins
+# 1. Copy config, skills, agents, and plugins
 Write-Output "Copying config..."
 New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
 Copy-Item -Recurse "$RepoDir\config\*" $ConfigDir -Force
+
+# Create opencode.jsonc from example if not present
+$jsonc = "$ConfigDir\opencode.jsonc"
+if (-not (Test-Path $jsonc)) {
+  Copy-Item "$RepoDir\config\opencode.jsonc.example" $jsonc
+  Write-Output "Created opencode.jsonc from example — edit API key before use"
+}
+
 Copy-Item -Recurse "$RepoDir\skills" $ConfigDir -Force
-Copy-Item -Recurse "$RepoDir\commands" "$ConfigDir\commands" -Force
+if (Test-Path "$RepoDir\agents") {
+  New-Item -ItemType Directory -Path "$ConfigDir\agents" -Force | Out-Null
+  Copy-Item -Recurse "$RepoDir\agents\*" "$ConfigDir\agents\" -Force
+}
 Copy-Item -Recurse "$RepoDir\plugins" "$ConfigDir\plugins" -Force
 Copy-Item "$RepoDir\AGENTS.md" "$ConfigDir\AGENTS.md" -Force
 
-# 2. Create package.json with deps & install locally
+# 2. Write package.json from template (always overwrites — keeps deps tracking latest)
 Write-Output "Installing npm deps..."
 $pkgPath = "$ConfigDir\package.json"
-if (-not (Test-Path $pkgPath)) {
-  @{
-    dependencies = @{
-      "@opencode-ai/plugin" = "latest"
-      "opencode-lazy-loader" = "^1.0.3"
-    }
-  } | ConvertTo-Json | Set-Content $pkgPath -Encoding UTF8
-}
+@{
+  type = "module"
+  dependencies = @{
+    "@opencode-ai/plugin" = "latest"
+  }
+} | ConvertTo-Json | Set-Content $pkgPath -Encoding UTF8
 Push-Location $ConfigDir
+Remove-Item package-lock.json -Force -ErrorAction SilentlyContinue
 npm install
 Pop-Location
 
-# 3. Patch opencode-lazy-loader to use plural 'skills' path
-#    (keybrdist fork fix — npm package still uses singular 'skill')
-Write-Output "Patching lazy-loader path to 'skills' (plural)..."
-$loaderPath = "$ConfigDir\node_modules\opencode-lazy-loader\dist\skill-loader.js"
-if (Test-Path $loaderPath) {
-  $content = Get-Content $loaderPath -Raw
+# 3. Patch global opencode-lazy-loader if present (machine-specific: portable Node.js install)
+$globalLoader = "$env:USERPROFILE\Downloads\w\nodejs\node_modules\opencode-lazy-loader\dist\skill-loader.js"
+if (Test-Path $globalLoader) {
+  $content = Get-Content $globalLoader -Raw
   $content = $content.Replace(
     "join(homedir(), '.config', 'opencode', 'skill')",
     "join(homedir(), '.config', 'opencode', 'skills')"
@@ -46,10 +54,24 @@ if (Test-Path $loaderPath) {
     "join(process.cwd(), '.opencode', 'skill')",
     "join(process.cwd(), '.opencode', 'skills')"
   )
-  Set-Content $loaderPath $content -NoNewline
+  Set-Content $globalLoader $content -NoNewline
 }
 
-# 4. Install RTK plugin (optional)
+# 3. Link .agents/skills/ unique skills into discovery scope
+Write-Output "Linking .agents skills..."
+$agentsDir = "$env:USERPROFILE\.agents\skills"
+$existingSkills = Get-ChildItem "$ConfigDir\skills" -Directory | Select-Object -ExpandProperty Name
+if (Test-Path $agentsDir) {
+  Get-ChildItem $agentsDir -Directory | Where-Object { $_.Name -notin $existingSkills } | ForEach-Object {
+    $link = Join-Path "$ConfigDir\skills" $_.Name
+    if (-not (Test-Path $link)) {
+      New-Item -ItemType Junction -Path $link -Target $_.FullName | Out-Null
+      Write-Output "  Linked $($_.Name)"
+    }
+  }
+}
+
+# 5. Install RTK plugin (optional)
 if (-not $SkipRtk) {
   $rtk = Get-Command rtk -ErrorAction SilentlyContinue
   if (-not $rtk) {

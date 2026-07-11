@@ -1,0 +1,43 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "shell": "pwsh",
+  "logLevel": "INFO",
+  "share": "manual",
+  "autoupdate": "notify",
+  "snapshot": true,
+  "instructions": [
+    "AGENTS.md"
+  ],
+  // Free models work without provider config or API key.
+  // To use paid models, add a provider block:
+  // "provider": { "your-provider": { "npm": "@ai-sdk/openai-compatible", "options": { "baseURL": "...", "apiKey": "..." } } },
+  "model": "oc/deepseek-v4-flash-free",
+  "mcp": {},
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "lsp": "allow"
+  },
+  "formatter": false,
+  "lsp": true,
+  "plugin": [
+    "lazy-loader.js"
+  ],
+  "experimental": {
+    "mcp_timeout": 60000
+  },
+  "tool_output": {
+    "max_lines": 500,
+    "max_bytes": 16384
+  },
+  "compaction": {
+    "auto": true,
+    "tail_turns": 20
+  }
+}

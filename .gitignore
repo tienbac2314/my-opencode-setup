@@ -2,3 +2,7 @@
 config/opencode.jsonc
 *.log
 node_modules/
+
+.idea/
+.superpowers/
+
