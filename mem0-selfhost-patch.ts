@@ -9,39 +9,31 @@
  *   2. Injects X-API-Key header for self-hosted auth
  *   3. Short-circuits /v1/ping/ to return self-hosted identity
  *   4. Mocks /v1/organizations/.../projects/... endpoints
+ *   5. Always registers fallback mem0 tools using the official Plugin API,
+ *      so add_memory/search_memories/etc are ALWAYS available to the LLM.
  *
- * Place in ~/.config/opencode/ (root directory, loaded explicitly in the plugin array before npm plugins).
- * Then use the OFFICIAL npm package: "@mem0/opencode-plugin" in your plugin array.
- *
+ * Place in ~/.config/opencode/ (root directory).
  * Required env vars:
- *   MEM0_HOST       - Your self-hosted Mem0 URL (e.g. https://mem0.tienbac.dpdns.org)
- *   MEM0_API_KEY    - Your self-hosted admin API key
+ *   MEM0_HOST       - Self-hosted Mem0 URL
+ *   MEM0_API_KEY    - Self-hosted admin API key
  */
+
+import { tool } from "@opencode-ai/plugin";
 
 const MEM0_HOST = process.env.MEM0_HOST || process.env.MEM0_BASE_URL;
 const MEM0_API_KEY = process.env.MEM0_API_KEY;
 const MEM0_CLOUD = "https://api.mem0.ai";
 
 // Route map: official cloud path prefix -> self-hosted path
-// Official uses versioned paths (/v1/, /v3/), self-hosted uses flat paths
 const ROUTE_REWRITES: [RegExp, string][] = [
-  // POST /v3/memories/add/ -> POST /memories
   [/\/v3\/memories\/add\/?$/, "/memories"],
-  // POST /v1/memories/search/ or /v3/memories/search/ -> POST /search
   [/\/v[13]\/memories\/search\/?$/, "/search"],
-  // GET|PUT|DELETE /v1/memories/{id}/ -> /memories/{id}
   [/\/v1\/memories\/([a-f0-9-]+)\/?$/, "/memories/$1"],
-  // GET /v1/memories/{id}/history/ -> /memories/{id}/history
   [/\/v1\/memories\/([a-f0-9-]+)\/history\/?$/, "/memories/$1/history"],
-  // GET|DELETE /v1/memories/ -> /memories
   [/\/v1\/memories\/?$/, "/memories"],
-  // GET /v1/entities/ -> /entities
   [/\/v1\/entities\/?$/, "/entities"],
-  // GET|DELETE /v1/entities/{type}/{name}/ -> /entities/{type}/{name}
   [/\/v1\/entities\/([^\/]+)\/([^\/]+)\/?$/, "/entities/$1/$2"],
-  // DELETE /v2/entities/{type}/{name}/ -> /entities/{type}/{name}
   [/\/v2\/entities\/([^\/]+)\/([^\/]+)\/?$/, "/entities/$1/$2"],
-  // GET /v1/event/{event_id}/ -> mocked (self-hosted creates are synchronous)
   [/\/v1\/event\/([a-f0-9-]+)\/?$/, "/__event/$1"],
 ];
 
@@ -53,172 +45,218 @@ if (MEM0_HOST && MEM0_API_KEY) {
     init?: RequestInit
   ): Promise<Response> {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
-
-    // Only intercept requests to Mem0 Cloud or to our self-hosted host
     if (!url.includes(MEM0_CLOUD) && !url.includes(MEM0_HOST)) {
       return originalFetch(input, init);
     }
 
-    // Parse the URL
     let targetUrl = url.replace(MEM0_CLOUD, MEM0_HOST);
     const parsed = new URL(targetUrl);
 
-    // --- Mock: /v1/ping/ ---
     if (parsed.pathname.match(/\/v1\/ping\/?$/)) {
-      return new Response(
-        JSON.stringify({
-          status: "ok",
-          orgId: "self-hosted",
-          projectId: "self-hosted",
-          userEmail: "self-hosted",
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ status: "ok", orgId: "self-hosted", projectId: "self-hosted", userEmail: "self-hosted" }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    // --- Mock: /v1/organizations/.../projects/... (getProject, updateProject) ---
     if (parsed.pathname.match(/\/v1\/organizations\/.+\/projects\//)) {
       const method = init?.method?.toUpperCase() || "GET";
-      if (method === "GET") {
-        return new Response(
-          JSON.stringify({ customCategories: [] }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        );
-      }
-      // PUT updateProject — just acknowledge
-      return new Response(
-        JSON.stringify({ success: true }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify(method === "GET" ? { customCategories: [] } : { success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    // --- Rewrite API routes ---
     for (const [pattern, replacement] of ROUTE_REWRITES) {
-      if (pattern.test(parsed.pathname)) {
-        parsed.pathname = parsed.pathname.replace(pattern, replacement);
-        break;
-      }
+      if (pattern.test(parsed.pathname)) { parsed.pathname = parsed.pathname.replace(pattern, replacement); break; }
     }
-
     targetUrl = parsed.toString();
 
-    // --- Mock: /__event/{event_id}/ (get_event_status) ---
-    // Must run AFTER route rewrites so /v1/event/{id} -> /__event/{id} resolves first.
-    // Self-hosted creates are synchronous, so every event is already complete.
     if (parsed.pathname.match(/\/__event\/([a-f0-9-]+)\/?$/)) {
-      return new Response(
-        JSON.stringify({
-          id: parsed.pathname.match(/\/__event\/([a-f0-9-]+)\/?$/)?.[1] || "",
-          status: "SUCCEEDED",
-          result: { success: true },
-          created_at: new Date().toISOString(),
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ id: parsed.pathname.match(/\/__event\/([a-f0-9-]+)\/?$/)?.[1] || "", status: "SUCCEEDED", result: { success: true }, created_at: new Date().toISOString() }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    // Inject X-API-Key header (self-hosted auth)
     const headers = new Headers(init?.headers || {});
     headers.set("X-API-Key", MEM0_API_KEY);
-    // Keep Authorization header too (official sets Token ${apiKey})
 
-    // Modify request body for POST /memories (previously /v3/memories/add/)
-    // Self-hosted MemoryCreate schema: { messages (required), user_id?, agent_id?, run_id?,
-    // metadata?, expiration_date?, infer?, memory_type?, prompt? }
-    // It does NOT accept: text, app_id, scope
     let newInit = { ...init, headers };
     if (parsed.pathname === "/memories" && newInit.method === "POST" && typeof newInit.body === "string") {
       try {
         const bodyObj = JSON.parse(newInit.body);
-        // Convert text -> messages array (cloud format -> self-hosted format)
-        if (bodyObj.text) {
-          bodyObj.messages = [{ role: "user", content: bodyObj.text }];
-          delete bodyObj.text;
-        }
-        // Strip fields the self-hosted MemoryCreate schema rejects
-        delete bodyObj.app_id;
-        delete bodyObj.scope;
+        if (bodyObj.text) { bodyObj.messages = [{ role: "user", content: bodyObj.text }]; delete bodyObj.text; }
+        delete bodyObj.app_id; delete bodyObj.scope;
         newInit.body = JSON.stringify(bodyObj);
-      } catch (e) {
-        // Ignore parse errors
-      }
+      } catch (e) { /* ignore parse errors */ }
     }
-    // Handle 502 from DELETE / DELETE /memories/{id} gracefully
-    // (self-hosted API returns 502 for non-existent IDs instead of 404)
     if (parsed.pathname.match(/^\/memories\//) && newInit.method === "DELETE") {
-      return originalFetch(targetUrl, newInit).then((res) => {
-        if (res.status === 502) {
-          return new Response(
-            JSON.stringify({ message: "Memory not found or already deleted" }),
-            { status: 404, headers: { "Content-Type": "application/json" } }
-          );
-        }
-        return res;
-      });
+      return originalFetch(targetUrl, newInit).then((res) => res.status === 502 ? new Response(JSON.stringify({ message: "Memory not found or already deleted" }), { status: 404, headers: { "Content-Type": "application/json" } }) : res);
     }
 
     return originalFetch(targetUrl, newInit);
   };
 }
 
-import mem0PluginExport from "@mem0/opencode-plugin";
+// ─── Self-hosted API helper ──────────────────────────────────────────────
+
+async function mem0Fetch(path: string, opts?: { method?: string; body?: any; query?: Record<string, string> }): Promise<any> {
+  const base = MEM0_HOST || "http://localhost:8080";
+  const key = MEM0_API_KEY || "";
+  const qs = opts?.query ? "?" + new URLSearchParams(opts.query).toString() : "";
+  const res = await fetch(`${base}${path}${qs}`, {
+    method: opts?.method || "GET",
+    headers: { "X-API-Key": key, "Content-Type": "application/json" },
+    body: opts?.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!res.ok) throw new Error(`mem0 API error ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+function resolveUserId(args: any): string {
+  return args.user_id || process.env.MEM0_USER_ID || process.env.USER || process.env.USERNAME || "user";
+}
+
+// ─── Fallback tools (always registered) ──────────────────────────────────
+
+const fallbackToolDefs: Record<string, any> = {
+  add_memory: tool({
+    description: "Add a new memory. Call when the user informs anything about themselves, their preferences, or anything relevant for future conversations. Set infer to false to store verbatim without LLM fact extraction.",
+    args: {
+      text: tool.schema.string().describe("Memory text content"),
+      user_id: tool.schema.string().optional().describe("User ID"),
+      agent_id: tool.schema.string().optional().describe("Agent ID"),
+      metadata: tool.schema.record(tool.schema.string(), tool.schema.any()).optional().describe("Metadata key-value pairs"),
+      infer: tool.schema.boolean().optional().describe("Set to false to store verbatim without extraction"),
+    },
+    async execute(args: any) {
+      const body: any = { messages: [{ role: "user", content: args.text }], user_id: resolveUserId(args), infer: args.infer ?? true };
+      if (args.agent_id) body.agent_id = args.agent_id;
+      if (args.metadata) body.metadata = args.metadata;
+      return JSON.stringify(await mem0Fetch("/memories", { method: "POST", body }));
+    },
+  }),
+
+  search_memories: tool({
+    description: "Search stored memories by semantic meaning. Use proactively before answering when the request may depend on the user's past work, preferences, or decisions.",
+    args: {
+      query: tool.schema.string().describe("Search query"),
+      user_id: tool.schema.string().optional().describe("User ID"),
+      agent_id: tool.schema.string().optional().describe("Agent ID"),
+      limit: tool.schema.number().optional().describe("Max results (default 10)"),
+    },
+    async execute(args: any) {
+      const filters: any = {};
+      if (args.user_id) filters.user_id = args.user_id;
+      else if (args.agent_id) filters.agent_id = args.agent_id;
+      else filters.user_id = resolveUserId(args);
+      return JSON.stringify(await mem0Fetch("/search", { method: "POST", body: { query: args.query, filters, limit: args.limit ?? 10 } }));
+    },
+  }),
+
+  get_memories: tool({
+    description: "List or browse stored memories without a search query — useful for auditing what is remembered or paging through everything in a scope.",
+    args: {
+      user_id: tool.schema.string().optional().describe("User ID"),
+      agent_id: tool.schema.string().optional().describe("Agent ID"),
+      page: tool.schema.number().optional().describe("Page number"),
+      page_size: tool.schema.number().optional().describe("Page size"),
+    },
+    async execute(args: any) {
+      const query: Record<string, string> = {};
+      if (args.user_id) query.user_id = args.user_id;
+      if (args.agent_id) query.agent_id = args.agent_id;
+      if (args.page) query.page = String(args.page);
+      if (args.page_size) query.page_size = String(args.page_size);
+      if (!query.user_id && !query.agent_id) query.user_id = resolveUserId(args);
+      return JSON.stringify(await mem0Fetch("/memories", { query }));
+    },
+  }),
+
+  get_memory: tool({
+    description: "Fetch one memory by its exact ID (e.g. an ID returned by search_memories or get_memories) to read its full content and metadata.",
+    args: { id: tool.schema.string().describe("The ID of the memory to retrieve") },
+    async execute(args: any) { return JSON.stringify(await mem0Fetch(`/memories/${args.id}`)); },
+  }),
+
+  update_memory: tool({
+    description: "Update an existing memory in place when a stored fact has changed — requires the memory ID. Preserves the ID and history.",
+    args: {
+      id: tool.schema.string().describe("The ID of the memory to update"),
+      text: tool.schema.string().optional().describe("New text content"),
+      metadata: tool.schema.record(tool.schema.string(), tool.schema.any()).optional().describe("New metadata key-value pairs"),
+    },
+    async execute(args: any) {
+      const body: any = {};
+      if (args.text) body.text = args.text;
+      if (args.metadata) body.metadata = args.metadata;
+      return JSON.stringify(await mem0Fetch(`/memories/${args.id}`, { method: "PUT", body }));
+    },
+  }),
+
+  delete_memory: tool({
+    description: "Delete one or more memories by ID when they are wrong, obsolete, or the user asks to forget them. Irreversible — only delete what is clearly no longer wanted.",
+    args: { id: tool.schema.string().describe("The ID of the memory to delete") },
+    async execute(args: any) { return JSON.stringify(await mem0Fetch(`/memories/${args.id}`, { method: "DELETE" })); },
+  }),
+
+  delete_all_memories: tool({
+    description: "Delete ALL memories for a given user or agent. Destructive and irreversible — only use when the user explicitly asks to wipe their memory. Never call speculatively.",
+    args: {
+      user_id: tool.schema.string().optional().describe("User ID whose memories to delete"),
+      agent_id: tool.schema.string().optional().describe("Agent ID whose memories to delete"),
+    },
+    async execute(args: any) {
+      const query: Record<string, string> = {};
+      if (args.user_id) query.user_id = args.user_id;
+      if (args.agent_id) query.agent_id = args.agent_id;
+      if (!query.user_id && !query.agent_id) query.user_id = resolveUserId(args);
+      return JSON.stringify(await mem0Fetch("/memories", { method: "DELETE", query }));
+    },
+  }),
+
+  delete_entities: tool({
+    description: "Delete entire user/agent entities and every memory attached to them. Irreversible — only on explicit user request.",
+    args: {
+      user_id: tool.schema.string().optional().describe("User ID"),
+      agent_id: tool.schema.string().optional().describe("Agent ID"),
+    },
+    async execute(args: any) {
+      if (args.user_id) return JSON.stringify(await mem0Fetch(`/entities/user/${args.user_id}`, { method: "DELETE" }));
+      if (args.agent_id) return JSON.stringify(await mem0Fetch(`/entities/agent/${args.agent_id}`, { method: "DELETE" }));
+      throw new Error("Either user_id or agent_id is required");
+    },
+  }),
+
+  list_entities: tool({
+    description: "List the user/agent/app/run entities that have memories. Use to discover which scopes exist before searching, listing, or deleting within a specific one.",
+    args: {},
+    async execute() { return JSON.stringify(await mem0Fetch("/entities")); },
+  }),
+
+  get_event_status: tool({
+    description: "Check whether an asynchronous memory write (add/update/delete) finished, using the event_id that call returned. Self-hosted creates are synchronous, so this always returns SUCCEEDED.",
+    args: { event_id: tool.schema.string().describe("The ID of the event/async operation to check") },
+    async execute(args: any) { return JSON.stringify({ id: args.event_id, status: "SUCCEEDED", result: { success: true } }); },
+  }),
+};
+
+// ─── Plugin export ────────────────────────────────────────────────────────
 
 export default {
   id: "mem0-selfhost-patch",
-  server: async (ctx, options) => {
-    // 1. Initialize the official plugin and get its hooks
-    let officialHooks = {};
+  server: async (ctx: any, options: any) => {
+    let officialHooks: Record<string, any> = {};
+
+    // Try loading the official @mem0/opencode-plugin for its extra hooks
+    // (chat.message, tool.execute.before/after, compaction, etc.)
     try {
-      officialHooks = await mem0PluginExport(ctx, options);
-    } catch (err) {
-      try {
-        await ctx.client?.app?.log?.({
-          body: {
-            service: "mem0-selfhost-patch",
-            level: "error",
-            message: `Failed to initialize official @mem0/opencode-plugin: ${err.message}`,
-          },
-        });
-      } catch {}
+      const mod = await import("@mem0/opencode-plugin");
+      const mem0PluginExport: any = mod.default || mod;
+      officialHooks = (await mem0PluginExport(ctx, options)) || {};
+    } catch (err: any) {
+      try { await ctx.client?.app?.log?.({ body: { service: "mem0-selfhost-patch", level: "warn", message: `Official plugin unavailable (${err.message}), using fallback tools only` } }); } catch {}
     }
 
-    // 2. Log initialization
+    // Merge fallback tools with official tools (fallbacks fill any gap)
+    officialHooks.tool = { ...fallbackToolDefs, ...(officialHooks.tool || {}) };
+
     try {
-      await ctx.client?.app?.log?.({
-        body: {
-          service: "mem0-selfhost-patch",
-          level: "info",
-          message: `Mem0 self-host patch wrapper initialized successfully. Host: ${MEM0_HOST}`,
-        },
-      });
+      await ctx.client?.app?.log?.({ body: { service: "mem0-selfhost-patch", level: "info", message: `Mem0 patch ready. Tools: ${Object.keys(officialHooks.tool).join(", ")}` } });
     } catch {}
 
-    // 3. Add fallback shell.env hook if official plugin didn't provide one
-    // The official plugin's shell.env hook sets MEM0_USER_ID, MEM0_APP_ID,
-    // MEM0_SESSION_ID, MEM0_BRANCH. If it failed to load (e.g. __require
-    // issue under Node), provide fallback values so skills can still work.
-    if (!officialHooks["shell.env"]) {
-      const fallbackUserId = process.env.MEM0_USER_ID || process.env.USER || process.env.USERNAME || "unknown";
-      const fallbackAppId = process.env.MEM0_APP_ID || "default";
-      const fallbackBranch = process.env.MEM0_BRANCH || "main";
-      const fallbackSessionId = `ses_${Math.floor(Date.now() / 1000)}_${Math.random().toString(36).slice(2, 8)}`;
-      officialHooks["shell.env"] = async (_input: any, output: any) => {
-        if (output?.env) {
-          output.env.MEM0_USER_ID = fallbackUserId;
-          output.env.MEM0_APP_ID = fallbackAppId;
-          output.env.MEM0_SESSION_ID = fallbackSessionId;
-          output.env.MEM0_BRANCH = fallbackBranch;
-          output.env.MEM0_DREAM = "true";
-        }
-      };
-    }
-
-    // 4. Return the merged hooks.
-    // Exporting them here as a file-based plugin ensures OpenCode registers all hooks
-    // (including the "tool" hook containing add_memory, search_memories, etc.)
-    // which the official npm package package.json registers incorrectly.
-    return {
-      ...officialHooks,
-    };
-  }
+    return officialHooks;
+  },
 };

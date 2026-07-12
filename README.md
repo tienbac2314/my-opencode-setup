@@ -159,15 +159,17 @@ The self-hosted instance is configured to use the embedding model `openrouter/nv
    cd ~/mem0/server && docker compose up -d --build --force-recreate mem0
    ```
 
-**Plugin:** Official `@mem0/opencode-plugin` npm package (unmodified) + `mem0-selfhost-patch.ts` fetch interceptor.
+**Plugin:** Official `@mem0/opencode-plugin` npm package (auto-updated) + `mem0-selfhost-patch.ts` hybrid plugin.
 
-The patch plugin (`mem0-selfhost-patch.ts`, loaded explicitly at the root) monkey-patches `globalThis.fetch` to:
-- Rewrite Mem0 Cloud API routes (`/v3/memories/add/`, `/v1/memories/search/`) to self-hosted routes (`/memories`, `/search`)
-- Inject `X-API-Key` header for self-hosted auth
-- Mock `/v1/ping/` to return self-hosted identity
-- Mock organization/project endpoints (not available on open-source Mem0)
+The patch plugin (`mem0-selfhost-patch.ts`, loaded explicitly at the root):
+1. Monkey-patches `globalThis.fetch` to rewrite Cloud API routes to self-hosted paths, inject `X-API-Key`, and mock missing endpoints (`/v1/ping/`, projects).
+2. Imports the official `@mem0/opencode-plugin` via **dynamic import** (inside `try/catch`) for its extra hooks (auto-memory, session compaction, etc.).
+3. **Always** registers its own fallback mem0 tools (`add_memory`, `search_memories`, `get_memories`, `get_memory`, `update_memory`, `delete_memory`, `delete_all_memories`, `list_entities`, `delete_entities`, `get_event_status`) using `tool()` from `@opencode-ai/plugin`. These call the self-hosted API directly, so the tools are **always available** even if the official plugin fails to load (e.g. Bun/Node mismatch).
 
-This means `@mem0/opencode-plugin` auto-updates via npm normally — no re-patching needed.
+Key advantages:
+- `@mem0/opencode-plugin` auto-updates via npm — no re-patching needed
+- Mem0 tools are ALWAYS registered — never a "tool not found" error for LLM agents
+- The fetch interceptor handles body format translation (`text` → `messages`) and strips unsupported fields (`app_id`, `scope`) silently
 
 **Required environment variables (User scope):**
 ```powershell

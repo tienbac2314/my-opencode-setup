@@ -1,6 +1,6 @@
 # OpenCode Known Bugs & Workarounds
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## `experimental.primary_tools` breaks subagent tool access
 
@@ -63,6 +63,68 @@ The `bootstrap.ps1` script handles this automatically.
 - Mock project-level metadata endpoints
 
 This allows running the unmodified official `@mem0/opencode-plugin` from npm, supporting automatic updates without manual re-patching.
+
+## Mem0 plugin: `@mem0/opencode-plugin` built with Bun, fails under Node
+
+**Symptom:** The official plugin's `dist/index.js` is Bun-bundled (uses `__require`). Under Node.js (e.g. `bash` tool in agent sessions), `import("@mem0/opencode-plugin")` throws `TypeError: __require is not a function`. This cascades: if the static top-level import fails, the entire plugin module crashes and NO tools (add_memory, search_memories...) get registered.
+
+**Workaround in `mem0-selfhost-patch.ts`:**
+- Import is now **dynamic** (`await import(...)`) inside `try/catch` — module-level crash is impossible
+- **Fallback tools** are always registered via `tool()` from `@opencode-ai/plugin` (which resolves fine). They call the self-hosted REST API directly
+- Even if the official plugin loads successfully, fallback tools fill any gaps
+
+**Upstream PR needed:** The official `@mem0/opencode-plugin` dist should be built for dual platform (Bun + Node), or include a CJS wrapper. File: `integrations/mem0-plugin/.opencode-plugin/package.json` — add `"exports": { "require": "./dist/index.cjs", "import": "./dist/index.js" }` and build both formats.
+
+---
+
+## Mem0 plugin: `app_id` and `scope` fields cause silent memory loss
+
+**Symptom:** `add_memory` creates return `{ results: [] }` and the memory is silently discarded. No error.
+
+**Root cause:** Self-hosted Mem0 API's `MemoryCreate` schema does NOT accept `app_id` or `scope` fields. The official plugin sends both (resolved from project identity + user args). The self-hosted FastAPI treats unknown fields as invalid and skips the record.
+
+**Workaround in `mem0-selfhost-patch.ts`:**
+- Body translation converts `text` → `messages: [{role: "user", content: text}]` (self-hosted format)
+- Strips `app_id` and `scope` before sending to self-hosted API
+
+**Upstream PR needed:** Self-hosted Mem0 should ignore unknown fields in `MemoryCreate` rather than silently failing. File: `server/main.py` — add `model_config = {"extra": "ignore"}` to `MemoryCreate` pydantic model.
+
+---
+
+## Mem0 plugin: `get_event_status` calls non-existent endpoint
+
+**Symptom:** `get_event_status` tool always fails.
+
+**Root cause:** The plugin calls `GET /v1/event/{event_id}/` which is a Cloud-only API. Self-hosted Mem0 has no event/status endpoint because creates are synchronous.
+
+**Workaround in `mem0-selfhost-patch.ts`:**
+- Route rewrite maps `/v1/event/{id}/` → `/__event/{id}`
+- Mock intercepts `/__event/{id}` and returns `{ status: "SUCCEEDED" }` immediately
+
+**Upstream PR needed:** Self-hosted Mem0 should either implement a lightweight event status endpoint or the plugin should detect self-hosted mode and skip event polling.
+
+---
+
+## Mem0 plugin: `DELETE /memories/{non-existent}` returns 502
+
+**Symptom:** Deleting a non-existent memory throws `error code: 502` instead of a clean 404.
+
+**Workaround in `mem0-selfhost-patch.ts`:**
+- Fetch interceptor catches HTTP 502 responses on DELETE `/memories/{id}` and converts them to 404.
+
+**Upstream PR needed:** Self-hosted Mem0 API should return 404 for non-existent resources.
+
+---
+
+## Mem0 plugin: `shell.env` hook may not fire env vars
+
+**Symptom:** `MEM0_USER_ID`, `MEM0_APP_ID`, `MEM0_SESSION_ID`, `MEM0_BRANCH` are empty in some sessions.
+
+**Root cause:** The plugin's `shell.env` hook relies on the official plugin loading successfully. If it fails (Bun/Node mismatch), no env vars are injected.
+
+**Workaround:** The `shell.env` hook in `mem0-selfhost-patch.ts` provides fallback values. No longer needed since fallback tools resolve identity via `process.env.USER`.
+
+---
 
 ## oh-my-opencode-slim installer overwrites
 
