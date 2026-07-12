@@ -1,7 +1,8 @@
 # Mem0 Self-Hosted Integration — Full Architecture & Session Log
 
-**Date:** 2026-07-12/13
-**Context:** This document captures the full journey of integrating `@mem0/opencode-plugin` with a self-hosted Mem0 instance — the bugs found, the architectural decisions, and the fix rationale. It is the canonical reference for why things are the way they are.
+**Date:** 2026-07-12 to 2026-07-13
+**Author:** tienbac2314 + OpenCode agent
+**Context:** Integrating `@mem0/opencode-plugin` with a self-hosted Mem0 instance on `mem0.tienbac.dpdns.org`. This is the canonical reference for the full journey — the 10 bugs found, the architectural decisions, the fix rationale, and the upstream PRs needed.
 
 ---
 
@@ -9,57 +10,305 @@
 
 | Time | Event |
 |------|-------|
-| **Before** | Using a **forked** `@mem0/opencode-plugin` (`integrations/mem0-plugin/`) — manually patched `dist/index.js` to point at self-hosted paths |
-| **Step 1** | Discovered the official plugin fails against self-hosted Mem0 (missing `/v1/` prefix, no org/project endpoints, `__require` under Node.js) |
-| **Step 2** | Created `mem0-selfhost-patch.ts` — a **fetch interceptor** that rewrites Cloud API routes to self-hosted paths at runtime **without** forking the npm package |
-| **Step 3** | Discovered 10 bugs via systematic REST API testing with `curl` |
-| **Step 4** | Fixed `app_id`/`scope` stripping (silent memory loss), `get_event_status` route (mocked), DELETE 502→404 conversion |
-| **Step 5** | Refactored to **dynamic import** — the official plugin is now optional, loaded inside `try/catch` |
-| **Step 6** | Registered **fallback tools** via `tool()` from `@opencode-ai/plugin` — always available, never a "tool not found" error |
-| **Step 7** | Documented all bugs in `opencode-bugs-known.md` |
-| **Step 8** | Updated `README.md` + committed to `opencode-dotfiles` |
-| **Final** | `b69bb62` — final docs commit |
+| **Phase 0 (2026-07-12)** | Original state: forked `@mem0/opencode-plugin` in `integrations/mem0-plugin/` — manually patched `dist/index.js` |
+| **Phase 1** | Discovered the fork was painful to maintain (every npm update required re-patching). Replaced with **fetch interceptor** (`mem0-selfhost-patch.ts`) |
+| **Phase 2** | Systematic REST API testing with `curl` revealed **10 distinct bugs** in the official plugin against self-hosted Mem0 |
+| **Phase 3** | Refactored patch to **dynamic import** (`await import(...)` in `try/catch`) — official plugin is now optional |
+| **Phase 4** | Registered **11 fallback tools** via `tool()` from `@opencode-ai/plugin` — always available, never a "tool not found" error |
+| **Phase 5** | Documented all bugs in `opencode-bugs-known.md` + comprehensive session log (this file) |
+| **Final** | `b69bb62` (bugs ref) + `c37c7fe` (this doc) |
 
-## 2. The 10 Bugs
+## 2. The 10 Bugs (with actual evidence)
 
-### Bug 1-2: `app_id` and `scope` fields cause silent memory loss
-**Where:** Self-hosted Mem0 API's `MemoryCreate` schema — does NOT accept `app_id` or `scope`.  
-**What happens:** `add_memory` returns `{ results: [] }` — no error, memory silently discarded.  
-**Fix:** Strip `app_id` and `scope` from POST body before sending. Also convert `text`→`messages` format.
+### Bug 1: `text` field unsupported (HTTP 422)
 
-### Bug 3: `get_event_status` calls non-existent endpoint
-**Where:** Route `/v1/event/{id}/` — Cloud-only API.  
-**Fix:** Rewrite to `/__event/{id}` and mock return `{ status: "SUCCEEDED" }` immediately.
+**Symptom:** `add_memory` tool fails with HTTP 422: `Field required: messages`. Memory never stored.
 
-### Bug 4: `shell.env` hook may not fire env vars
-**Where:** Only fires if official plugin loads successfully.  
-**Status:** Not critical — fallback tools resolve `userId` via `process.env.USER`.
+**Test:**
+```bash
+curl -X POST "$MEM0_HOST/memories" \
+  -H "X-API-Key: $MEM0_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"user likes Rust","user_id":"bug_test_v3"}'
+```
 
-### Bug 5-6: Missing `~/.mem0/settings.json` and `~/.mem0/mem0-dream-state.json`
-**Where:** Plugin settings files.  
-**Fix:** Created with `default_scope: project`, `dream: true`.
+**Response (HTTP 422):**
+```json
+{"detail":[{"type":"missing","loc":["body","messages"],"msg":"Field required",
+  "input":{"text":"user likes Rust","user_id":"bug_test_v3"}}]}
+```
 
-### Bug 7: Search requires `user_id`/`agent_id`/`run_id` filter
-**Where:** Self-hosted search API.  
-**Fix:** Plugin SDK already handles this — user passes `user_id` or `agent_id` in search args.
+**Root cause:** Self-hosted Mem0's `MemoryCreate` schema requires `messages: [{role, content}]` array. The official plugin sends `text: "string"` (Cloud API format).
 
-### Bug 8: DELETE 502→404 conversion
-**Where:** Deleting non-existent memory returns 502.  
-**Fix:** Fetch interceptor catches 502 on DELETE and converts to 404.
+**Fix in `mem0-selfhost-patch.ts:80`:**
+```typescript
+if (bodyObj.text) {
+  bodyObj.messages = [{ role: "user", content: bodyObj.text }];
+  delete bodyObj.text;
+}
+```
 
-### Bug 9: `delete_all` needs identifier
-**Where:** `DELETE /memories` with no filter.  
-**Fix:** Plugin SDK already passes `user_id`/`agent_id` — no change needed.
+**Upstream PR:** Self-hosted Mem0 should accept `text` as a shortcut for `messages`. File: `server/main.py` — extend `MemoryCreate` validator.
 
-### Bug 10: `__require` under Node.js
-**Where:** `@mem0/opencode-plugin` v0.2.1 is Bun-bundled.  
-**Fix:** Dynamic import (`await import(...)`) inside `try/catch` — module-level crash is impossible.
+---
+
+### Bug 2: `app_id` field silently dropped (silent memory loss)
+
+**Symptom:** `add_memory` returns `{ results: [] }` — NO error, but memory is NOT stored. Silent data loss.
+
+**Test (with app_id):**
+```bash
+curl -X POST "$MEM0_HOST/memories" \
+  -H "X-API-Key: $MEM0_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"hi"}],"user_id":"bug_test_v4","app_id":"opencode"}'
+```
+
+**Response (HTTP 200 — BUT no memory created):**
+```json
+{"results":[]}
+```
+
+**Root cause:** Self-hosted Mem0's pydantic `MemoryCreate` model uses default `extra = "forbid"`. Unknown fields (`app_id`) cause validation to skip the record instead of erroring. The official plugin always sends `app_id` (project identifier from git remote).
+
+**Fix in `mem0-selfhost-patch.ts:81`:**
+```typescript
+delete bodyObj.app_id;
+delete bodyObj.scope;
+```
+
+**Upstream PR:** Add `model_config = {"extra": "ignore"}` to `MemoryCreate`. File: `server/main.py`.
+
+---
+
+### Bug 3: `scope` field silently dropped (silent memory loss)
+
+**Symptom:** Same as Bug 2 but with `scope: "project"` field. Memory silently not stored.
+
+**Test:**
+```bash
+curl -X POST "$MEM0_HOST/memories" \
+  -H "X-API-Key: $MEM0_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"hi"}],"user_id":"bug_test_v5","scope":"project"}'
+```
+
+**Response (HTTP 200, empty results):**
+```json
+{"results":[]}
+```
+
+**Root cause:** Same as Bug 2 — `scope` is a Cloud-only concept. Self-hosted doesn't have org/project scoping (it's all flat per-user/per-agent).
+
+**Fix:** Same as Bug 2 — strip `scope`.
+
+**Upstream PR:** Same as Bug 2.
+
+---
+
+### Bug 4: `get_event_status` calls non-existent endpoint (HTTP 404)
+
+**Symptom:** `get_event_status` tool always fails. The plugin polls `/v1/event/{id}/` waiting for async completion.
+
+**Test:**
+```bash
+curl "$MEM0_HOST/v1/event/abc123/" -H "X-API-Key: $MEM0_API_KEY"
+```
+
+**Response (HTTP 404):**
+```json
+{"detail":"Not Found"}
+```
+
+**Root cause:** Self-hosted Mem0 has no event/status endpoint because creates are synchronous. Cloud API supports async event polling; self-hosted returns the created memory directly in the POST response.
+
+**Fix in `mem0-selfhost-patch.ts:37, 69-71`:**
+```typescript
+// Route rewrite
+[/\/v1\/event\/([a-f0-9-]+)\/?$/, "/__event/$1"],
+
+// Mock short-circuit
+if (parsed.pathname.match(/\/__event\/([a-f0-9-]+)\/?$/)) {
+  return new Response(JSON.stringify({
+    id: parsed.pathname.match(/\/__event\/([a-f0-9-]+)\/?$/)?.[1] || "",
+    status: "SUCCEEDED",
+    result: { success: true },
+    created_at: new Date().toISOString()
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+```
+
+**Upstream PR:** Self-hosted Mem0 should either implement a lightweight event endpoint OR document that creates are synchronous. The plugin should also detect self-hosted mode and skip event polling.
+
+---
+
+### Bug 5: `/v1/ping/` endpoint doesn't exist (HTTP 404)
+
+**Symptom:** Plugin initialization fails when calling the Cloud-only health check endpoint.
+
+**Test:**
+```bash
+curl "$MEM0_HOST/v1/ping/" -H "X-API-Key: $MEM0_API_KEY"
+```
+
+**Response (HTTP 404):**
+```json
+{"detail":"Not Found"}
+```
+
+**Root cause:** Cloud API uses `/v1/ping/` for health checks; self-hosted has `/configure` or `/docs` instead.
+
+**Fix in `mem0-selfhost-patch.ts:55-57`:**
+```typescript
+if (parsed.pathname.match(/\/v1\/ping\/?$/)) {
+  return new Response(JSON.stringify({
+    status: "ok",
+    orgId: "self-hosted",
+    projectId: "self-hosted",
+    userEmail: "self-hosted"
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+```
+
+**Upstream PR:** Add `/v1/ping/` to self-hosted API. File: `server/main.py` — `@app.get("/v1/ping/")`.
+
+---
+
+### Bug 6: `/v1/organizations/.../projects/...` doesn't exist (HTTP 404)
+
+**Symptom:** Plugin fetches project metadata on startup. Self-hosted has no org/project hierarchy.
+
+**Test:**
+```bash
+curl "$MEM0_HOST/v1/organizations/org-123/projects/proj-456/" -H "X-API-Key: $MEM0_API_KEY"
+```
+
+**Response (HTTP 404):**
+```json
+{"detail":"Not Found"}
+```
+
+**Root cause:** Cloud API has multi-tenant org/project structure; self-hosted is single-tenant.
+
+**Fix in `mem0-selfhost-patch.ts:59-62`:**
+```typescript
+if (parsed.pathname.match(/\/v1\/organizations\/.+\/projects\//)) {
+  const method = init?.method?.toUpperCase() || "GET";
+  return new Response(JSON.stringify(
+    method === "GET" ? { customCategories: [] } : { success: true }
+  ), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+```
+
+**Upstream PR:** Plugin should detect self-hosted mode and skip org/project calls entirely.
+
+---
+
+### Bug 7: Search requires filter (HTTP 400)
+
+**Symptom:** `search_memories` tool fails with HTTP 400 when called without `user_id`/`agent_id`/`run_id` filter.
+
+**Test (no filter):**
+```bash
+curl -X POST "$MEM0_HOST/search" \
+  -H "X-API-Key: $MEM0_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"hello","limit":5}'
+```
+
+**Response (HTTP 400):**
+```json
+{"detail":"filters must contain at least one of: user_id, agent_id, run_id.
+  Example: filters={'user_id': 'u1'}"}
+```
+
+**Root cause:** Self-hosted search API requires at least one filter to scope the query. The official plugin sometimes calls search without filters (e.g. for "global" searches).
+
+**Fix in `mem0-selfhost-patch.ts:140-146` (fallback tool):**
+```typescript
+search_memories: tool({
+  args: { query, user_id?, agent_id?, limit? },
+  async execute(args) {
+    const filters: any = {};
+    if (args.user_id) filters.user_id = args.user_id;
+    else if (args.agent_id) filters.agent_id = args.agent_id;
+    else filters.user_id = resolveUserId(args);  // always provide a filter
+    return mem0Fetch("/search", { method: "POST", body: { query: args.query, filters, limit: args.limit ?? 10 } });
+  }
+})
+```
+
+**Upstream PR:** Plugin should always pass a filter, defaulting to `user_id = process.env.USER`.
+
+---
+
+### Bug 8: Auth required (HTTP 401)
+
+**Symptom:** All API calls fail with HTTP 401 if `X-API-Key` header is missing.
+
+**Test:**
+```bash
+curl -X POST "$MEM0_HOST/memories" \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"hi"}],"user_id":"x"}'
+```
+
+**Response (HTTP 401):**
+```json
+{"detail":"Authentication required. Provide a Bearer token or X-API-Key header."}
+```
+
+**Root cause:** Self-hosted Mem0 requires authentication (unlike pre-auth builds that allowed open access with empty `ADMIN_API_KEY`). The official plugin doesn't inject `X-API-Key` for self-hosted mode.
+
+**Fix in `mem0-selfhost-patch.ts:73-74` (fetch interceptor):**
+```typescript
+const headers = new Headers(init?.headers || {});
+headers.set("X-API-Key", MEM0_API_KEY);
+```
+
+**Upstream PR:** Plugin should read `MEM0_API_KEY` env var and inject `X-API-Key` header when `MEM0_HOST` is set.
+
+---
+
+### Bug 9: `__require` not defined under Node.js (TypeError)
+
+**Symptom:** When OpenCode TUI spawns a subagent via Node.js (e.g. `bash` tool), the official plugin crashes with `TypeError: __require is not a function`. All tools disappear.
+
+**Test:** Run `bash -c "node -e 'require(\"@mem0/opencode-plugin\")'"` — fails.
+
+**Root cause:** `@mem0/opencode-plugin` v0.2.1 `dist/index.js` is built with Bun, which uses `__require` as a bundler pragma. Node.js doesn't recognize it.
+
+**Fix in `mem0-selfhost-patch.ts:246-251` (dynamic import):**
+```typescript
+try {
+  const mod = await import("@mem0/opencode-plugin");
+  officialHooks = (await mod.default(ctx, options)) || {};
+} catch (err: any) {
+  // Log warning, fallback tools remain registered
+}
+```
+
+**Upstream PR:** Build plugin for dual platform (Bun + Node). Add `"exports": { "require": "./dist/index.cjs", "import": "./dist/index.js" }`. File: `integrations/mem0-plugin/.opencode-plugin/package.json`.
+
+---
+
+### Bug 10: `shell.env` hook fails under Node.js
+
+**Symptom:** `MEM0_USER_ID`, `MEM0_APP_ID`, `MEM0_SESSION_ID`, `MEM0_BRANCH` env vars are empty in shell sessions when official plugin fails.
+
+**Root cause:** The `shell.env` hook only fires if the official plugin loads successfully. If it crashes (Bug 9), no env vars are injected.
+
+**Fix:** Fallback tools resolve `userId` via `process.env.USER` when no `user_id` arg is passed. The patch no longer provides a fallback `shell.env` hook (was too autonomous, injected `MEM0_DREAM = "true"`).
+
+**Upstream PR:** Plugin should decouple `shell.env` from the broken dist, or the patch should provide a fallback env injection.
+
+---
 
 ## 3. Architecture Decisions
 
 ### Decision 1: Fetch interceptor instead of fork
 **Why:** Forking `dist/index.js` requires re-patching every npm update. A fetch interceptor is stateless — it rewrites routes at runtime.  
-**Tradeoff:** Slightly slower (route matching on every call) vs. no maintenance burden.
+**Tradeoff:** Slightly slower (route matching on every call) vs. zero maintenance burden.
 
 ### Decision 2: Dynamic import instead of static
 **Why:** Static `import "@mem0/opencode-plugin"` at the top of the file crashes the entire plugin if it fails. Dynamic import inside `try/catch` is safe — the official plugin is optional.  
@@ -110,7 +359,7 @@ mem0-selfhost-patch.ts does:
 │    - add_memory, search_memories, get_memories,             │
 │    - get_memory, update_memory, delete_memory,              │
 │    - delete_all_memories, list_entities, delete_entities,   │
-│    - get_event_status, delete_entities                       │
+│    - get_event_status                                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -120,56 +369,49 @@ This is the contract the patch targets:
 
 **Self-hosted Mem0 API:**
 - Base: `https://mem0.tienbac.dpdns.org`
-- Auth: `X-API-Key` header
+- Auth: `X-API-Key` header (required)
 - Endpoints:
   - `POST /memories` — create (body: `{ messages, user_id?, agent_id?, metadata?, infer? }`)
   - `GET /memories` — list (query: `?user_id&agent_id&page&page_size`)
   - `GET /memories/{id}` — get
-  - `POST /search` — search (body: `{ query, filters, limit }`)
+  - `POST /search` — search (body: `{ query, filters: {user_id|agent_id|run_id}, limit }`)
   - `PUT /memories/{id}` — update (body: `{ text?, metadata? }`)
-  - `DELETE /memories/{id}` — delete
+  - `DELETE /memories/{id}` — delete (returns 404 for non-existent)
   - `DELETE /memories` — delete all (query: `?user_id&agent_id`)
   - `GET /entities` — list entities
   - `DELETE /entities/{type}/{id}` — delete entity
 
 **NOT on the self-hosted API:**
-- `POST /memories` with `app_id` or `scope`
-- `POST /memories` with `text` (must use `messages`)
+- `POST /memories` with `app_id` or `scope` (silently dropped → HTTP 200 with empty results)
+- `POST /memories` with `text` (HTTP 422 — must use `messages`)
 - `GET /v1/event/{id}` — no events endpoint
 - `GET /v1/organizations/.../projects/...` — no org/project hierarchy
+- `GET /v1/ping/` — no health check endpoint
 
 ## 6. Verification
 
-Tested with `verify-patch.ts` (Bun-based):
-- `add_memory` — returns created memory with ID
-- `search_memories` — returns matching memories
-- `get_memories` — returns list with pagination
-- `get_memory` — returns single memory by ID
-- `update_memory` — updates content
-- `delete_memory` — deletes and confirms
-- `get_event_status` — returns SUCCEEDED (synchronous mock)
-- `list_entities` — returns entity list
-- `delete_entities` — deletes by type
-- `delete_all_memories` — deletes all for user
-
-All pass under both:
-- **Bun** (official plugin loads, tools merge)
-- **Node.js** (official plugin fails at `__require`, fallback tools take over)
+Run `bun verify-patch.ts` to verify the patch works against your VPS:
+- `GET https://api.mem0.ai/v1/ping/` → mock returns `{ status: "ok", orgId: "self-hosted" }`
+- `GET https://api.mem0.ai/v1/organizations/org/projects/proj/` → mock returns `{ customCategories: [] }`
+- `POST https://api.mem0.ai/v3/memories/search/` → rewritten to `$MEM0_HOST/search`, returns real results from VPS
 
 ## 7. Upstream PRs Needed
 
-| File | Change |
-|------|--------|
-| `integrations/mem0-plugin/.opencode-plugin/package.json` | Add `"tool"` to `"opencode.hooks"` |
-| `integrations/mem0-plugin/.opencode-plugin/package.json` | Add `"exports"` for dual CJS/ESM |
-| `integrations/mem0-plugin/dist/index.js` | Build for both Bun+Node (avoid `__require`) |
-| `server/main.py` | Add `model_config = {"extra": "ignore"}` to `MemoryCreate` |
-| `server/main.py` | Add `GET /__event/{id}` endpoint (even if synchronous) |
-| `server/main.py` | Return 404 instead of 502 for `DELETE /memories/{non-existent}` |
-| `server/main.py` | Accept `text` field in `MemoryCreate` (for compatibility) |
+| File | Change | Bug |
+|------|--------|-----|
+| `integrations/mem0-plugin/.opencode-plugin/package.json` | Add `"tool"` to `"opencode.hooks"` | Plugin-level bug |
+| `integrations/mem0-plugin/.opencode-plugin/package.json` | Add `"exports"` for dual CJS/ESM | Bug 9 |
+| `integrations/mem0-plugin/dist/index.js` | Build for both Bun+Node (avoid `__require`) | Bug 9 |
+| `server/main.py` | Add `model_config = {"extra": "ignore"}` to `MemoryCreate` | Bugs 2, 3 |
+| `server/main.py` | Add `GET /v1/ping/` endpoint | Bug 5 |
+| `server/main.py` | Add `GET /v1/organizations/.../projects/...` endpoint OR plugin skips it | Bug 6 |
+| `server/main.py` | Add `GET /__event/{id}` endpoint (even if synchronous) | Bug 4 |
+| `server/main.py` | Accept `text` field in `MemoryCreate` (for compatibility) | Bug 1 |
+| `server/main.py` | Return 404 instead of 502 for `DELETE /memories/{non-existent}` | Bug 8 (already fixed in current VPS) |
 
 ## 8. See Also
 
-- `docs/opencode-bugs-known.md` — brief bug reference (this doc is the expanded version)
+- `docs/opencode-bugs-known.md` — brief bug reference
 - `README.md` — user-facing docs with setup guide
 - `mem0-selfhost-patch.ts` — the actual plugin code
+- `verify-patch.ts` — verification script
