@@ -74,25 +74,7 @@ $githubPlugins = @(
 )
 
 Write-Host "`n[2/5] File-based plugins (GitHub raw)..." -ForegroundColor Yellow
-foreach ($p in $githubPlugins) {
-  try {
-    if ($DryRun) {
-      Write-Host "  [dry-run] Would fetch $($p.Name) from $($p.Url)" -ForegroundColor DarkGray
-      continue
-    }
-    $newContent = Invoke-RestMethod -Uri $p.Url -TimeoutSec 15
-    $oldContent = if (Test-Path $p.Target) { Get-Content $p.Target -Raw } else { "" }
-    if ($newContent -ne $oldContent) {
-      Set-Content -Path $p.Target -Value $newContent -NoNewline -Encoding UTF8
-      $updated += $p.Name
-      Write-Host "  [ok] $($p.Name) updated" -ForegroundColor Green
-    } else {
-      Write-Host "  [ok] $($p.Name) already latest" -ForegroundColor DarkGray
-    }
-  } catch {
-    Write-Host "  [warn] $($p.Name) fetch failed: $($_.Exception.Message)" -ForegroundColor Red
-  }
-}
+Write-Host "  [skip] Using local repo copies for now until upstream PRs are merged" -ForegroundColor DarkGray
 
 # --- 3. tokens command file ---
 Write-Host "`n[3/5] Command files (GitHub raw)..." -ForegroundColor Yellow

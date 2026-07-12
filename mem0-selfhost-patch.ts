@@ -10,7 +10,7 @@
  *   3. Short-circuits /v1/ping/ to return self-hosted identity
  *   4. Mocks /v1/organizations/.../projects/... endpoints
  *
- * Place in ~/.config/opencode/plugins/ (auto-discovered, loads before npm plugins).
+ * Place in ~/.config/opencode/ (root directory, loaded explicitly in the plugin array before npm plugins).
  * Then use the OFFICIAL npm package: "@mem0/opencode-plugin" in your plugin array.
  *
  * Required env vars:
@@ -101,12 +101,64 @@ if (MEM0_HOST && MEM0_API_KEY) {
     headers.set("X-API-Key", MEM0_API_KEY);
     // Keep Authorization header too (official sets Token ${apiKey})
 
-    return originalFetch(targetUrl, {
-      ...init,
-      headers,
-    });
+    // Modify request body for POST /memories (previously /v3/memories/add/)
+    let newInit = { ...init, headers };
+    if (parsed.pathname === "/memories" && newInit.method === "POST" && typeof newInit.body === "string") {
+      try {
+        const bodyObj = JSON.parse(newInit.body);
+        if (bodyObj.text) {
+          // Self-hosted expects { messages: [{role, content}], ... } instead of { text, ... }
+          bodyObj.messages = [{ role: "user", content: bodyObj.text }];
+          delete bodyObj.text;
+          newInit.body = JSON.stringify(bodyObj);
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+
+    return originalFetch(targetUrl, newInit);
   };
 }
 
-// Export empty plugin — the patching happens at module load time via the fetch override
-export default {};
+import mem0PluginExport from "@mem0/opencode-plugin";
+
+export default {
+  id: "mem0-selfhost-patch",
+  server: async (ctx, options) => {
+    // 1. Initialize the official plugin and get its hooks
+    let officialHooks = {};
+    try {
+      officialHooks = await mem0PluginExport(ctx, options);
+    } catch (err) {
+      try {
+        await ctx.client?.app?.log?.({
+          body: {
+            service: "mem0-selfhost-patch",
+            level: "error",
+            message: `Failed to initialize official @mem0/opencode-plugin: ${err.message}`,
+          },
+        });
+      } catch {}
+    }
+
+    // 2. Log initialization
+    try {
+      await ctx.client?.app?.log?.({
+        body: {
+          service: "mem0-selfhost-patch",
+          level: "info",
+          message: `Mem0 self-host patch wrapper initialized successfully. Host: ${MEM0_HOST}`,
+        },
+      });
+    } catch {}
+
+    // 3. Return the merged hooks.
+    // Exporting them here as a file-based plugin ensures OpenCode registers all hooks
+    // (including the "tool" hook containing add_memory, search_memories, etc.)
+    // which the official npm package package.json registers incorrectly.
+    return {
+      ...officialHooks,
+    };
+  }
+};

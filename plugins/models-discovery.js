@@ -88,7 +88,7 @@ export const ModelDiscovery = async ({ client }) => {
             if (ctx) {
               entry.limit = ctx
             } else {
-              entry.limit = { context: 300000, output: 65536 }
+              entry.limit = { context: 1000000, output: 65536 }
             }
           }
 

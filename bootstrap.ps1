@@ -32,29 +32,35 @@ Copy-Item -Recurse "$RepoDir\skills" $ConfigDir -Force
 # Copy agents
 if (Test-Path "$RepoDir\agents") {
   New-Item -ItemType Directory -Path "$ConfigDir\agents" -Force | Out-Null
+  # Migration: remove legacy web-search-modules from agents/ (moved to data/)
+  $legacyModules = "$ConfigDir\agents\web-search-modules"
+  if (Test-Path $legacyModules) {
+    Remove-Item $legacyModules -Recurse -Force
+    Write-Output "  Migrated web-search-modules from agents/ to data/"
+  }
   Copy-Item -Recurse "$RepoDir\agents\*" "$ConfigDir\agents\" -Force
+}
+
+# Copy data (web-search-strategies, etc.)
+if (Test-Path "$RepoDir\data") {
+  New-Item -ItemType Directory -Path "$ConfigDir\data" -Force | Out-Null
+  Copy-Item -Recurse "$RepoDir\data\*" "$ConfigDir\data\" -Force
 }
 
 # ─── 2. Install file-based plugins (auto-discovered from plugins/ dir) ───
 Write-Output "[2/8] Installing file-based plugins..."
 $pluginsDir = "$ConfigDir\plugins"
 New-Item -ItemType Directory -Path $pluginsDir -Force | Out-Null
-Copy-Item -Recurse "$RepoDir\plugins\*" "$pluginsDir\" -Force
-Write-Output "  Installed: models-discovery.js"
 
-# Download latest lazy-load and tokens-source from GitHub
-$githubPlugins = @(
-  @{ Name = "lazy-load.ts"; Url = "https://raw.githubusercontent.com/omarwaly-ai/opencode-lazy-loading/main/plugins/opencode-lazy-load.ts" },
-  @{ Name = "0-tokens-source.ts"; Url = "https://raw.githubusercontent.com/omarwaly-ai/OpenCode-tokens-source/main/plugins/tokens-source.ts" }
-)
-foreach ($p in $githubPlugins) {
-  try {
-    Invoke-RestMethod -Uri $p.Url -OutFile "$pluginsDir\$($p.Name)" -TimeoutSec 15
-    Write-Output "  Downloaded: $($p.Name)"
-  } catch {
-    Write-Output "  [warn] Failed to download $($p.Name): $($_.Exception.Message)"
-  }
+# Clean up legacy/duplicate plugins from previous configurations
+$legacyPlugins = @("opencode-lazy-load.ts", "tokens-source.ts", "rtk.ts", "mem0-selfhost-patch.ts")
+foreach ($lp in $legacyPlugins) {
+  Remove-Item (Join-Path $pluginsDir $lp) -Force -ErrorAction SilentlyContinue
 }
+
+Copy-Item -Recurse "$RepoDir\plugins\*" "$pluginsDir\" -Force
+Copy-Item "$RepoDir\mem0-selfhost-patch.ts" "$ConfigDir\mem0-selfhost-patch.ts" -Force
+Write-Output "  Installed: models-discovery.js and mem0-selfhost-patch.ts"
 
 # Download tokens command
 New-Item -ItemType Directory -Path "$ConfigDir\commands" -Force | Out-Null
@@ -73,6 +79,7 @@ $pkgPath = "$ConfigDir\package.json"
   dependencies = @{
     "@opencode-ai/plugin" = "latest"
     "@ai-sdk/openai-compatible" = "latest"
+    "@mem0/opencode-plugin" = "latest"
   }
 } | ConvertTo-Json | Set-Content $pkgPath -Encoding UTF8
 Push-Location $ConfigDir
@@ -117,10 +124,10 @@ if (-not $SkipCodeGraph) {
 # ─── 6. Mem0 self-hosted fetch patch ───
 if (-not $SkipMem0) {
   Write-Output "[6/8] Installing Mem0 self-hosted patch..."
-  # The patch plugin (mem0-selfhost-patch.ts) is already in plugins/ dir
-  # and gets copied in step 2. It monkey-patches fetch() at runtime so the
-  # official @mem0/opencode-plugin npm package works with self-hosted Mem0.
-  Write-Output "  mem0-selfhost-patch.ts installed (auto-discovered from plugins/)"
+  # The patch plugin (mem0-selfhost-patch.ts) is copied to the root ConfigDir
+  # and loaded explicitly in the plugin array of opencode.jsonc to run before
+  # the official @mem0/opencode-plugin is loaded at startup.
+  Write-Output "  mem0-selfhost-patch.ts installed (loaded explicitly in opencode.jsonc)"
   Write-Output "  Required env vars: MEM0_HOST, MEM0_API_KEY"
   if (-not $env:MEM0_HOST) {
     Write-Output "  [warn] MEM0_HOST not set — run: [System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')"

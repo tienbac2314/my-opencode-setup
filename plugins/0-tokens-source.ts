@@ -494,6 +494,11 @@ function wrapFetchForTools(): void {
 // ─── Plugin ──────────────────────────────────────────────────────────────────
 
 const TokensSourcePlugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
+  if ((globalThis as any).__tokens_source_loaded__) {
+    return {}
+  }
+  (globalThis as any).__tokens_source_loaded__ = true
+
   const { client } = input
 
   // Wrap fetch FIRST (before lazy-load wraps it). This makes tokens-source

@@ -17,12 +17,17 @@ Last updated: 2026-07-12
 
 ## Plugin load order
 
-Auto-discovered plugins from `~/.config/opencode/plugins/` load by filename sort BEFORE config `plugin` array entries. This is why:
-- `0-tokens-source.ts` has the `0-` prefix (loads first)
-- `lazy-load.ts` loads second (needs tokens-source's fetch wrapper already in place)
-- `models-discovery.js` loads third
+Auto-discovered plugins from `~/.config/opencode/plugins/` load by filename sort BEFORE config `plugin` array entries.
+Config array plugins load in order.
+Because `@mem0/opencode-plugin` performs startup initialization (e.g. calls to `/v1/ping/`), `mem0-selfhost-patch.ts` must load *before* it to successfully rewrite those requests.
+To solve this, we place `mem0-selfhost-patch.ts` in the root of `~/.config/opencode/` (so it is not auto-loaded out of order) and list it explicitly at the very beginning of the `plugin` array in `opencode.jsonc` and `tui.json`.
 
-Config array plugins load after: `opencode-update-notifier`, `./opencode-mem0-plugin`, `oh-my-opencode-slim`.
+Plugin load order is now:
+1. `./mem0-selfhost-patch.ts` (loaded first explicitly, patches fetch globally)
+2. `opencode-update-notifier`
+3. `@mem0/opencode-plugin` (loads third, uses patched fetch)
+4. `oh-my-opencode-slim`
+5. Auto-discovered plugins (`0-tokens-source.ts`, `lazy-load.ts`, `models-discovery.js`) load alphabetically after the config array. Since `mem0-selfhost-patch.ts` already patched fetch at the root, the later wrappers chain on top cleanly.
 
 ## Desktop app plugin resolution
 
@@ -52,12 +57,12 @@ The `bootstrap.ps1` script handles this automatically.
 
 **Symptom:** Official `@mem0/opencode-plugin` fails against self-hosted Mem0 (missing `/v1/` prefix, no org/project endpoints).
 
-**Fix:** Local patched copy at `~/.config/opencode/opencode-mem0-plugin/`. Patches:
-- `MEM0_HOST` env var support
-- `X-API-Key` header injection
-- Mocked `getProject`/`updateProject`
+**Fix:** A thin interceptor `mem0-selfhost-patch.ts` is loaded explicitly in `opencode.jsonc` before `@mem0/opencode-plugin`. It monkey-patches `globalThis.fetch` to:
+- Redirect Mem0 Cloud routes to self-hosted FastAPI routes
+- Inject `X-API-Key` headers
+- Mock project-level metadata endpoints
 
-Re-patch required if upstream `@mem0/opencode-plugin` updates significantly.
+This allows running the unmodified official `@mem0/opencode-plugin` from npm, supporting automatic updates without manual re-patching.
 
 ## oh-my-opencode-slim installer overwrites
 

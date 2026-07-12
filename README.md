@@ -27,10 +27,10 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 ├── tui.json                          # TUI plugin config
 ├── AGENTS.md                         # Behavioral instructions
 ├── package.json                      # npm deps (plugin SDK + provider SDK)
+├── mem0-selfhost-patch.ts            # Fetch interceptor for self-hosted Mem0 (loaded first explicitly)
 ├── plugins/                          # Auto-discovered file-based plugins
 │   ├── 0-tokens-source.ts            # Token usage breakdown (prefix ensures load order)
 │   ├── lazy-load.ts                  # Lazy tool loading to save tokens
-│   ├── mem0-selfhost-patch.ts        # Fetch interceptor for self-hosted Mem0
 │   └── models-discovery.js           # Auto-discover 9router models with modalities
 ├── opencode-mem0-plugin/             # (LEGACY, can be removed — replaced by fetch patch)
 │   ├── dist/index.js                 # Was: patched Bun bundle for self-hosted
@@ -55,6 +55,7 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 │   ├── tokens-source.ts              # Snapshot of tokens-source plugin
 │   └── models-discovery.js           # Custom model discovery plugin
 ├── mem0-plugin/                      # Patched Mem0 plugin for self-hosted
+├── mem0-selfhost-patch.ts            # Fetch interceptor for self-hosted Mem0
 ├── skills/                           # All skills
 ├── agents/                           # Sub-agents
 ├── docs/
@@ -125,7 +126,7 @@ Persistent long-term memory via self-hosted Mem0 on VPS.
 
 **Plugin:** Official `@mem0/opencode-plugin` npm package (unmodified) + `mem0-selfhost-patch.ts` fetch interceptor.
 
-The patch plugin (`plugins/mem0-selfhost-patch.ts`, auto-discovered) monkey-patches `globalThis.fetch` to:
+The patch plugin (`mem0-selfhost-patch.ts`, loaded explicitly at the root) monkey-patches `globalThis.fetch` to:
 - Rewrite Mem0 Cloud API routes (`/v3/memories/add/`, `/v1/memories/search/`) to self-hosted routes (`/memories`, `/search`)
 - Inject `X-API-Key` header for self-hosted auth
 - Mock `/v1/ping/` to return self-hosted identity
@@ -215,7 +216,7 @@ Key ones:
 **Daily:** The `update-plugins.ps1` script handles routine updates with a 12h cooldown.
 
 **When Mem0 upstream changes routes:**
-The `mem0-selfhost-patch.ts` fetch interceptor handles route mapping. If Mem0 changes its self-hosted API routes, update the `ROUTE_REWRITES` array in `plugins/mem0-selfhost-patch.ts`. No need to re-patch the npm package.
+The `mem0-selfhost-patch.ts` fetch interceptor handles route mapping. If Mem0 changes its self-hosted API routes, update the `ROUTE_REWRITES` array in `mem0-selfhost-patch.ts`. No need to re-patch the npm package.
 
 **When switching models:** Edit both files:
 - `~/.config/opencode/opencode.jsonc` — `model` and `agent` section
@@ -229,7 +230,7 @@ codegraph init
 
 ## Architecture Notes
 
-- **Plugin load order:** Auto-discovered files from `plugins/` load by filename sort, then config `plugin` array entries load in order. `0-tokens-source.ts` < `lazy-load.ts` < `mem0-selfhost-patch.ts` < `models-discovery.js` (auto), then `opencode-update-notifier` < `@mem0/opencode-plugin` < `oh-my-opencode-slim` (config array).
+- **Plugin load order:** The patch `./mem0-selfhost-patch.ts` is placed at the root ConfigDir and loaded explicitly as the first entry in the config `plugin` array to guarantee it intercepts requests before `@mem0/opencode-plugin` initializes at startup. Auto-discovered plugins (`0-tokens-source.ts`, `lazy-load.ts`, `models-discovery.js`) load alphabetically after the config array, chaining their fetch wrappers cleanly.
 - **omo-slim overrides default agents:** The installer disables OpenCode's built-in `general` and `explore` agents, replacing them with the Pantheon (Orchestrator, Oracle, etc.).
 - **Context window strategy:** lazy-load strips ~85% of tool schemas. Compaction is enabled with 20 tail turns. CodeGraph provides surgical context to avoid file-crawling bloat.
 - **No Honcho:** We replaced Honcho with self-hosted Mem0. Honcho was cloud-dependent. Mem0 runs on your VPS with your own LLM routing.

@@ -48,16 +48,6 @@ const originals = new Map<string, string>()
 const originalSchemas = new Map<string, any>()
 
 /**
- * Full original descriptions for MCP tools, keyed by tool name.
- * MCP tools bypass the tool.definition hook (verified at session/tools.ts
- * L117-201). The fetch wrapper identifies MCP tools as: any tool in
- * body.tools that's NOT in `originals` (built-in) and NOT `load_tool`.
- * Saves their description + schema before removing them from the HTTP body.
- */
-const mcpOriginals = new Map<string, string>()
-const mcpSchemas = new Map<string, any>()
-
-/**
  * Per-turn loaded-tools tracking. Keyed by sessionID. Persists across
  * multiple fetch calls within the SAME turn (one user message = one turn,
  * which may span multiple LLM API calls as the LLM does multi-step tool use).
@@ -94,12 +84,6 @@ function buildPointerList(): string {
     const brief = briefOf(desc)
     pointers.push(brief ? `- ${name} - ${brief}` : `- ${name}`)
   }
-  // MCP tools are deliberately EXCLUDED from the pointer list.
-  // They are still callable directly (the SSE transform passes them through
-  // untouched), but they do NOT appear in load_tool's description.
-  // This keeps load_tool's token footprint minimal — MCP tools add zero
-  // tokens to the tools array. The LLM discovers MCP tools through other
-  // channels (system prompt, etc.) and can call them directly.
   return pointers.sort().join("\n")
 }
 
@@ -178,27 +162,20 @@ function wrapFetch(): void {
         try {
           const body = JSON.parse(bodyText)
           if (Array.isArray(body.tools)) {
-            // Save MCP tools (not in originals) before removing them
+            // Capture schemas and descriptions for all tools on the fly
             for (const t of body.tools) {
               const fn = t?.function
               const name = fn?.name || t?.name || ""
               if (!name || name === "load_tool") continue
-              if (originals.has(name)) {
-                // Built-in tool: capture its JSON schema here (jsonSchema is
-                // undefined in the tool.definition hook — it's only generated
-                // by the AI SDK at serialization time, which is this point).
-                // MCP tools are NOT touched here — they fall through below.
-                const params = fn?.parameters || t?.parameters
-                if (params && !originalSchemas.has(name)) {
-                  originalSchemas.set(name, params)
-                }
-                continue
-              }
+
               const desc = fn?.description || t?.description || ""
-              const params = fn?.parameters || t?.parameters || {}
-              if (desc && !mcpOriginals.has(name)) {
-                mcpOriginals.set(name, desc)
-                mcpSchemas.set(name, params)
+              const params = fn?.parameters || t?.parameters
+
+              if (desc && !originals.has(name)) {
+                originals.set(name, desc)
+              }
+              if (params && !originalSchemas.has(name)) {
+                originalSchemas.set(name, params)
               }
             }
 
@@ -525,6 +502,11 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
 // ─── Plugin ──────────────────────────────────────────────────────────────────
 
 const LazyLoadPlugin: Plugin = async (_input, _options) => {
+  if ((globalThis as any).__lazy_load_loaded__) {
+    return {}
+  }
+  (globalThis as any).__lazy_load_loaded__ = true
+
   // Wrap fetch BEFORE the first LLM call. The wrapper removes all tools
   // except load_tool from the request body, and rewrites load_tool execute
   // calls to real tool calls in the SSE response — no throw, no error, no prompt.
@@ -550,11 +532,11 @@ const LazyLoadPlugin: Plugin = async (_input, _options) => {
             .describe("Tool name to load instructions for"),
         },
         async execute(args, context) {
-          const full = originals.get(args.name) || mcpOriginals.get(args.name)
-          const schema = originalSchemas.get(args.name) || mcpSchemas.get(args.name)
+          const full = originals.get(args.name)
+          const schema = originalSchemas.get(args.name)
 
           if (!full) {
-            const allKnown = Array.from(new Set([...originals.keys(), ...mcpOriginals.keys()])).sort()
+            const allKnown = Array.from(originals.keys()).sort()
             return {
               title: `Unknown tool: ${args.name}`,
               output: `No instructions found for "${args.name}". Available tools: ${allKnown.join(", ")}`,
