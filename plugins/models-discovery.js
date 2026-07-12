@@ -49,7 +49,6 @@ export const ModelDiscovery = async ({ client }) => {
         const userMeta = p.models || {}
         const built = { ...userMeta }
         const added = []
-        const removed = []
 
         for (const m of models) {
           const id = m.id || m.name
@@ -58,27 +57,54 @@ export const ModelDiscovery = async ({ client }) => {
           if (exclude && exclude.test(id)) continue
 
           const prev = userMeta[id]
-          built[id] = prev ? { ...prev } : { name: id }
-          if (!built[id].limit) {
-            const ctx = inferContext(id)
-            if (ctx) built[id].limit = ctx
+          if (prev) {
+            built[id] = { ...prev }
+            continue
           }
-          added.push(id)
-        }
 
-        for (const id of Object.keys(userMeta)) {
-          if (!built[id]) removed.push(id)
+          const entry = { name: id }
+          const caps = m.capabilities || {}
+
+          if (caps.vision === true) {
+            entry.modalities = { input: ["text", "image"], output: ["text"] }
+          } else if (caps.vision === false) {
+            entry.modalities = { input: ["text"], output: ["text"] }
+          } else {
+            entry.modalities = { input: ["text", "image"], output: ["text"] }
+          }
+
+          if (caps.contextWindow || caps.maxOutput) {
+            entry.limit = {}
+            if (caps.contextWindow) entry.limit.context = caps.contextWindow
+            if (caps.maxOutput) entry.limit.output = caps.maxOutput
+          }
+
+          if (caps.thinking === true) {
+            entry.reasoning = true
+          }
+
+          if (!entry.limit) {
+            const ctx = inferContext(id)
+            if (ctx) {
+              entry.limit = ctx
+            } else {
+              entry.limit = { context: 300000, output: 65536 }
+            }
+          }
+
+          built[id] = entry
+          added.push(id)
         }
 
         p.models = built
 
-        if (added.length || removed.length) {
+        if (added.length) {
           await client?.app?.log?.({
             body: {
               service: 'models-discovery',
               level: 'info',
-              message: `${providerId}: ${added.length} models, ${removed.length} stale removed`,
-              extra: { added, removed },
+              message: `${providerId}: ${added.length} new models discovered`,
+              extra: { added },
             },
           })
         }

@@ -1,51 +1,66 @@
 # OpenCode Known Bugs & Workarounds
 
-Known: 2026-07-11
+Last updated: 2026-07-12
 
 ## `experimental.primary_tools` breaks subagent tool access
 
-**Symptom:** Explore subagent (and potentially other subagents) claims it only has `webfetch`/`websearch`. Missing `read`, `glob`, `grep`, `task` tools. Agent effectively crippled.
+**Symptom:** Explore subagent claims it only has `webfetch`/`websearch`. Missing `read`, `glob`, `grep`, `task` tools.
 
-**Root cause:** `experimental.primary_tools` list (`["edit", "bash", "read", "glob", "grep"]`) is inverted for subagents — they lose access to tools in that list. Only tools NOT in `primary_tools` survive.
+**Root cause:** `experimental.primary_tools` list is inverted for subagents — they lose access to tools in that list.
 
-**Fix:** Remove `primary_tools` from `experimental` block:
+**Fix:** Do NOT add `primary_tools` to `experimental` block. Keep it as:
 ```jsonc
 "experimental": {
   "mcp_timeout": 60000
 }
 ```
 
-**Note:** `config/opencode.jsonc` is gitignored (contains API keys). Fix must be applied manually after each `bootstrap.ps1` run, or add a post-bootstrap sed/copy step.
+## Plugin load order
 
-## `opencode-lazy-load` plugin
+Auto-discovered plugins from `~/.config/opencode/plugins/` load by filename sort BEFORE config `plugin` array entries. This is why:
+- `0-tokens-source.ts` has the `0-` prefix (loads first)
+- `lazy-load.ts` loads second (needs tokens-source's fetch wrapper already in place)
+- `models-discovery.js` loads third
 
-- Shipped locally in `plugins/opencode-lazy-load.ts`
-- Strips tool definitions from request payload to save 85%+ tokens per request.
-- Uses `load_tool` to dynamically load tool schemas and skills on-demand.
-- Replaces the old broken `opencode-lazy-loader` npm package.
+Config array plugins load after: `opencode-update-notifier`, `./opencode-mem0-plugin`, `oh-my-opencode-slim`.
 
 ## Desktop app plugin resolution
 
-**Symptom:** `skill(name="...")` returns "Available skills: none" despite correct setup.
+**Symptom:** `skill(name="...")` returns "Available skills: none" in Desktop app.
 
-**Root cause:** OpenCode Desktop (Electron) only loads plugins from the `plugins/` directory via filesystem auto-discovery.
-
-**Fix:** Since we now use single-file `.ts` plugins (`opencode-lazy-load.ts`, `tokens-source.ts`), they are placed directly in the `plugins/` directory. They are auto-discovered correctly by both Desktop and TUI without needing bridge files.
+**Fix:** File-based `.ts` plugins in `plugins/` dir are auto-discovered by both Desktop and TUI. No bridge files needed.
 
 ## `.agents/skills/` not discovered
 
-**Symptom:** Skills in `~/.agents/skills/` (handoff, find-skills, grill-me, etc.) don't appear in `skill()` tool even though listed in system prompt's `available_skills`.
+**Symptom:** Skills in `~/.agents/skills/` don't appear in `skill()` tool.
 
-**Root cause:** `opencode-lazy-loader` only scans `~/.config/opencode/skills/` and `.opencode/skills/`. The `.agents/` directory is a separate path not in discovery scope. The system prompt's `available_skills` list is hardcoded agent metadata, not a live filesystem scan.
-
-**Fix:** Create junctions from `.config/opencode/skills/{name}` → `.agents/skills/{name}` for the 6 unique skills:
+**Fix:** Create junctions into `~/.config/opencode/skills/`:
+```powershell
+New-Item -ItemType Junction -Path "$env:USERPROFILE\.config\opencode\skills\skill-name" -Target "$env:USERPROFILE\.agents\skills\skill-name"
 ```
-find-skills, grill-me, grill-with-docs, handoff, notebooklm, vshell
-```
-Overlapping skills (brainstorming, debugging, etc.) are intentionally NOT junctioned — the `.config/opencode/skills/` versions are the canonical ones.
+The `bootstrap.ps1` script handles this automatically.
 
-## Missing `"type": "module"` in package.json
+## 9router model modalities
 
-**Symptom:** Server log warning: `MODULE_TYPELESS_PACKAGE_JSON — Reparsing as ES module because module syntax was detected.`
+**Symptom:** "Cannot read image.png (this model does not support image input)" with 9router models.
 
-**Fix:** Add `"type": "module"` to `~/.config/opencode/package.json`. Required because `plugins/models-discovery.js` and `plugins/lazy-loader.js` use ESM syntax.
+**Root cause:** Newly discovered models got `{ name: id }` with no `modalities`, so OpenCode assumed text-only.
+
+**Fix:** `models-discovery.js` plugin now defaults to `text+image` input for all discovered models. It checks `capabilities.vision` from the API response and falls back to multimodal.
+
+## Mem0 plugin self-hosted compatibility
+
+**Symptom:** Official `@mem0/opencode-plugin` fails against self-hosted Mem0 (missing `/v1/` prefix, no org/project endpoints).
+
+**Fix:** Local patched copy at `~/.config/opencode/opencode-mem0-plugin/`. Patches:
+- `MEM0_HOST` env var support
+- `X-API-Key` header injection
+- Mocked `getProject`/`updateProject`
+
+Re-patch required if upstream `@mem0/opencode-plugin` updates significantly.
+
+## oh-my-opencode-slim installer overwrites
+
+**Symptom:** Running `bunx oh-my-opencode-slim@latest install` may reorder the `plugin` array in `opencode.jsonc` and overwrite `oh-my-opencode-slim.json`.
+
+**Workaround:** The `bootstrap.ps1` restores the preset config after running the installer. The `update-plugins.ps1` script also runs the installer but your custom preset is preserved because omo-slim only writes defaults if the config file doesn't exist.

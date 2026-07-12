@@ -1,80 +1,235 @@
 # OpenCode Dotfiles
 
-Personal OpenCode configuration with skill-embedded MCPs, lazy loading, and token-optimized skill routing.
+Personal OpenCode configuration: multi-agent orchestration, semantic code intelligence, persistent memory, token optimization, and auto-updating plugins.
 
 ## Stack
 
-| Component | Choice |
-|-----------|--------|
-| **Shell** | PowerShell 7+ |
-| **Provider** | 9router (OpenAI-compatible) |
-| **Model** | deepseek-v4-flash-free (free tier) |
-| **MCP Lazy Loader** | [omarwaly-ai/opencode-lazy-loading](https://github.com/omarwaly-ai/opencode-lazy-loading) |
-| **Token Monitor** | [omarwaly-ai/OpenCode-tokens-source](https://github.com/omarwaly-ai/OpenCode-tokens-source) |
-| **LSP** | Auto-discovered |
+| Component | Tool | Purpose |
+|-----------|------|---------|
+| **Shell** | PowerShell 7+ | All scripts target pwsh |
+| **Provider** | 9router (OpenAI-compatible) | Self-hosted LLM gateway at `tienbac.dpdns.org` |
+| **Default Model** | `9router/ag/gemini-3.5-flash-low` | Free tier via 9router |
+| **Agent Orchestrator** | [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) | Multi-agent delegation (Orchestrator, Oracle, Explorer, Librarian, Designer, Fixer) |
+| **Code Intelligence** | [CodeGraph](https://github.com/colbymchenry/codegraph) | Semantic code graph — surgical context, fewer tool calls |
+| **Long-Term Memory** | [Mem0](https://github.com/mem0ai/mem0) (self-hosted) | Persistent memory across sessions via VPS |
+| **Token Optimization** | [opencode-lazy-loading](https://github.com/omarwaly-ai/opencode-lazy-loading) | Strips tool schemas, saves ~85% base tokens |
+| **Token Monitoring** | [OpenCode-tokens-source](https://github.com/omarwaly-ai/OpenCode-tokens-source) | Per-source token usage breakdown |
+| **Model Discovery** | `models-discovery.js` (custom) | Auto-discovers models from 9router with correct modalities |
+| **Update Notifier** | [opencode-update-notifier](https://github.com/tim-hilde/opencode-update-notifier) | Alerts when pinned npm plugins have updates |
+| **LSP** | Built-in | Auto-discovered, enabled globally |
 
-## Structure
+## Directory Structure
 
 ```
 ~/.config/opencode/
-├── opencode.jsonc              # Main config
-├── AGENTS.md                   # Behavioral instructions
-├── package.json                # npm deps: plugin SDK + lazy-loader
+├── opencode.jsonc                    # Main config (API keys — gitignored)
+├── oh-my-opencode-slim.json          # Agent orchestration presets
+├── tui.json                          # TUI plugin config
+├── AGENTS.md                         # Behavioral instructions
+├── package.json                      # npm deps (plugin SDK + provider SDK)
+├── plugins/                          # Auto-discovered file-based plugins
+│   ├── 0-tokens-source.ts            # Token usage breakdown (prefix ensures load order)
+│   ├── lazy-load.ts                  # Lazy tool loading to save tokens
+│   └── models-discovery.js           # Auto-discover 9router models with modalities
+├── opencode-mem0-plugin/             # Patched Mem0 plugin for self-hosted instance
+│   ├── dist/index.js                 # Bun-bundled entry point (patched for self-hosted)
+│   └── opencode-skills/              # mem0-remember, mem0-search, etc.
+├── commands/
+│   └── tokens.md                     # /tokens slash command
+├── skills/                           # 30+ skills (security, research, debugging, etc.)
+└── agents/                           # Sub-agents (web-search, etc.)
+```
+
+## Setup Repo Structure
+
+```
+~/opencode-dotfiles/
+├── bootstrap.ps1                     # Full installer script
+├── update-plugins.ps1                # Plugin auto-updater (12h cooldown)
+├── config/
+│   ├── opencode.jsonc.example        # Template config (no secrets)
+│   └── oh-my-opencode-slim.json      # Agent preset config (9router default)
 ├── plugins/
-│   ├── opencode-lazy-load.ts   # Lazy loads tools and MCPs to save tokens
-│   ├── tokens-source.ts        # Breaks down token usage per source
-│   ├── models-discovery.js     # Auto-discovers LLM models from provider
-│   └── rtk.ts                  # RTK agent protocol (optional)
-├── agents/                     # Sub-agents
-│   ├── web-search.md           # Web researcher sub-agent (used by research skills)
-│   └── web-search-modules/     # Search strategy modules
-├── skills/                     # 31 skills (3 with embedded MCPs)
-│   ├── browser-automation/     # Playwright MCP
-│   ├── devtools-debugger/      # Chrome DevTools MCP
-│   ├── docs-fetcher/           # Context7 MCP
-│   ├── brainstorming/          # Creative work workflow
-│   ├── research/               # Deep research workflow (5 skills)
-│   ├── research-add-fields/
-│   ├── research-add-items/
-│   ├── research-deep/
-│   ├── research-report/
-│   ├── codex-security-*/       # 10 security scanning skills
-│   ├── systematic-debugging/   # Debugging workflow
-│   ├── test-driven-development/
-│   ├── writing-plans/          # Implementation planning
-│   └── ...                     # review, git, dispatching, etc
+│   ├── opencode-lazy-load.ts         # Snapshot of lazy-load plugin
+│   ├── tokens-source.ts              # Snapshot of tokens-source plugin
+│   └── models-discovery.js           # Custom model discovery plugin
+├── mem0-plugin/                      # Patched Mem0 plugin for self-hosted
+├── skills/                           # All skills
+├── agents/                           # Sub-agents
+├── docs/
+│   └── opencode-bugs-known.md        # Known bugs and workarounds
+├── AGENTS.md                         # LLM behavioral instructions
+└── README.md                         # This file
 ```
 
 ## Quick Install
 
 ```powershell
-git clone https://github.com/tienbac2314/opencode-dotfiles ~\opencode-dotfiles
-cd ~\opencode-dotfiles
+git clone https://github.com/tienbac2314/my-opencode-setup ~/opencode-dotfiles
+cd ~/opencode-dotfiles
 .\bootstrap.ps1
 ```
 
-Then restart OpenCode.
+Then:
+1. Edit `~/.config/opencode/opencode.jsonc` — set your 9router API key
+2. Restart your terminal (env vars need a new session)
+3. Start OpenCode and type `ping all agents` to verify
+
+## Plugin Details
+
+### oh-my-opencode-slim (V2)
+
+Multi-agent orchestration. Routes tasks to specialized agents:
+
+| Agent | Role | Model |
+|-------|------|-------|
+| **Orchestrator** | Plans, delegates, reconciles | `9router/ag/gemini-3.5-flash-low` |
+| **Oracle** | Architecture review, deep analysis | `9router/ag/gemini-3.5-flash-low` |
+| **Explorer** | Codebase reconnaissance | `9router/ag/gemini-3.5-flash-low` |
+| **Librarian** | Documentation lookup, web search | `9router/ag/gemini-3.5-flash-low` |
+| **Designer** | UI/UX work | `9router/ag/gemini-3.5-flash-low` |
+| **Fixer** | Bug fixes, implementations | `9router/ag/gemini-3.5-flash-low` |
+
+Config: `~/.config/opencode/oh-my-opencode-slim.json`
+
+Three presets available: `9router` (active), `openai`, `opencode-go`.
+
+To switch presets: change `"preset"` value in the config file.
+
+### CodeGraph
+
+Semantic code intelligence. Builds a knowledge graph of symbols, call edges, and dependencies.
+
+- **Install:** `npm install -g @colbymchenry/codegraph` (or via `bootstrap.ps1`)
+- **Wire up:** `codegraph install --yes` (auto-configures OpenCode MCP)
+- **Index a project:** `codegraph init` (run inside each project dir)
+- **Auto-syncs:** Watches for file changes after init — no re-indexing needed
+
+Reduces tool calls by 40-80% and speeds up responses by providing surgical context.
+
+### Mem0 (Self-Hosted)
+
+Persistent long-term memory via self-hosted Mem0 on VPS.
+
+**Architecture:**
+- VPS runs Mem0 REST API (Docker: `mem0-dev-mem0-1`) on port 8888
+- Cloudflare tunnel exposes it as `https://mem0.tienbac.dpdns.org`
+- LLM/embedding calls route through 9router on the same VPS
+- pgvector for vector storage
+
+**Dashboard:**
+- URL: `http://161.118.215.190:3000`
+- Email: `admin@mem0.dev`
+- Password: `skibidi123`
+
+**Plugin:** Local patched copy of `@mem0/opencode-plugin` at `~/.config/opencode/opencode-mem0-plugin/`
+
+Patches applied to `dist/index.js`:
+- Added `MEM0_HOST` / `MEM0_BASE_URL` env var support for custom endpoint
+- Injected `X-API-Key` headers for self-hosted auth
+- Rewrote API paths to match self-hosted FastAPI routes
+- Mocked `getProject` / `updateProject` (not available on open-source Mem0)
+
+**Required environment variables (User scope):**
+```powershell
+[System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')
+[System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', 'YOUR_MEM0_ADMIN_KEY', 'User')
+```
+
+**Skills:** mem0-remember, mem0-search, mem0-forget, mem0-dream, mem0-pin, mem0-scope, mem0-status, mem0-tour, mem0-context-loader
+
+### Token Optimization Plugins
+
+**lazy-load.ts** — Strips all tool/MCP schema definitions from every LLM request. The model calls `load_tool(name)` to fetch individual schemas on-demand. Saves ~85% base tokens per turn.
+
+**0-tokens-source.ts** — Wraps the fetch pipeline to track token usage by source (system prompt, tools, user messages, etc.). Use `/tokens` command to view breakdown.
+
+**Load order matters:** The `0-` prefix ensures tokens-source loads before lazy-load so the fetch wrapper nesting is correct.
+
+### models-discovery.js
+
+Custom plugin that queries `9router/v1/models` on startup and auto-registers discovered models with correct `modalities` (text+image input). Solves the "this model does not support image input" error for 9router models.
+
+Falls back to `text+image` input for models without explicit capabilities metadata.
+
+### opencode-update-notifier
+
+Checks pinned npm plugin entries for newer versions. Shows TUI toast if updates available. Does NOT auto-update.
+
+To benefit from it, pin your plugin versions: `"oh-my-opencode-slim@x.y.z"` instead of `"oh-my-opencode-slim"`.
+
+## Auto-Update Script
+
+`update-plugins.ps1` updates everything in one shot:
+
+```powershell
+# Normal run (respects 12h cooldown)
+.\update-plugins.ps1
+
+# Force update now
+.\update-plugins.ps1 -Force
+
+# Dry run (show what would change)
+.\update-plugins.ps1 -DryRun -Force
+```
+
+What it updates:
+1. **oh-my-opencode-slim** via `bunx` (re-runs installer)
+2. **lazy-load.ts** and **0-tokens-source.ts** from GitHub raw
+3. **tokens.md** command from GitHub raw
+4. **CodeGraph CLI** via `codegraph upgrade`
+5. **npm deps** in `package.json` via `npm update`
+
+**Not auto-updated** (intentionally):
+- `models-discovery.js` — custom, only you maintain it
+- `opencode-mem0-plugin` — patched, manual update required if upstream changes
+- `opencode-update-notifier` — updated via npm deps step
+
+## Environment Variables
+
+| Variable | Scope | Value | Purpose |
+|----------|-------|-------|---------|
+| `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS` | User | `true` | Enable omo-slim background agent dispatch |
+| `MEM0_HOST` | User | `https://mem0.tienbac.dpdns.org` | Self-hosted Mem0 endpoint |
+| `MEM0_API_KEY` | User | (your admin key) | Mem0 API authentication |
+
+Set via:
+```powershell
+[System.Environment]::SetEnvironmentVariable('VAR_NAME', 'value', 'User')
+```
+
+## Known Issues
+
+See [docs/opencode-bugs-known.md](docs/opencode-bugs-known.md).
+
+Key ones:
+- `experimental.primary_tools` breaks subagent tool access — do NOT use it
+- Desktop app (Electron) only loads plugins from `plugins/` dir via auto-discovery
+- Skills in `~/.agents/skills/` need junctions into `~/.config/opencode/skills/`
+
+## Maintenance
+
+**Daily:** The `update-plugins.ps1` script handles routine updates with a 12h cooldown.
+
+**When Mem0 upstream updates:**
+1. `npm pack @mem0/opencode-plugin` to get the new tarball
+2. Extract to `opencode-mem0-plugin/`
+3. Re-apply the self-hosted patches to `dist/index.js`
+4. Test with: `curl -H "X-API-Key: YOUR_KEY" https://mem0.tienbac.dpdns.org/configure`
+
+**When switching models:** Edit both files:
+- `~/.config/opencode/opencode.jsonc` — `model` and `agent` section
+- `~/.config/opencode/oh-my-opencode-slim.json` — active preset's agent models
+
+**To add a new project to CodeGraph:**
+```bash
+cd your-project
+codegraph init
+```
 
 ## Architecture Notes
 
-See [docs/opencode-bugs-known.md](docs/opencode-bugs-known.md) for detailed plugin loading behavior, path fixes, and workarounds.
-
-Key points:
-- Desktop app (Electron) loads plugins from `plugins/` dir only — ignores npm config entries
-- We use single-file `.ts` plugins (`opencode-lazy-load.ts` and `tokens-source.ts`) which load cleanly in both CLI and Desktop without needing bridges or transpilation.
-- No NPM dependencies required.
-
-## OpenCode 2.0 Considerations
-
-- **Plugin API stability**: v2 may change how plugins export/register. Bridge plugin is thin — one import + re-export. Easy to update.
-- **ESM-only**: v2 likely drops CJS support. Package.json already has `"type": "module"`.
-- **Built-in skill system**: v2 may natively support skills without lazy-loader. Bridge plugin makes migration trivial — just remove it and let v2 handle skills directly.
-- **Desktop app plugin resolution**: If v2 desktop app adds `node_modules` plugin resolution, `lazy-loader.js` bridge becomes unnecessary and can be deleted.
-
-## Key Features
-
-- **MCPs load on-demand** via skill activation (not at startup)
-- **Windows-native** environment variable pass-through for MCPs
-- **Dual-client support** — same config works for desktop app and CLI
-- **No NPM package dependencies** — single-file TypeScript plugins
-- **Automatic bootstrap** installs everything simply.
+- **Plugin load order:** Auto-discovered files from `plugins/` load by filename sort, then config `plugin` array entries load in order. `0-tokens-source.ts` < `lazy-load.ts` < `models-discovery.js` (auto), then `opencode-update-notifier` < `./opencode-mem0-plugin` < `oh-my-opencode-slim` (config array).
+- **omo-slim overrides default agents:** The installer disables OpenCode's built-in `general` and `explore` agents, replacing them with the Pantheon (Orchestrator, Oracle, etc.).
+- **Context window strategy:** lazy-load strips ~85% of tool schemas. Compaction is enabled with 20 tail turns. CodeGraph provides surgical context to avoid file-crawling bloat.
+- **No Honcho:** We replaced Honcho with self-hosted Mem0. Honcho was cloud-dependent. Mem0 runs on your VPS with your own LLM routing.

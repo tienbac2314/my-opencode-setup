@@ -6,3 +6,5 @@ node_modules/
 .idea/
 .superpowers/
 
+# Mem0 plugin build artifacts that shouldn't be tracked as editable
+# (the dist/ bundle is needed for the plugin to work, so we include it)
