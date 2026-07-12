@@ -30,9 +30,10 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 ├── plugins/                          # Auto-discovered file-based plugins
 │   ├── 0-tokens-source.ts            # Token usage breakdown (prefix ensures load order)
 │   ├── lazy-load.ts                  # Lazy tool loading to save tokens
+│   ├── mem0-selfhost-patch.ts        # Fetch interceptor for self-hosted Mem0
 │   └── models-discovery.js           # Auto-discover 9router models with modalities
-├── opencode-mem0-plugin/             # Patched Mem0 plugin for self-hosted instance
-│   ├── dist/index.js                 # Bun-bundled entry point (patched for self-hosted)
+├── opencode-mem0-plugin/             # (LEGACY, can be removed — replaced by fetch patch)
+│   ├── dist/index.js                 # Was: patched Bun bundle for self-hosted
 │   └── opencode-skills/              # mem0-remember, mem0-search, etc.
 ├── commands/
 │   └── tokens.md                     # /tokens slash command
@@ -122,13 +123,15 @@ Persistent long-term memory via self-hosted Mem0 on VPS.
 - Email: `admin@mem0.dev`
 - Password: `skibidi123`
 
-**Plugin:** Local patched copy of `@mem0/opencode-plugin` at `~/.config/opencode/opencode-mem0-plugin/`
+**Plugin:** Official `@mem0/opencode-plugin` npm package (unmodified) + `mem0-selfhost-patch.ts` fetch interceptor.
 
-Patches applied to `dist/index.js`:
-- Added `MEM0_HOST` / `MEM0_BASE_URL` env var support for custom endpoint
-- Injected `X-API-Key` headers for self-hosted auth
-- Rewrote API paths to match self-hosted FastAPI routes
-- Mocked `getProject` / `updateProject` (not available on open-source Mem0)
+The patch plugin (`plugins/mem0-selfhost-patch.ts`, auto-discovered) monkey-patches `globalThis.fetch` to:
+- Rewrite Mem0 Cloud API routes (`/v3/memories/add/`, `/v1/memories/search/`) to self-hosted routes (`/memories`, `/search`)
+- Inject `X-API-Key` header for self-hosted auth
+- Mock `/v1/ping/` to return self-hosted identity
+- Mock organization/project endpoints (not available on open-source Mem0)
+
+This means `@mem0/opencode-plugin` auto-updates via npm normally — no re-patching needed.
 
 **Required environment variables (User scope):**
 ```powershell
@@ -181,8 +184,8 @@ What it updates:
 5. **npm deps** in `package.json` via `npm update`
 
 **Not auto-updated** (intentionally):
-- `models-discovery.js` — custom, only you maintain it
-- `opencode-mem0-plugin` — patched, manual update required if upstream changes
+- `models-discovery.js` -- custom, only you maintain it
+- `mem0-selfhost-patch.ts` -- only changes if Mem0's self-hosted API routes change
 - `opencode-update-notifier` — updated via npm deps step
 
 ## Environment Variables
@@ -211,11 +214,8 @@ Key ones:
 
 **Daily:** The `update-plugins.ps1` script handles routine updates with a 12h cooldown.
 
-**When Mem0 upstream updates:**
-1. `npm pack @mem0/opencode-plugin` to get the new tarball
-2. Extract to `opencode-mem0-plugin/`
-3. Re-apply the self-hosted patches to `dist/index.js`
-4. Test with: `curl -H "X-API-Key: YOUR_KEY" https://mem0.tienbac.dpdns.org/configure`
+**When Mem0 upstream changes routes:**
+The `mem0-selfhost-patch.ts` fetch interceptor handles route mapping. If Mem0 changes its self-hosted API routes, update the `ROUTE_REWRITES` array in `plugins/mem0-selfhost-patch.ts`. No need to re-patch the npm package.
 
 **When switching models:** Edit both files:
 - `~/.config/opencode/opencode.jsonc` — `model` and `agent` section
@@ -229,7 +229,7 @@ codegraph init
 
 ## Architecture Notes
 
-- **Plugin load order:** Auto-discovered files from `plugins/` load by filename sort, then config `plugin` array entries load in order. `0-tokens-source.ts` < `lazy-load.ts` < `models-discovery.js` (auto), then `opencode-update-notifier` < `./opencode-mem0-plugin` < `oh-my-opencode-slim` (config array).
+- **Plugin load order:** Auto-discovered files from `plugins/` load by filename sort, then config `plugin` array entries load in order. `0-tokens-source.ts` < `lazy-load.ts` < `mem0-selfhost-patch.ts` < `models-discovery.js` (auto), then `opencode-update-notifier` < `@mem0/opencode-plugin` < `oh-my-opencode-slim` (config array).
 - **omo-slim overrides default agents:** The installer disables OpenCode's built-in `general` and `explore` agents, replacing them with the Pantheon (Orchestrator, Oracle, etc.).
 - **Context window strategy:** lazy-load strips ~85% of tool schemas. Compaction is enabled with 20 tail turns. CodeGraph provides surgical context to avoid file-crawling bloat.
 - **No Honcho:** We replaced Honcho with self-hosted Mem0. Honcho was cloud-dependent. Mem0 runs on your VPS with your own LLM routing.

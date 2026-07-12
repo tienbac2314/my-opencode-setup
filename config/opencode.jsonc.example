@@ -66,7 +66,7 @@
   "lsp": true,
   "plugin": [
     "opencode-update-notifier",
-    "./opencode-mem0-plugin",
+    "@mem0/opencode-plugin",
     "oh-my-opencode-slim"
   ],
   "experimental": {

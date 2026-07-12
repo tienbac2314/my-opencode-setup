@@ -114,21 +114,19 @@ if (-not $SkipCodeGraph) {
   Write-Output "[5/8] Skipping CodeGraph (--SkipCodeGraph)"
 }
 
-# ─── 6. Install Mem0 plugin (self-hosted) ───
+# ─── 6. Mem0 self-hosted fetch patch ───
 if (-not $SkipMem0) {
-  Write-Output "[6/8] Installing Mem0 plugin..."
-  if (Test-Path "$RepoDir\mem0-plugin") {
-    Copy-Item -Recurse "$RepoDir\mem0-plugin" "$ConfigDir\opencode-mem0-plugin" -Force
-    Write-Output "  Mem0 plugin installed (self-hosted patch)"
-    Write-Output "  Required env vars: MEM0_HOST, MEM0_API_KEY"
-    if (-not $env:MEM0_HOST) {
-      Write-Output "  [warn] MEM0_HOST not set — run: [System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')"
-    }
-    if (-not $env:MEM0_API_KEY) {
-      Write-Output "  [warn] MEM0_API_KEY not set — run: [System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', 'YOUR_KEY', 'User')"
-    }
-  } else {
-    Write-Output "  [skip] mem0-plugin/ not found in repo — copy manually from ~/.config/opencode/opencode-mem0-plugin/"
+  Write-Output "[6/8] Installing Mem0 self-hosted patch..."
+  # The patch plugin (mem0-selfhost-patch.ts) is already in plugins/ dir
+  # and gets copied in step 2. It monkey-patches fetch() at runtime so the
+  # official @mem0/opencode-plugin npm package works with self-hosted Mem0.
+  Write-Output "  mem0-selfhost-patch.ts installed (auto-discovered from plugins/)"
+  Write-Output "  Required env vars: MEM0_HOST, MEM0_API_KEY"
+  if (-not $env:MEM0_HOST) {
+    Write-Output "  [warn] MEM0_HOST not set — run: [System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')"
+  }
+  if (-not $env:MEM0_API_KEY) {
+    Write-Output "  [warn] MEM0_API_KEY not set — run: [System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', 'YOUR_KEY', 'User')"
   }
 } else {
   Write-Output "[6/8] Skipping Mem0 (--SkipMem0)"
