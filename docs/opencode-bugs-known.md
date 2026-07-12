@@ -19,15 +19,16 @@ Last updated: 2026-07-13
 
 Auto-discovered plugins from `~/.config/opencode/plugins/` load by filename sort BEFORE config `plugin` array entries.
 Config array plugins load in order.
-Because `@mem0/opencode-plugin` performs startup initialization (e.g. calls to `/v1/ping/`), `mem0-selfhost-patch.ts` must load *before* it to successfully rewrite those requests.
-To solve this, we place `mem0-selfhost-patch.ts` in the root of `~/.config/opencode/` (so it is not auto-loaded out of order) and list it explicitly at the very beginning of the `plugin` array in `opencode.jsonc` and `tui.json`.
 
-Plugin load order is now:
-1. `./mem0-selfhost-patch.ts` (loaded first explicitly, patches fetch globally)
+`mem0-selfhost-patch.ts` is placed in the root of `~/.config/opencode/` (so it's not auto-loaded out of order) and listed explicitly at the very beginning of the `plugin` array.
+
+Plugin load order:
+1. `./mem0-selfhost-patch.ts` (patches fetch, always registers 11 fallback tools via `tool()` API)
 2. `opencode-update-notifier`
-3. `@mem0/opencode-plugin` (loads third, uses patched fetch)
-4. `oh-my-opencode-slim`
-5. Auto-discovered plugins (`0-tokens-source.ts`, `lazy-load.ts`, `models-discovery.js`) load alphabetically after the config array. Since `mem0-selfhost-patch.ts` already patched fetch at the root, the later wrappers chain on top cleanly.
+3. `oh-my-opencode-slim`
+4. Auto-discovered plugins (`0-tokens-source.ts`, `lazy-load.ts`, `models-discovery.js`) load alphabetically after the config array.
+
+`@mem0/opencode-plugin` is NOT in the plugin array. It's dynamically imported inside `mem0-selfhost-patch.ts` via `await import("@mem0/opencode-plugin")` in a `try/catch`. If it loads (Bun), its tools merge on top. If it fails (Node.js), fallback tools remain registered. See "Missing `'tool'` hook" and "Bun-built dist" sections below.
 
 ## Desktop app plugin resolution
 
@@ -138,6 +139,66 @@ The official plugin is now optional. If it loads (under Bun), its tools merge on
 | Storage reset (pgvector table dropped) | REST API returns empty results | Tools work normally, no data — same as fresh install |
 
 No silent failures. Tools are always callable; they only fail at the network layer if the server is unreachable.
+
+---
+
+## Mem0 plugin: Missing `"tool"` hook in plugin descriptor
+
+**Symptom:** Tools registered via `tool()` from `@mem0/opencode-plugin` don't show up in the tool list when loaded as a static plugin entry in `opencode.jsonc`.
+
+**Root cause:** `@mem0/opencode-plugin` v0.2.1 `package.json` declares:
+```json
+"opencode": { "hooks": ["config", "shell.env"] }
+```
+`"tool"` is missing from the `hooks` array. OpenCode only processes `tool()` registrations from plugins that declare the `"tool"` hook in their descriptor. Without it, tools registered inside the plugin are silently ignored.
+
+**Workaround in `mem0-selfhost-patch.ts`:**
+- `mem0-selfhost-patch.ts` does NOT declare `"tool"` in its hook list either (it's a flat `.ts` file loaded via the `plugin` array, not a proper package). However, OpenCode processes `tool()` calls from ALL script plugins regardless of hook declarations — the hook requirement only applies to package plugins (`node_modules`).
+- All 11 fallback tools are registered from a flat file, so they bypass the hook check entirely.
+
+**Upstream PR needed:** Add `"tool"` to the hooks array in `@mem0/opencode-plugin/package.json`. File: `integrations/mem0-plugin/.opencode-plugin/package.json`:
+```json
+"opencode": { "hooks": ["config", "shell.env", "tool"] }
+```
+
+---
+
+## lazy-load.ts: Tool filtering splits `originals` and `mcpOriginals`
+
+**Symptom:** Mem0 tools disappear after `lazy-load.ts` processes them. Tools registered by later-loading plugins are missing but earlier ones work.
+
+**Root cause:** `lazy-load.ts` originally maintained two maps: `originals` (tools for OpenAI provider endpoints) and `mcpOriginals` (tools for MCP endpoints). The `mcpOriginals` map captured ALL known tools at startup, including mem0 tools. When the tool schema filtering function checked `name in originals`, it returned `false` for mem0 tools (they lived in `mcpOriginals`), causing the filter to strip their schemas. Since `tool()` merges by name, stripped schemas didn't get re-added.
+
+**Fix:** The two maps were merged into a single `originals` object. The filter now checks one map:
+```typescript
+const originals: Record<string, OriginalToolInfo> = { ...mcpOriginals, ...openAIOriginals };
+```
+This ensures tools from either source retain their full schemas.
+
+**Why it matters:** Any plugin that registers tools late (after `lazy-load.ts` initializes its originals snapshot) can collide with the filtering. MCP-originated tools are especially vulnerable because they don't match OpenAI provider patterns.
+
+---
+
+## Duplicate loading guards
+
+**Symptom:** After running `update-plugins.ps1` or `bootstrap.ps1`, tools appear twice in the UI or `tool()` throws "already registered" errors.
+
+**Root cause:** `lazy-load.ts` and `0-tokens-source.ts` are auto-discovered from `plugins/` dir AND may also be manually loaded by other plugins. Without guards, they register their hooks/tools multiple times.
+
+**Workaround:** Both files use `globalThis` sentinels:
+```typescript
+if (globalThis.__lazy_load_loaded__) return;
+globalThis.__lazy_load_loaded__ = true;
+```
+
+```typescript
+if (globalThis.__tokens_source_loaded__) return;
+globalThis.__tokens_source_loaded__ = true;
+```
+
+These prevent re-registration on second load. The guards are safe because the registration is idempotent apart from the duplicate-error problem.
+
+**Note:** The `bootstrap.ps1` no longer re-downloads these files from GitHub (see "Bootstrap / update scripts" section), so double-loading only happens if another plugin explicitly imports them.
 
 ---
 
