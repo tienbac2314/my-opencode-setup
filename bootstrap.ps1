@@ -60,7 +60,8 @@ foreach ($lp in $legacyPlugins) {
 
 Copy-Item -Recurse "$RepoDir\plugins\*" "$pluginsDir\" -Force
 Copy-Item "$RepoDir\mem0-selfhost-patch.ts" "$ConfigDir\mem0-selfhost-patch.ts" -Force
-Write-Output "  Installed: models-discovery.js and mem0-selfhost-patch.ts"
+Copy-Item "$RepoDir\verify-patch.ts" "$ConfigDir\verify-patch.ts" -Force
+Write-Output "  Installed: models-discovery.js, mem0-selfhost-patch.ts, and verify-patch.ts"
 
 # Download tokens command
 New-Item -ItemType Directory -Path "$ConfigDir\commands" -Force | Out-Null

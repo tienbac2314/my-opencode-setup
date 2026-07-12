@@ -124,6 +124,41 @@ Persistent long-term memory via self-hosted Mem0 on VPS.
 - Email: `admin@mem0.dev`
 - Password: `skibidi123`
 
+**Self-Hosted Setup & Custom Embedding Model Configuration:**
+The self-hosted instance is configured to use the embedding model `openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free` (2048 dimensions). 
+- **Bypass HNSW Dimension limit**: pgvector's HNSW index has a strict limit of 2000 dimensions. To run the 2048-dimensional Nemotron model, `"hnsw": False` is added to `main.py`'s `DEFAULT_CONFIG` on the VPS to default to exact search (extremely fast/accurate for agent memories).
+- **Environment variables on the VPS (`~/mem0/server/.env`)**:
+  ```env
+  MEM0_DEFAULT_EMBEDDER_MODEL=openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free
+  MEM0_DEFAULT_EMBEDDER_DIMS=2048
+  ```
+- **Dimension Changes**: Changing embedding models requires dropping the existing memories table so that pgvector recreates it with the correct dimensions:
+  ```bash
+  docker exec -i mem0-dev-postgres-1 psql -U postgres -d postgres -c 'DROP TABLE IF EXISTS memories;'
+  ```
+
+**How to Update the Self-Hosted Stack:**
+1. Pull the latest updates on the VPS:
+   ```bash
+   cd ~/mem0 && git pull
+   ```
+2. Re-apply the `hnsw: False` and `embedding_model_dims` configuration to `main.py` on the VPS if it was overwritten:
+   ```bash
+   python3 -c '
+   with open("/home/ubuntu/mem0/server/main.py", "r") as f:
+       content = f.read()
+   target = "\"collection_name\": POSTGRES_COLLECTION_NAME,\n        },"
+   replacement = "\"collection_name\": POSTGRES_COLLECTION_NAME,\n            \"embedding_model_dims\": int(os.environ.get(\"MEM0_DEFAULT_EMBEDDER_DIMS\", 1536)),\n            \"hnsw\": False,\n        },"
+   if target in content:
+       with open("/home/ubuntu/mem0/server/main.py", "w") as f:
+           f.write(content.replace(target, replacement))
+   '
+   ```
+3. Rebuild and recreate the containers:
+   ```bash
+   cd ~/mem0/server && docker compose up -d --build --force-recreate mem0
+   ```
+
 **Plugin:** Official `@mem0/opencode-plugin` npm package (unmodified) + `mem0-selfhost-patch.ts` fetch interceptor.
 
 The patch plugin (`mem0-selfhost-patch.ts`, loaded explicitly at the root) monkey-patches `globalThis.fetch` to:
@@ -139,6 +174,16 @@ This means `@mem0/opencode-plugin` auto-updates via npm normally — no re-patch
 [System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')
 [System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', 'YOUR_MEM0_ADMIN_KEY', 'User')
 ```
+
+**Testing & Verification:**
+Verify the setup and patch execution by running the diagnosis script:
+```bash
+bun verify-patch.ts
+```
+This tests:
+1. Mocked `GET /v1/ping/` returns self-hosted identity.
+2. Mocked `GET /v1/organizations/.../projects/...` returns custom categories.
+3. Rewritten `POST /v3/memories/search/` successfully queries your self-hosted VPS backend.
 
 **Skills:** mem0-remember, mem0-search, mem0-forget, mem0-dream, mem0-pin, mem0-scope, mem0-status, mem0-tour, mem0-context-loader
 

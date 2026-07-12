@@ -27,16 +27,22 @@ const MEM0_CLOUD = "https://api.mem0.ai";
 const ROUTE_REWRITES: [RegExp, string][] = [
   // POST /v3/memories/add/ -> POST /memories
   [/\/v3\/memories\/add\/?$/, "/memories"],
-  // POST /v1/memories/search/ -> POST /search
-  [/\/v1\/memories\/search\/?$/, "/search"],
+  // POST /v1/memories/search/ or /v3/memories/search/ -> POST /search
+  [/\/v[13]\/memories\/search\/?$/, "/search"],
   // GET|PUT|DELETE /v1/memories/{id}/ -> /memories/{id}
   [/\/v1\/memories\/([a-f0-9-]+)\/?$/, "/memories/$1"],
   // GET /v1/memories/{id}/history/ -> /memories/{id}/history
   [/\/v1\/memories\/([a-f0-9-]+)\/history\/?$/, "/memories/$1/history"],
   // GET|DELETE /v1/memories/ -> /memories
   [/\/v1\/memories\/?$/, "/memories"],
-  // DELETE /entities/{type}/{name} -> /entities/{type}/{name}
-  [/\/entities\/(.+)$/, "/entities/$1"],
+  // GET /v1/entities/ -> /entities
+  [/\/v1\/entities\/?$/, "/entities"],
+  // GET|DELETE /v1/entities/{type}/{name}/ -> /entities/{type}/{name}
+  [/\/v1\/entities\/([^\/]+)\/([^\/]+)\/?$/, "/entities/$1/$2"],
+  // DELETE /v2/entities/{type}/{name}/ -> /entities/{type}/{name}
+  [/\/v2\/entities\/([^\/]+)\/([^\/]+)\/?$/, "/entities/$1/$2"],
+  // GET /v1/event/{event_id}/ -> mocked (self-hosted creates are synchronous)
+  [/\/v1\/event\/([a-f0-9-]+)\/?$/, "/__event/$1"],
 ];
 
 if (MEM0_HOST && MEM0_API_KEY) {
@@ -96,25 +102,59 @@ if (MEM0_HOST && MEM0_API_KEY) {
 
     targetUrl = parsed.toString();
 
+    // --- Mock: /__event/{event_id}/ (get_event_status) ---
+    // Must run AFTER route rewrites so /v1/event/{id} -> /__event/{id} resolves first.
+    // Self-hosted creates are synchronous, so every event is already complete.
+    if (parsed.pathname.match(/\/__event\/([a-f0-9-]+)\/?$/)) {
+      return new Response(
+        JSON.stringify({
+          id: parsed.pathname.match(/\/__event\/([a-f0-9-]+)\/?$/)?.[1] || "",
+          status: "SUCCEEDED",
+          result: { success: true },
+          created_at: new Date().toISOString(),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     // Inject X-API-Key header (self-hosted auth)
     const headers = new Headers(init?.headers || {});
     headers.set("X-API-Key", MEM0_API_KEY);
     // Keep Authorization header too (official sets Token ${apiKey})
 
     // Modify request body for POST /memories (previously /v3/memories/add/)
+    // Self-hosted MemoryCreate schema: { messages (required), user_id?, agent_id?, run_id?,
+    // metadata?, expiration_date?, infer?, memory_type?, prompt? }
+    // It does NOT accept: text, app_id, scope
     let newInit = { ...init, headers };
     if (parsed.pathname === "/memories" && newInit.method === "POST" && typeof newInit.body === "string") {
       try {
         const bodyObj = JSON.parse(newInit.body);
+        // Convert text -> messages array (cloud format -> self-hosted format)
         if (bodyObj.text) {
-          // Self-hosted expects { messages: [{role, content}], ... } instead of { text, ... }
           bodyObj.messages = [{ role: "user", content: bodyObj.text }];
           delete bodyObj.text;
-          newInit.body = JSON.stringify(bodyObj);
         }
+        // Strip fields the self-hosted MemoryCreate schema rejects
+        delete bodyObj.app_id;
+        delete bodyObj.scope;
+        newInit.body = JSON.stringify(bodyObj);
       } catch (e) {
         // Ignore parse errors
       }
+    }
+    // Handle 502 from DELETE / DELETE /memories/{id} gracefully
+    // (self-hosted API returns 502 for non-existent IDs instead of 404)
+    if (parsed.pathname.match(/^\/memories\//) && newInit.method === "DELETE") {
+      return originalFetch(targetUrl, newInit).then((res) => {
+        if (res.status === 502) {
+          return new Response(
+            JSON.stringify({ message: "Memory not found or already deleted" }),
+            { status: 404, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        return res;
+      });
     }
 
     return originalFetch(targetUrl, newInit);
@@ -153,7 +193,27 @@ export default {
       });
     } catch {}
 
-    // 3. Return the merged hooks.
+    // 3. Add fallback shell.env hook if official plugin didn't provide one
+    // The official plugin's shell.env hook sets MEM0_USER_ID, MEM0_APP_ID,
+    // MEM0_SESSION_ID, MEM0_BRANCH. If it failed to load (e.g. __require
+    // issue under Node), provide fallback values so skills can still work.
+    if (!officialHooks["shell.env"]) {
+      const fallbackUserId = process.env.MEM0_USER_ID || process.env.USER || process.env.USERNAME || "unknown";
+      const fallbackAppId = process.env.MEM0_APP_ID || "default";
+      const fallbackBranch = process.env.MEM0_BRANCH || "main";
+      const fallbackSessionId = `ses_${Math.floor(Date.now() / 1000)}_${Math.random().toString(36).slice(2, 8)}`;
+      officialHooks["shell.env"] = async (_input: any, output: any) => {
+        if (output?.env) {
+          output.env.MEM0_USER_ID = fallbackUserId;
+          output.env.MEM0_APP_ID = fallbackAppId;
+          output.env.MEM0_SESSION_ID = fallbackSessionId;
+          output.env.MEM0_BRANCH = fallbackBranch;
+          output.env.MEM0_DREAM = "true";
+        }
+      };
+    }
+
+    // 4. Return the merged hooks.
     // Exporting them here as a file-based plugin ensures OpenCode registers all hooks
     // (including the "tool" hook containing add_memory, search_memories, etc.)
     // which the official npm package package.json registers incorrectly.
