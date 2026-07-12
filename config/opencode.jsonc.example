@@ -4,7 +4,7 @@
   "logLevel": "INFO",
   "share": "manual",
   "autoupdate": "notify",
-  "snapshot": true,
+  "snapshot": false,
   "instructions": [
     "AGENTS.md"
   ],
@@ -32,6 +32,9 @@
     },
     "explore": {
       "model": "opencode/deepseek-v4-flash-free"
+    },
+    "compaction": {
+      "model": "9router/ag/claude-opus-4-6-thinking"
     }
   },
   "skills": {
@@ -79,6 +82,10 @@
   },
   "compaction": {
     "auto": true,
-    "tail_turns": 20
+    "prune": true,
+    "keep": {
+      "tokens": 20000
+    },
+    "buffer": 8000
   }
 }

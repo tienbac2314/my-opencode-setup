@@ -57,12 +57,13 @@ The `bootstrap.ps1` script handles this automatically.
 
 **Symptom:** Official `@mem0/opencode-plugin` fails against self-hosted Mem0 (missing `/v1/` prefix, no org/project endpoints).
 
-**Fix:** A thin interceptor `mem0-selfhost-patch.ts` is loaded explicitly in `opencode.jsonc` before `@mem0/opencode-plugin`. It monkey-patches `globalThis.fetch` to:
-- Redirect Mem0 Cloud routes to self-hosted FastAPI routes
-- Inject `X-API-Key` headers
-- Mock project-level metadata endpoints
+**Fix:** `mem0-selfhost-patch.ts` does three things:
+1. Monkey-patches `globalThis.fetch` to rewrite Cloud API routes to self-hosted paths and inject `X-API-Key`
+2. Dynamically imports official `@mem0/opencode-plugin` inside `try/catch` for its extra hooks (auto-memory, compaction)
+3. **Always** registers its own fallback tools (`add_memory`, `search_memories`, etc.) via `tool()` from `@opencode-ai/plugin` — these call the self-hosted REST API directly
 
-This allows running the unmodified official `@mem0/opencode-plugin` from npm, supporting automatic updates without manual re-patching.
+The official plugin is now optional. If it loads (under Bun), its tools merge on top of fallbacks. If it fails (Node), fallback tools are still registered.
+
 
 ## Mem0 plugin: `@mem0/opencode-plugin` built with Bun, fails under Node
 
@@ -120,9 +121,23 @@ This allows running the unmodified official `@mem0/opencode-plugin` from npm, su
 
 **Symptom:** `MEM0_USER_ID`, `MEM0_APP_ID`, `MEM0_SESSION_ID`, `MEM0_BRANCH` are empty in some sessions.
 
-**Root cause:** The plugin's `shell.env` hook relies on the official plugin loading successfully. If it fails (Bun/Node mismatch), no env vars are injected.
+**Root cause:** The official plugin's `shell.env` hook only fires if the official plugin loads successfully. If it fails (Bun/Node mismatch), no env vars are injected.
 
-**Workaround:** The `shell.env` hook in `mem0-selfhost-patch.ts` provides fallback values. No longer needed since fallback tools resolve identity via `process.env.USER`.
+**Status:** Not critical. Fallback tools in `mem0-selfhost-patch.ts` resolve userId via `process.env.USER` when no `user_id` arg is passed. The official hook still works when the plugin loads; the patch no longer provides a fallback `shell.env` hook (was too autonomous, injected `MEM0_DREAM = "true"`).
+
+---
+
+## Mem0 unavailable scenarios
+
+| Scenario | What happens | Mitigation |
+|----------|-------------|------------|
+| Server down / unreachable | Tools registered but `mem0Fetch()` calls throw connection error | Error returned to LLM, operation fails gracefully |
+| Official plugin fails (Node/Bun) | Dynamic import catches error, logs warning | Fallback tools take over — full CRUD via REST API |
+| Both down | Tools registered, every call returns error | LLM can report error to user |
+| `MEM0_HOST` or `MEM0_API_KEY` missing | `mem0Fetch()` throws "API error" | Clear error message |
+| Storage reset (pgvector table dropped) | REST API returns empty results | Tools work normally, no data — same as fresh install |
+
+No silent failures. Tools are always callable; they only fail at the network layer if the server is unreachable.
 
 ---
 
@@ -131,3 +146,49 @@ This allows running the unmodified official `@mem0/opencode-plugin` from npm, su
 **Symptom:** Running `bunx oh-my-opencode-slim@latest install` may reorder the `plugin` array in `opencode.jsonc` and overwrite `oh-my-opencode-slim.json`.
 
 **Workaround:** The `bootstrap.ps1` restores the preset config after running the installer. The `update-plugins.ps1` script also runs the installer but your custom preset is preserved because omo-slim only writes defaults if the config file doesn't exist.
+
+---
+
+## Bootstrap / update scripts overwrite local plugin patches
+
+**Symptom:** After running `bootstrap.ps1` or `update-plugins.ps1`, custom patches in `lazy-load.ts` or `0-tokens-source.ts` are gone — replaced by upstream GitHub raw copies.
+
+**Root cause:** Both scripts hardcode download URLs pointing to GitHub raw content for `lazy-load.ts` and `0-tokens-source.ts`. When run, they overwrite the local patched files in `~/.config/opencode/plugins/` with the unpatched upstream versions.
+
+**Workaround:** The download steps in both scripts are now disabled. Scripts use local copies from the dotfiles repo instead. If re-enabling upstream downloads, ensure patches are re-applied afterward.
+
+---
+
+## DeepSeek XML tool-call regression after compaction
+
+**Symptom:** After compaction, the agent outputs XML-style tool calls (`<｜｜DSML｜｜tool_calls> <｜｜DSML｜｜invoke name="skill">…`) instead of OpenAI JSON format. The agent becomes effectively dead — it cannot call any tools successfully.
+
+**Root cause (two parts):**
+
+1. `compaction.keep.tokens` was set to `4000` — roughly 2-3 turns. After compaction the rebuilt context was too thin. DeepSeek-class models revert to their base training format (XML tool calls) when they lack enough context to stay in "assistant mode".
+
+2. The compaction summary itself was generated by the same DeepSeek free model. If the model was already in a degraded state, it produced a corrupt summary, making the next epoch start broken.
+
+**Fix applied (`opencode.jsonc`):**
+```jsonc
+// Raise keep window so model retains 10-15 turns verbatim after compaction
+"compaction": {
+  "auto": true,
+  "prune": true,
+  "keep": { "tokens": 20000 },
+  "buffer": 8000
+},
+// Dedicated compaction agent using a powerful model (Claude writes the summary)
+"agent": {
+  "compaction": { "model": "9router/ag/claude-opus-4-6-thinking" }
+}
+```
+
+**Why it matters:** Even models with 128K context windows suffer from format regression when compacted context is too sparse. The compaction agent decouples summary generation from the working model — Gemini produces a coherent summary; DeepSeek receives it and continues normally.
+
+## lazy-load.ts URL detection — NOTE (not a bug)
+
+`lazy-load.ts`'s `isLLM` check looks for `/chat/completions` in the URL path. Since the AI SDK always appends `/chat/completions` to any OpenAI-compatible provider's `baseURL`, **all** OpenAI-compatible proxies (including `tienbac.dpdns.org`) are already matched by the first condition — no domain-specific entry needed.
+
+The domain list (`api.openai.com`, `api.deepseek.com`, etc.) only matters for providers that use non-standard paths. For any standard `/chat/completions` endpoint, the plugin works out of the box.
+

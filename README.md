@@ -171,6 +171,18 @@ Key advantages:
 - Mem0 tools are ALWAYS registered — never a "tool not found" error for LLM agents
 - The fetch interceptor handles body format translation (`text` → `messages`) and strips unsupported fields (`app_id`, `scope`) silently
 
+**When Mem0 Is Unavailable:**
+
+| Scenario | What happens | Fallback |
+|----------|-------------|----------|
+| Self-hosted API is down / unreachable | Tools still register; `mem0Fetch()` calls fail at runtime with HTTP connection error | Error message returned to LLM, operation fails gracefully |
+| Official `@mem0/opencode-plugin` fails to load (Node/Bun mismatch) | Dynamic import catches the error, logs a warning via ctx | Fallback tools (line above) take over — full mem0 CRUD via REST API |
+| Both official plugin AND REST API are down | Tools register, but every call returns connection error | LLM sees the error and can report it to the user |
+| `MEM0_HOST` or `MEM0_API_KEY` missing | `mem0Fetch()` helper throws "API error" | Operations fail with clear error message |
+| Storage is reset (pgvector table dropped) | REST API returns empty results for all queries | Tools work normally, just no data — same as fresh install |
+
+The system degrades gracefully: tools are always callable, they just fail at the network layer if the server is unreachable. No silent failures.
+
 **Required environment variables (User scope):**
 ```powershell
 [System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')
@@ -257,6 +269,7 @@ Key ones:
 - `experimental.primary_tools` breaks subagent tool access — do NOT use it
 - Desktop app (Electron) only loads plugins from `plugins/` dir via auto-discovery
 - Skills in `~/.agents/skills/` need junctions into `~/.config/opencode/skills/`
+- DeepSeek XML regression after compaction — keep `keep.tokens` ≥ 20000 and configure a compaction agent with a stable model
 
 ## Maintenance
 
@@ -279,5 +292,5 @@ codegraph init
 
 - **Plugin load order:** The patch `./mem0-selfhost-patch.ts` is placed at the root ConfigDir and loaded explicitly as the first entry in the config `plugin` array to guarantee it intercepts requests before `@mem0/opencode-plugin` initializes at startup. Auto-discovered plugins (`0-tokens-source.ts`, `lazy-load.ts`, `models-discovery.js`) load alphabetically after the config array, chaining their fetch wrappers cleanly.
 - **omo-slim overrides default agents:** The installer disables OpenCode's built-in `general` and `explore` agents, replacing them with the Pantheon (Orchestrator, Oracle, etc.).
-- **Context window strategy:** lazy-load strips ~85% of tool schemas. Compaction is enabled with 20 tail turns. CodeGraph provides surgical context to avoid file-crawling bloat.
+- **Context window strategy:** lazy-load strips ~85% of tool schemas. Compaction is enabled with `keep.tokens: 20000` (~10-15 turns verbatim). A dedicated `compaction` agent (`9router/ag/claude-opus-4-6-thinking`) writes the summary — decoupling summary generation from the working model avoids DeepSeek XML format regression. CodeGraph provides surgical context to avoid file-crawling bloat.
 - **No Honcho:** We replaced Honcho with self-hosted Mem0. Honcho was cloud-dependent. Mem0 runs on your VPS with your own LLM routing.
