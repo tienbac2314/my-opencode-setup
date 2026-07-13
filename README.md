@@ -1,304 +1,169 @@
 # OpenCode Dotfiles
 
-Personal OpenCode configuration: multi-agent orchestration, semantic code intelligence, persistent memory, token optimization, and auto-updating plugins.
+Windows OpenCode configuration for multi-agent orchestration, code intelligence, self-hosted memory, lazy tool loading, token reporting, model discovery, update checks, and RTK shell rewriting.
 
-## Stack
+## Runtime
 
-| Component | Tool | Purpose |
-|-----------|------|---------|
-| **Shell** | PowerShell 7+ | All scripts target pwsh |
-| **Provider** | 9router (OpenAI-compatible) | Self-hosted LLM gateway at `tienbac.dpdns.org` |
-| **Default Model** | `9router/ag/gemini-3.5-flash-low` | Free tier via 9router |
-| **Agent Orchestrator** | [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) | Multi-agent delegation (Orchestrator, Oracle, Explorer, Librarian, Designer, Fixer) |
-| **Code Intelligence** | [CodeGraph](https://github.com/colbymchenry/codegraph) | Semantic code graph — surgical context, fewer tool calls |
-| **Long-Term Memory** | [Mem0](https://github.com/mem0ai/mem0) (self-hosted) | Persistent memory across sessions via VPS |
-| **Token Optimization** | [opencode-lazy-loading](https://github.com/omarwaly-ai/opencode-lazy-loading) | Strips tool schemas, saves ~85% base tokens |
-| **Token Monitoring** | [OpenCode-tokens-source](https://github.com/omarwaly-ai/OpenCode-tokens-source) | Per-source token usage breakdown |
-| **Model Discovery** | `models-discovery.js` (custom) | Auto-discovers models from 9router with correct modalities |
-| **Update Notifier** | [opencode-update-notifier](https://github.com/tim-hilde/opencode-update-notifier) | Alerts when pinned npm plugins have updates |
-| **LSP** | Built-in | Auto-discovered, enabled globally |
+| Component | Implementation |
+|---|---|
+| Shell | PowerShell 7+ |
+| OpenCode | TUI and Desktop App |
+| Provider | OpenAI-compatible 9router gateway |
+| Agents | `oh-my-opencode-slim` |
+| Code intelligence | CodeGraph plus `codegraph-helper.ts` |
+| Memory | `opencode-supermemory` against self-hosted Supermemory |
+| Tool optimization | `lazy-load.ts` |
+| Token reporting | `0-tokens-source.ts` |
+| Model discovery | `models-discovery.js` |
+| Update checks | `opencode-update-notifier` |
+| Shell compression | RTK plus `rtk.ts` |
 
-## Directory Structure
+## Repository Layout
 
-```
-~/.config/opencode/
-├── opencode.jsonc                    # Main config (API keys — gitignored)
-├── oh-my-opencode-slim.json          # Agent orchestration presets
-├── tui.json                          # TUI plugin config
-├── AGENTS.md                         # Behavioral instructions
-├── package.json                      # npm deps (plugin SDK + provider SDK)
-├── mem0-selfhost-patch.ts            # Fetch interceptor for self-hosted Mem0 (loaded first explicitly)
-├── plugins/                          # Auto-discovered file-based plugins
-│   ├── 0-tokens-source.ts            # Token usage breakdown (prefix ensures load order)
-│   ├── lazy-load.ts                  # Lazy tool loading to save tokens
-│   ├── models-discovery.js           # Auto-discover 9router models with modalities
-│   └── codegraph-helper.ts           # Enforces and auto-updates CodeGraph index
-├── opencode-mem0-plugin/             # (LEGACY, can be removed — replaced by fetch patch)
-│   ├── dist/index.js                 # Was: patched Bun bundle for self-hosted
-│   └── opencode-skills/              # mem0-remember, mem0-search, etc.
-├── commands/
-│   └── tokens.md                     # /tokens slash command
-├── skills/                           # 30+ skills (security, research, debugging, etc.)
-└── agents/                           # Sub-agents (web-search, etc.)
-```
-
-## Setup Repo Structure
-
-```
-~/opencode-dotfiles/
-├── bootstrap.ps1                     # Full installer script
-├── update-plugins.ps1                # Plugin auto-updater (12h cooldown)
+```text
+opencode-dotfiles/
+├── bootstrap.ps1
+├── update-plugins.ps1
 ├── config/
-│   ├── opencode.jsonc.example        # Template config (no secrets)
-│   └── oh-my-opencode-slim.json      # Agent preset config (9router default)
+│   ├── opencode.jsonc.example
+│   ├── oh-my-opencode-slim.json
+│   ├── supermemory.jsonc.example
+│   └── tui.json
 ├── plugins/
-│   ├── lazy-load.ts                  # Snapshot of lazy-load plugin
-│   ├── 0-tokens-source.ts            # Snapshot of tokens-source plugin
-│   ├── models-discovery.js           # Custom model discovery plugin
-│   └── codegraph-helper.ts           # CodeGraph dynamic helper plugin
-├── mem0-plugin/                      # Patched Mem0 plugin for self-hosted
-├── mem0-selfhost-patch.ts            # Fetch interceptor for self-hosted Mem0
-├── skills/                           # All skills
-├── agents/                           # Sub-agents
+│   ├── 0-tokens-source.ts
+│   ├── codegraph-helper.ts
+│   ├── lazy-load.ts
+│   ├── models-discovery.js
+│   ├── rtk.ts
+│   └── supermemory.ts
+├── agents/
+├── skills/
 ├── docs/
-│   └── opencode-bugs-known.md        # Known bugs and workarounds
-├── AGENTS.md                         # LLM behavioral instructions
-└── README.md                         # This file
+└── mem0-archive/
 ```
 
-## Quick Install
+`mem0-archive/` is historical reference only. Bootstrap never deploys it.
+
+## Install
 
 ```powershell
-git clone https://github.com/tienbac2314/my-opencode-setup ~/opencode-dotfiles
-cd ~/opencode-dotfiles
+git clone https://github.com/tienbac2314/my-opencode-setup "$HOME\opencode-dotfiles"
+Set-Location "$HOME\opencode-dotfiles"
 .\bootstrap.ps1
 ```
 
-Then:
-1. Edit `~/.config/opencode/opencode.jsonc` — set your 9router API key
-2. Restart your terminal (env vars need a new session)
-3. Start OpenCode and type `ping all agents` to verify
+Then configure:
 
-## Plugin Details
+1. `~/.config/opencode/opencode.jsonc`: provider API key and model.
+2. `~/.config/opencode/supermemory.jsonc`: Supermemory API key and base URL.
+3. Restart OpenCode after dependency or plugin changes.
 
-### oh-my-opencode-slim (V2)
+Real credentials belong only in local ignored files. Never add them to this repository.
 
-Multi-agent orchestration. Routes tasks to specialized agents:
+## Plugin Loading
 
-| Agent | Role | Model |
-|-------|------|-------|
-| **Orchestrator** | Plans, delegates, reconciles | `9router/ag/gemini-3.5-flash-low` |
-| **Oracle** | Architecture review, deep analysis | `9router/ag/gemini-3.5-flash-low` |
-| **Explorer** | Codebase reconnaissance | `9router/ag/gemini-3.5-flash-low` |
-| **Librarian** | Documentation lookup, web search | `9router/ag/gemini-3.5-flash-low` |
-| **Designer** | UI/UX work | `9router/ag/gemini-3.5-flash-low` |
-| **Fixer** | Bug fixes, implementations | `9router/ag/gemini-3.5-flash-low` |
+OpenCode auto-discovers local files under `~/.config/opencode/plugins/` in both TUI and Desktop App. `opencode.jsonc` explicitly lists only npm plugins:
 
-Config: `~/.config/opencode/oh-my-opencode-slim.json`
+- `opencode-update-notifier`
+- `oh-my-opencode-slim`
 
-Three presets available: `9router` (active), `openai`, `opencode-go`.
+Bootstrap copies every repository plugin into that directory. Local plugins must not also be listed explicitly; duplicate registration changes wrapper order and can break Desktop startup.
 
-To switch presets: change `"preset"` value in the config file.
+`0-tokens-source.ts` sorts before `lazy-load.ts`. This ordering lets token reporting observe the request after lazy-load reduces tool schemas.
 
-### CodeGraph
+## Installed Plugins
 
-Semantic code intelligence. Builds a knowledge graph of symbols, call edges, and dependencies.
+### oh-my-opencode-slim
 
-- **Install:** `npm install -g @colbymchenry/codegraph` (or via `bootstrap.ps1`)
-- **Wire up:** `codegraph install --yes` (auto-configures OpenCode MCP)
-- **Index a project:** `codegraph init` (run inside each project dir)
-- **Auto-syncs:** Watches for file changes after init — no re-indexing needed
+Provides Orchestrator, Oracle, Explorer, Librarian, Designer, and Fixer agents. Configuration lives in `config/oh-my-opencode-slim.json`.
 
-Reduces tool calls by 40-80% and speeds up responses by providing surgical context.
+Lifecycle check: OpenCode startup loads agents, then `ping all agents` exercises orchestration.
 
-### Mem0 (Self-Hosted)
+### CodeGraph and codegraph-helper
 
-Persistent long-term memory via self-hosted Mem0 on VPS.
+CodeGraph indexes symbols and call paths. When a repository contains `.codegraph/`, helper steers code search toward `codegraph_explore` and updates index after supported file edits.
 
-**Architecture:**
-- VPS runs Mem0 REST API (Docker: `mem0-dev-mem0-1`) on port 8888
-- Cloudflare tunnel exposes it as `https://mem0.tienbac.dpdns.org`
-- LLM/embedding calls route through 9router on the same VPS
-- pgvector for vector storage
-
-**Dashboard:**
-- URL: `http://161.118.215.190:3000`
-- Email: `admin@mem0.dev`
-- Password: `skibidi123`
-
-**Self-Hosted Setup & Custom Embedding Model Configuration:**
-The self-hosted instance is configured to use the embedding model `openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free` (2048 dimensions). 
-- **Bypass HNSW Dimension limit**: pgvector's HNSW index has a strict limit of 2000 dimensions. To run the 2048-dimensional Nemotron model, `"hnsw": False` is added to `main.py`'s `DEFAULT_CONFIG` on the VPS to default to exact search (extremely fast/accurate for agent memories).
-- **Environment variables on the VPS (`~/mem0/server/.env`)**:
-  ```env
-  MEM0_DEFAULT_EMBEDDER_MODEL=openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free
-  MEM0_DEFAULT_EMBEDDER_DIMS=2048
-  ```
-- **Dimension Changes**: Changing embedding models requires dropping the existing memories table so that pgvector recreates it with the correct dimensions:
-  ```bash
-  docker exec -i mem0-dev-postgres-1 psql -U postgres -d postgres -c 'DROP TABLE IF EXISTS memories;'
-  ```
-
-**How to Update the Self-Hosted Stack:**
-1. Pull the latest updates on the VPS:
-   ```bash
-   cd ~/mem0 && git pull
-   ```
-2. Re-apply the `hnsw: False` and `embedding_model_dims` configuration to `main.py` on the VPS if it was overwritten:
-   ```bash
-   python3 -c '
-   with open("/home/ubuntu/mem0/server/main.py", "r") as f:
-       content = f.read()
-   target = "\"collection_name\": POSTGRES_COLLECTION_NAME,\n        },"
-   replacement = "\"collection_name\": POSTGRES_COLLECTION_NAME,\n            \"embedding_model_dims\": int(os.environ.get(\"MEM0_DEFAULT_EMBEDDER_DIMS\", 1536)),\n            \"hnsw\": False,\n        },"
-   if target in content:
-       with open("/home/ubuntu/mem0/server/main.py", "w") as f:
-           f.write(content.replace(target, replacement))
-   '
-   ```
-3. Rebuild and recreate the containers:
-   ```bash
-   cd ~/mem0/server && docker compose up -d --build --force-recreate mem0
-   ```
-
-**Plugin:** Official `@mem0/opencode-plugin` npm package (auto-updated) + `mem0-selfhost-patch.ts` hybrid plugin.
-
-The patch plugin (`mem0-selfhost-patch.ts`, loaded explicitly at the root):
-1. Monkey-patches `globalThis.fetch` to rewrite Cloud API routes to self-hosted paths, inject `X-API-Key`, and mock missing endpoints (`/v1/ping/`, projects).
-2. Imports the official `@mem0/opencode-plugin` via **dynamic import** (inside `try/catch`) for its extra hooks (auto-memory, session compaction, etc.).
-3. **Always** registers its own fallback mem0 tools (`add_memory`, `search_memories`, `get_memories`, `get_memory`, `update_memory`, `delete_memory`, `delete_all_memories`, `list_entities`, `delete_entities`, `get_event_status`) using `tool()` from `@opencode-ai/plugin`. These call the self-hosted API directly, so the tools are **always available** even if the official plugin fails to load (e.g. Bun/Node mismatch).
-
-Key advantages:
-- `@mem0/opencode-plugin` auto-updates via npm — no re-patching needed
-- Mem0 tools are ALWAYS registered — never a "tool not found" error for LLM agents
-- The fetch interceptor handles body format translation (`text` → `messages`) and strips unsupported fields (`app_id`, `scope`) silently
-
-**When Mem0 Is Unavailable:**
-
-| Scenario | What happens | Fallback |
-|----------|-------------|----------|
-| Self-hosted API is down / unreachable | Tools still register; `mem0Fetch()` calls fail at runtime with HTTP connection error | Error message returned to LLM, operation fails gracefully |
-| Official `@mem0/opencode-plugin` fails to load (Node/Bun mismatch) | Dynamic import catches the error, logs a warning via ctx | Fallback tools (line above) take over — full mem0 CRUD via REST API |
-| Both official plugin AND REST API are down | Tools register, but every call returns connection error | LLM sees the error and can report it to the user |
-| `MEM0_HOST` or `MEM0_API_KEY` missing | `mem0Fetch()` helper throws "API error" | Operations fail with clear error message |
-| Storage is reset (pgvector table dropped) | REST API returns empty results for all queries | Tools work normally, just no data — same as fresh install |
-
-The system degrades gracefully: tools are always callable, they just fail at the network layer if the server is unreachable. No silent failures.
-
-**Required environment variables (User scope):**
 ```powershell
-[System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')
-[System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', 'YOUR_MEM0_ADMIN_KEY', 'User')
+npm install -g @colbymchenry/codegraph
+codegraph install --yes
+codegraph init
+codegraph explore "symbol or question"
 ```
 
-**Testing & Verification:**
-Verify the setup and patch execution by running the diagnosis script:
-```bash
-bun verify-patch.ts
-```
-This tests:
-1. Mocked `GET /v1/ping/` returns self-hosted identity.
-2. Mocked `GET /v1/organizations/.../projects/...` returns custom categories.
-3. Rewritten `POST /v3/memories/search/` successfully queries your self-hosted VPS backend.
+Lifecycle check: plugin initializes, detects index, `codegraph explore` returns current source, and index update completes.
 
-**Skills:** mem0-remember, mem0-search, mem0-forget, mem0-dream, mem0-pin, mem0-scope, mem0-status, mem0-tour, mem0-context-loader
+### Supermemory
 
-### Token Optimization Plugins
+`plugins/supermemory.ts` adapts current named `SupermemoryPlugin` export to OpenCode's default plugin-object contract. Client configuration lives in ignored `supermemory.jsonc`.
 
-**lazy-load.ts** — Strips all tool/MCP schema definitions from every LLM request. The model calls `load_tool(name)` to fetch individual schemas on-demand. Saves ~85% base tokens per turn.
+The `supermemory` tool supports these modes:
 
-**0-tokens-source.ts** — Wraps the fetch pipeline to track token usage by source (system prompt, tools, user messages, etc.). Use `/tokens` command to view breakdown.
+- `add`
+- `search`
+- `profile`
+- `list`
+- `forget`
 
-**Load order matters:** The `0-` prefix ensures tokens-source loads before lazy-load so the fetch wrapper nesting is correct.
+Lifecycle check: add uniquely tagged temporary memory, find it, retrieve profile/list state, forget it, then prove it no longer appears.
 
-### models-discovery.js
+Server operations: [docs/supermemory-setup.md](docs/supermemory-setup.md).
 
-Custom plugin that queries `9router/v1/models` on startup and auto-registers discovered models with correct `modalities` (text+image input). Solves the "this model does not support image input" error for 9router models.
+### lazy-load
 
-Falls back to `text+image` input for models without explicit capabilities metadata.
+Removes built-in tool schemas from LLM requests and exposes `load_tool(name)`. Loaded tools remain usable for current turn only. MCP tools pass through.
 
-### codegraph-helper.ts
+Lifecycle check: call `load_tool` for shell tool, run exact command, end turn, then prove next turn requires loading again.
 
-Enforces CodeGraph search and automates database updates using OpenCode hooks:
-- **Enforcement (`tool.execute.before`)**: Intercepts `grep_search` and `glob_search`. If the repository is indexed by CodeGraph (`.codegraph` folder exists), it blocks standard grep/glob and returns a redirect error instructing the model to use `codegraph_explore` instead.
-- **Auto-Update (`tool.execute.after`)**: Watches for successful file write/edit tool executions (`replace_file_content`, `write_to_file`, `multi_replace_file_content`) and triggers `codegraph index` in the background asynchronously to ensure the database is always up-to-date with agent changes.
+### tokens-source
+
+Captures system, message, tool, and API token accounting without modifying request payload. `/tokens` displays latest breakdown.
+
+Lifecycle check: complete one model request, invoke `/tokens`, and verify non-empty system/message/tool sections.
+
+### models-discovery
+
+Queries configured OpenAI-compatible provider model endpoint and registers discovered models with text/image modalities.
+
+Lifecycle check: startup completes without discovery exception and `opencode models 9router` includes provider results.
 
 ### opencode-update-notifier
 
-Checks pinned npm plugin entries for newer versions. Shows TUI toast if updates available. Does NOT auto-update.
+Checks configured npm plugins for newer releases and shows a TUI notification. It does not install updates.
 
-To benefit from it, pin your plugin versions: `"oh-my-opencode-slim@x.y.z"` instead of `"oh-my-opencode-slim"`.
+Lifecycle check: plugin initializes and update check completes without changing `package.json`.
 
-## Auto-Update Script
+### RTK
 
-`update-plugins.ps1` updates everything in one shot:
+`plugins/rtk.ts` delegates eligible shell-command rewriting to installed `rtk` binary.
+
+Lifecycle check: plugin initializes, eligible shell command is rewritten, and command output remains equivalent.
+
+## Configuration Rules
+
+- Keep `experimental.primary_tools` unset; it can hide tools from subagents.
+- Keep local plugins in `plugins/`; do not add bridge files.
+- Keep `compaction.keep.tokens` high enough to avoid DeepSeek format drift after compaction.
+- Keep credentials, logs, package caches, and `.codegraph` databases untracked.
+- Use `workathome\.config` only as bare provider/configuration control. It has no custom lazy-load framework.
+
+## Updates
 
 ```powershell
-# Normal run (respects 12h cooldown)
 .\update-plugins.ps1
-
-# Force update now
 .\update-plugins.ps1 -Force
-
-# Dry run (show what would change)
 .\update-plugins.ps1 -DryRun -Force
 ```
 
-What it updates:
-1. **oh-my-opencode-slim** via `bunx` (re-runs installer)
-2. **lazy-load.ts** and **0-tokens-source.ts** from GitHub raw
-3. **tokens.md** command from GitHub raw
-4. **CodeGraph CLI** via `codegraph upgrade`
-5. **npm deps** in `package.json` via `npm update`
+Local plugin patches remain repository-controlled until upstream behavior matches tested OpenCode TUI and Desktop requirements.
 
-**Not auto-updated** (intentionally):
-- `models-discovery.js` -- custom, only you maintain it
-- `mem0-selfhost-patch.ts` -- only changes if Mem0's self-hosted API routes change
-- `opencode-update-notifier` — updated via npm deps step
+## Troubleshooting
 
-## Environment Variables
-
-| Variable | Scope | Value | Purpose |
-|----------|-------|-------|---------|
-| `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS` | User | `true` | Enable omo-slim background agent dispatch |
-| `MEM0_HOST` | User | `https://mem0.tienbac.dpdns.org` | Self-hosted Mem0 endpoint |
-| `MEM0_API_KEY` | User | (your admin key) | Mem0 API authentication |
-
-Set via:
 ```powershell
-[System.Environment]::SetEnvironmentVariable('VAR_NAME', 'value', 'User')
+opencode debug config
+opencode models 9router
+opencode run "Use load_tool to load bash, then run: Write-Output LAZY_LOAD_OK"
 ```
 
-## Known Issues
+Expected `debug config` plugin origins: each local file once plus each npm plugin once.
 
-See [docs/opencode-bugs-known.md](docs/opencode-bugs-known.md).
-
-Key ones:
-- `experimental.primary_tools` breaks subagent tool access — do NOT use it
-- Desktop app (Electron) only loads plugins from `plugins/` dir via auto-discovery
-- Skills in `~/.agents/skills/` need junctions into `~/.config/opencode/skills/`
-- DeepSeek XML regression after compaction — keep `keep.tokens` ≥ 20000 and configure a compaction agent with a stable model
-
-## Maintenance
-
-**Daily:** The `update-plugins.ps1` script handles routine updates with a 12h cooldown.
-
-**When Mem0 upstream changes routes:**
-The `mem0-selfhost-patch.ts` fetch interceptor handles route mapping. If Mem0 changes its self-hosted API routes, update the `ROUTE_REWRITES` array in `mem0-selfhost-patch.ts`. No need to re-patch the npm package.
-
-**When switching models:** Edit both files:
-- `~/.config/opencode/opencode.jsonc` — `model` and `agent` section
-- `~/.config/opencode/oh-my-opencode-slim.json` — active preset's agent models
-
-**To add a new project to CodeGraph:**
-```bash
-cd your-project
-codegraph init
-```
-
-## Architecture Notes
-
-- **Plugin load order:** The patch `./mem0-selfhost-patch.ts` is placed at the root ConfigDir and loaded explicitly as the first entry in the config `plugin` array to guarantee it intercepts requests before `@mem0/opencode-plugin` initializes at startup. Auto-discovered plugins (`0-tokens-source.ts`, `lazy-load.ts`, `models-discovery.js`) load alphabetically after the config array, chaining their fetch wrappers cleanly.
-- **omo-slim overrides default agents:** The installer disables OpenCode's built-in `general` and `explore` agents, replacing them with the Pantheon (Orchestrator, Oracle, etc.).
-- **Context window strategy:** lazy-load strips ~85% of tool schemas. Compaction is enabled with `keep.tokens: 20000` (~10-15 turns verbatim). A dedicated `compaction` agent (`9router/ag/claude-opus-4-6-thinking`) writes the summary — decoupling summary generation from the working model avoids DeepSeek XML format regression. CodeGraph provides surgical context to avoid file-crawling bloat.
-- **No Honcho:** We replaced Honcho with self-hosted Mem0. Honcho was cloud-dependent. Mem0 runs on your VPS with your own LLM routing.
+Known runtime issues: [docs/opencode-bugs-known.md](docs/opencode-bugs-known.md).

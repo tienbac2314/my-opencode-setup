@@ -69,9 +69,6 @@
   "formatter": false,
   "lsp": true,
   "plugin": [
-    "./plugins/0-tokens-source.ts",
-    "./plugins/lazy-load.ts",
-    "./mem0-selfhost-patch.ts",
     "opencode-update-notifier",
     "oh-my-opencode-slim"
   ],

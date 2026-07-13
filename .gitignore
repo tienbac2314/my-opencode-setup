@@ -1,5 +1,9 @@
 # Sensitive files — DO NOT commit secrets
 config/opencode.jsonc
+config/supermemory.jsonc
+config/credentials.json
+credentials.json
+.env
 *.log
 node_modules/
 

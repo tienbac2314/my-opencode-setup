@@ -1,7 +1,6 @@
 param(
   [switch]$SkipRtk,
-  [switch]$SkipCodeGraph,
-  [switch]$SkipMem0
+  [switch]$SkipCodeGraph
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,9 +64,19 @@ foreach ($lp in $legacyPlugins) {
 }
 
 Copy-Item -Recurse "$RepoDir\plugins\*" "$pluginsDir\" -Force
-Copy-Item "$RepoDir\mem0-selfhost-patch.ts" "$ConfigDir\mem0-selfhost-patch.ts" -Force
-Copy-Item "$RepoDir\verify-patch.ts" "$ConfigDir\verify-patch.ts" -Force
-Write-Output "  Installed: models-discovery.js, mem0-selfhost-patch.ts, and verify-patch.ts"
+Write-Output "  Installed file-based plugins from repository"
+
+# Create Supermemory config only when absent so bootstrap never overwrites credentials.
+$supermemoryConfig = "$ConfigDir\supermemory.jsonc"
+if (-not (Test-Path $supermemoryConfig)) {
+  Copy-Item "$RepoDir\config\supermemory.jsonc.example" $supermemoryConfig
+  Write-Output "  Created supermemory.jsonc from template"
+}
+
+# Remove root-level Mem0 artifacts left by older installations.
+Remove-Item "$ConfigDir\mem0-selfhost-patch.ts" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ConfigDir\mem0-selfhost-patch.ts.disabled" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ConfigDir\verify-patch.ts" -Force -ErrorAction SilentlyContinue
 
 # Download tokens command
 New-Item -ItemType Directory -Path "$ConfigDir\commands" -Force | Out-Null
@@ -81,13 +90,20 @@ try {
 # ─── 3. Write package.json + npm install ───
 Write-Output "[3/8] Installing npm dependencies..."
 $pkgPath = "$ConfigDir\package.json"
+$config = Get-Content "$ConfigDir\opencode.jsonc" -Raw | ConvertFrom-Json
+$dependencies = [ordered]@{
+  "@opencode-ai/plugin"       = "latest"
+  "@ai-sdk/openai-compatible" = "latest"
+  "opencode-supermemory"      = "latest"
+}
+foreach ($plugin in $config.plugin) {
+  if ($plugin -is [string] -and $plugin -notmatch '^\./') {
+    $dependencies[$plugin] = "latest"
+  }
+}
 @{
   type = "module"
-  dependencies = @{
-    "@opencode-ai/plugin" = "latest"
-    "@ai-sdk/openai-compatible" = "latest"
-    "@mem0/opencode-plugin" = "latest"
-  }
+  dependencies = $dependencies
 } | ConvertTo-Json | Set-Content $pkgPath -Encoding UTF8
 Push-Location $ConfigDir
 Remove-Item package-lock.json -Force -ErrorAction SilentlyContinue
@@ -128,22 +144,12 @@ if (-not $SkipCodeGraph) {
   Write-Output "[5/8] Skipping CodeGraph (--SkipCodeGraph)"
 }
 
-# ─── 6. Mem0 self-hosted fetch patch ───
-if (-not $SkipMem0) {
-  Write-Output "[6/8] Installing Mem0 self-hosted patch..."
-  # The patch plugin (mem0-selfhost-patch.ts) is copied to the root ConfigDir
-  # and loaded explicitly in the plugin array of opencode.jsonc to run before
-  # the official @mem0/opencode-plugin is loaded at startup.
-  Write-Output "  mem0-selfhost-patch.ts installed (loaded explicitly in opencode.jsonc)"
-  Write-Output "  Required env vars: MEM0_HOST, MEM0_API_KEY"
-  if (-not $env:MEM0_HOST) {
-    Write-Output "  [warn] MEM0_HOST not set — run: [System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')"
-  }
-  if (-not $env:MEM0_API_KEY) {
-    Write-Output "  [warn] MEM0_API_KEY not set — run: [System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', 'YOUR_KEY', 'User')"
-  }
+# ─── 6. Supermemory configuration ───
+Write-Output "[6/8] Checking Supermemory configuration..."
+if ((Get-Content $supermemoryConfig -Raw) -match 'sm_your_api_key_here') {
+  Write-Output "  [warn] Add API key to $supermemoryConfig"
 } else {
-  Write-Output "[6/8] Skipping Mem0 (--SkipMem0)"
+  Write-Output "  Supermemory configuration present"
 }
 
 # ─── 7. Set environment variables ───
@@ -187,7 +193,7 @@ Write-Output ""
 Write-Output "Next steps:"
 Write-Output "  1. Edit API key in: $ConfigDir\opencode.jsonc"
 Write-Output "  2. Run 'codegraph init' in each project you want indexed"
-Write-Output "  3. Run '/honcho:setup' or '/mem0:setup' in OpenCode for memory"
+Write-Output "  3. Configure Supermemory in: $ConfigDir\supermemory.jsonc"
 Write-Output "  4. Run 'ping all agents' in OpenCode to verify omo-slim"
 Write-Output "  5. Restart your terminal for env vars to take effect"
 Write-Output ""

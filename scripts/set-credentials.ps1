@@ -12,8 +12,8 @@
   {
     "router_api_key": "sk-...",
     "router_base_url": "https://...",
-    "mem0_host": "https://...",
-    "mem0_api_key": "sk_admin_...",
+    "supermemory_base_url": "https://supermemory.example.com",
+    "supermemory_api_key": "sm_...",
     "openrouter_api_key": "sk-or-v1-..."
   }
 
@@ -57,11 +57,14 @@ if (Test-Path $ConfigFile) {
   Write-Output "[warn] $ConfigFile does not exist — run bootstrap.ps1 first"
 }
 
-# ─── 2. Mem0 env vars ───
-[System.Environment]::SetEnvironmentVariable('MEM0_HOST', $Credentials.mem0_host, 'User')
-Write-Output "[ok] MEM0_HOST set: $($Credentials.mem0_host)"
-[System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', $Credentials.mem0_api_key, 'User')
-Write-Output "[ok] MEM0_API_KEY set"
+# ─── 2. Supermemory client config ───
+if ($Credentials.supermemory_api_key -and $Credentials.supermemory_base_url) {
+  @{
+    apiKey = $Credentials.supermemory_api_key
+    baseUrl = $Credentials.supermemory_base_url
+  } | ConvertTo-Json | Set-Content "$ConfigDir\supermemory.jsonc" -Encoding UTF8
+  Write-Output "[ok] Supermemory config written"
+}
 
 # ─── 3. OpenCode experimental flag ───
 [System.Environment]::SetEnvironmentVariable('OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS', 'true', 'User')

@@ -1,0 +1,7 @@
+{
+  // Supermemory API key. Keep real value outside Git.
+  "apiKey": "sm_your_api_key_here",
+
+  // Self-hosted Supermemory endpoint.
+  "baseUrl": "https://supermemory.tienbac.dpdns.org"
+}
