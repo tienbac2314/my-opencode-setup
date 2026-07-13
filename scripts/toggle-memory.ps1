@@ -162,7 +162,7 @@ if ($Provider -eq "supermemory") {
     foreach ($skill in $mem0Skills) {
         $targetSkill = "$skillsDir\$skill"
         if (Test-Path $targetSkill) {
-            Remove-Item -Path $targetSkill -Force
+            [System.IO.Directory]::Delete($targetSkill)
             Write-Output "Removed Mem0 skill junction: $skill"
         }
     }
@@ -179,7 +179,7 @@ if ($Provider -eq "supermemory") {
             
             if (Test-Path $sourceSkill) {
                 if (Test-Path $targetSkill) {
-                    Remove-Item -Path $targetSkill -Force
+                    [System.IO.Directory]::Delete($targetSkill)
                 }
                 New-Item -ItemType Junction -Path $targetSkill -Target $sourceSkill | Out-Null
                 Write-Output "Created Mem0 skill junction: $skillName"
