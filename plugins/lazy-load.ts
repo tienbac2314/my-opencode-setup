@@ -254,7 +254,7 @@ function wrapFetch(): void {
             if (pointerList) {
               for (const t of body.tools) {
                 const fn = t?.function
-                if (fn && fn.name === "load_tool") {
+                if (fn && fn.name && fn.name.includes("load_tool")) {
                   fn.description = [
                     "Gateway tool — the only tool you can call directly.",
                     "All other tools are accessed through this tool.",
@@ -385,7 +385,7 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
                 const callArgs = JSON.parse(buf.arguments)
                 toolBuffers.delete(idx)
 
-                if (name === "load_tool") {
+                if (name.includes("load_tool")) {
                   // load_tool passes through. Track the loaded tool in this
                   // stream so subsequent direct calls within the SAME turn work.
                   const loadName = callArgs.name
@@ -593,3 +593,4 @@ export default {
   id: "opencode-lazy-load",
   server: LazyLoadPlugin,
 }
+

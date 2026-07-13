@@ -37,3 +37,7 @@ export const RtkOpenCodePlugin: Plugin = async ({ $ }) => {
     },
   }
 }
+export default {
+  id: "opencode-rtk",
+  server: RtkOpenCodePlugin,
+}
