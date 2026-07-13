@@ -12,6 +12,10 @@ import * as fs from "fs";
 import * as path from "path";
 
 export const CodeGraphHelperPlugin: Plugin = async ({ client, $, directory }) => {
+  if ((globalThis as any).__codegraph_helper_loaded__) return {}
+  ;(globalThis as any).__codegraph_helper_loaded__ = true
+
+  const shell = $
   return {
     async "tool.execute.before"(input, output) {
       const toolName = input.tool;
@@ -35,14 +39,14 @@ export const CodeGraphHelperPlugin: Plugin = async ({ client, $, directory }) =>
       // Auto-update CodeGraph index after successful file writes/edits
       if (hasCodeGraph && ["replace_file_content", "write_to_file", "multi_replace_file_content"].includes(toolName)) {
         try {
-          // Trigger index in background asynchronously
-          $`codegraph index`.catch(() => {});
+          if (shell) { shell\`codegraph index\`.catch(() => {}) }
         } catch {
           // Ignore background runner issues
         }
       }
     }
   };
+};
 };
 
 export default {
