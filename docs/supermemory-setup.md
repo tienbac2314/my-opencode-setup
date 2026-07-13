@@ -90,10 +90,9 @@ If you use a local `cloudflared` config managed via PM2 (e.g. `omni-tunnel`), ad
    Edit your local Cloudflare configuration file (e.g., `/home/ubuntu/.cloudflared/config.yml`):
    ```yaml
    ingress:
-     - hostname: supermemory.tienbac.dpdns.org
-       service: http://127.0.0.1:6767
-     - hostname: mem0.tienbac.dpdns.org
-       service: http://127.0.0.1:8888
+      - hostname: supermemory.tienbac.dpdns.org
+        service: http://127.0.0.1:6767
+      ...
      ...
    ```
 
@@ -105,20 +104,9 @@ If you use a local `cloudflared` config managed via PM2 (e.g. `omni-tunnel`), ad
 
 ---
 
-## 5. Local Client Toggle Configuration
+## 5. Local Client Configuration
 
-Run the switcher script in your local Windows `opencode-dotfiles` folder to toggle the active provider:
-
-```powershell
-# Toggle to SuperMemory (default)
-.\scripts\toggle-memory.ps1 -Provider supermemory
-
-# Toggle back to Mem0 if ever needed
-.\scripts\toggle-memory.ps1 -Provider mem0
-```
-
-This script:
-1. Swaps the memory plugins in `opencode.jsonc`.
+OpenCode now uses **SuperMemory** exclusively. Mem0 has been archived to `mem0-archive/` in the dotfiles repo for historical reference. No toggle needed.
 2. Automatically disables/enables the conflicting context window recovery hooks in `oh-my-opencode-slim.json`.
 3. Cleans up/creates the required skills junctions inside `~/.config/opencode/skills`.
 
