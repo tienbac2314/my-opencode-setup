@@ -97,6 +97,24 @@ function isParsableJson(str: string): boolean {
   try { JSON.parse(str); return true } catch { return false }
 }
 
+function parseDSML(xml: string): Array<{ name: string; args: any }> {
+  const invokes: Array<{ name: string; args: any }> = []
+  const invokeRegex = /<｜｜DSML｜｜invoke name="([^"]+)">([\s\S]*?)<\/｜｜DSML｜｜invoke>/g
+  let invokeMatch: RegExpExecArray | null
+  while ((invokeMatch = invokeRegex.exec(xml)) !== null) {
+    const toolName = invokeMatch[1]
+    const innerContent = invokeMatch[2]
+    const args: Record<string, string> = {}
+    const paramRegex = /<｜｜DSML｜｜parameter name="([^"]+)"[^>]*>([\s\S]*?)<\/｜｜DSML｜｜parameter>/g
+    let paramMatch: RegExpExecArray | null
+    while ((paramMatch = paramRegex.exec(innerContent)) !== null) {
+      args[paramMatch[1]] = paramMatch[2]
+    }
+    invokes.push({ name: toolName, args })
+  }
+  return invokes
+}
+
 // ─── Fetch wrapper (request + response interception) ─────────────────────────
 //
 // REQUEST side: Remove ALL tools except load_tool from body.tools. The LLM
@@ -326,6 +344,7 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
   const decoder = new TextDecoder()
   const encoder = new TextEncoder()
   let buffer = ""
+  let dsmlBuffer = ""
   // Per-index buffer for ALL tool calls: {id, name, arguments}
   const toolBuffers = new Map<number, { id?: string; name?: string; arguments: string }>()
   // Get or create this session's turn-loaded set. Persists across multiple
@@ -357,6 +376,93 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
 
           try {
             const parsed = JSON.parse(data)
+            const delta = parsed?.choices?.[0]?.delta
+            const content = delta?.content || ""
+
+            // ─── DSML parsing and interception ───
+            if (content.includes("<｜｜DSML｜｜") || dsmlBuffer !== "") {
+              dsmlBuffer += content
+              if (delta) {
+                delete delta.content
+              }
+
+              if (dsmlBuffer.includes("</｜｜DSML｜｜tool_calls>")) {
+                const parsedCalls = parseDSML(dsmlBuffer)
+                dsmlBuffer = ""
+
+                if (parsedCalls.length > 0) {
+                  const filtered: any[] = []
+                  for (let i = 0; i < parsedCalls.length; i++) {
+                    const call = parsedCalls[i]
+                    const name = call.name
+                    const bufArgs = JSON.stringify(call.args)
+                    const idx = i
+                    const callId = `dsml_${Date.now()}_${Math.random().toString(36).slice(2)}`
+
+                    if (name.includes("load_tool")) {
+                      const loadName = call.args.name
+                      if (loadName) getTurnLoaded().add(loadName)
+                      filtered.push({
+                        index: idx,
+                        id: callId,
+                        type: "function",
+                        function: {
+                          name: activeLoadToolName,
+                          arguments: bufArgs,
+                        },
+                      })
+                    } else {
+                      if (originals.has(name)) {
+                        if (getTurnLoaded().has(name)) {
+                          filtered.push({
+                            index: idx,
+                            id: callId,
+                            type: "function",
+                            function: {
+                              name,
+                              arguments: bufArgs,
+                            },
+                          })
+                        } else {
+                          getTurnLoaded().add(name)
+                          filtered.push({
+                            index: idx,
+                            id: callId,
+                            type: "function",
+                            function: {
+                              name: activeLoadToolName,
+                              arguments: JSON.stringify({ name }),
+                            },
+                          })
+                        }
+                      } else {
+                        filtered.push({
+                          index: idx,
+                          id: callId,
+                          type: "function",
+                          function: {
+                            name,
+                            arguments: bufArgs,
+                          },
+                        })
+                      }
+                    }
+                  }
+                  if (filtered.length > 0) {
+                    parsed.choices[0].delta.tool_calls = filtered
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`))
+                    continue
+                  }
+                }
+              } else {
+                // Still buffering DSML - emit chunk without content
+                const hasText = delta && (delta.reasoning || parsed.choices[0].finish_reason)
+                if (hasText) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`))
+                }
+                continue
+              }
+            }
             const toolCalls = parsed?.choices?.[0]?.delta?.tool_calls
 
             if (Array.isArray(toolCalls)) {
