@@ -30,7 +30,7 @@
 
 **Mitigation:** Lazy-load response transform converts complete DSML blocks, including blocks split across stream chunks. Standard JSON tool-call and finish deltas must bypass DSML text buffering.
 
-**Configuration:** Keep compaction buffer large enough to reduce format drift. Dedicated stable compaction model remains recommended.
+**Configuration:** Keep supported `compaction.reserved` buffer large enough to reduce format drift. Dedicated stable compaction model remains recommended.
 
 ## Lazy-load per-turn state
 

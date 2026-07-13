@@ -92,13 +92,20 @@ Write-Output "[3/8] Installing npm dependencies..."
 $pkgPath = "$ConfigDir\package.json"
 $config = Get-Content "$ConfigDir\opencode.jsonc" -Raw | ConvertFrom-Json
 $dependencies = [ordered]@{
-  "@opencode-ai/plugin"       = "latest"
-  "@ai-sdk/openai-compatible" = "latest"
-  "opencode-supermemory"      = "latest"
+  "@opencode-ai/plugin"       = "1.17.18"
+  "@ai-sdk/openai-compatible" = "3.0.7"
+  "opencode-supermemory"      = "2.0.8"
 }
 foreach ($plugin in $config.plugin) {
   if ($plugin -is [string] -and $plugin -notmatch '^\./') {
-    $dependencies[$plugin] = "latest"
+    $separator = $plugin.LastIndexOf('@')
+    if ($separator -gt 0) {
+      $packageName = $plugin.Substring(0, $separator)
+      $version = $plugin.Substring($separator + 1)
+      $dependencies[$packageName] = $version
+    } else {
+      $dependencies[$plugin] = "latest"
+    }
   }
 }
 @{

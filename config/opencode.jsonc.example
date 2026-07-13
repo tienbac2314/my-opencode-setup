@@ -69,8 +69,8 @@
   "formatter": false,
   "lsp": true,
   "plugin": [
-    "opencode-update-notifier",
-    "oh-my-opencode-slim"
+    "opencode-update-notifier@0.3.3",
+    "oh-my-opencode-slim@2.1.1"
   ],
   "experimental": {
     "mcp_timeout": 60000
@@ -82,9 +82,6 @@
   "compaction": {
     "auto": true,
     "prune": true,
-    "keep": {
-      "tokens": 20000
-    },
-    "buffer": 8000
+    "reserved": 20000
   }
 }

@@ -67,6 +67,8 @@ OpenCode auto-discovers local files under `~/.config/opencode/plugins/` in both 
 - `opencode-update-notifier`
 - `oh-my-opencode-slim`
 
+Both npm entries are version-pinned in configuration so update-notifier can compare installed and published versions.
+
 Bootstrap copies every repository plugin into that directory. Local plugins must not also be listed explicitly; duplicate registration changes wrapper order and can break Desktop startup.
 
 `0-tokens-source.ts` sorts before `lazy-load.ts`. This ordering lets token reporting observe the request after lazy-load reduces tool schemas.
@@ -142,7 +144,7 @@ Lifecycle check: plugin initializes, eligible shell command is rewritten, and co
 
 - Keep `experimental.primary_tools` unset; it can hide tools from subagents.
 - Keep local plugins in `plugins/`; do not add bridge files.
-- Keep `compaction.keep.tokens` high enough to avoid DeepSeek format drift after compaction.
+- Keep `compaction.reserved` high enough to leave room for stable compaction output.
 - Keep credentials, logs, package caches, and `.codegraph` databases untracked.
 - Use `workathome\.config` only as bare provider/configuration control. It has no custom lazy-load framework.
 
