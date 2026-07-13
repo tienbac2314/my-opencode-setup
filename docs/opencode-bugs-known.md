@@ -260,3 +260,14 @@ The domain list (`api.openai.com`, `api.deepseek.com`, etc.) only matters for pr
 **Symptom:** OpenCode cannot select or resolve `9router/oc/deepseek-v4-flash-free` or other free models under the `9router` provider because they are missing from the proxy's `/v1/models` endpoint list, preventing registration by the discovery plugin.
 
 **Fix:** Modified `plugins/models-discovery.js` to explicitly inject these free models (`oc/big-pickle`, `oc/deepseek-v4-flash-free`, `oc/hy3-free`, `oc/mimo-v2.5-free`, `oc/north-mini-code-free`, and `oc/nemotron-3-ultra-free`) into the discovered models array when `providerId === '9router'`. This registers them with correct capabilities (vision for flash/hy3/mimo, reasoning for flash/hy3) and proper token limits (`context: 190000`, `output: 16384`) so OpenCode can route them through the `9router` proxy.
+
+---
+
+## Dynamic CodeGraph Enforcement & Auto-Index Updates
+
+**Goal:** Force agents to use CodeGraph search tools in repositories that are indexed (to prevent token waste on raw grep/glob), while keeping standard grep/glob as a fallback for non-indexed repositories. Also, automatically keep the CodeGraph index updated when files are written or edited.
+
+**Fix:** Created `plugins/codegraph-helper.ts` which uses two OpenCode hooks:
+1. `tool.execute.before`: Intercepts `grep_search` and `glob_search` execution. If a `.codegraph` directory exists in the workspace, it blocks the tool run and throws a redirection error: *"This repository is indexed by CodeGraph. Standard grep/glob is blocked. Use codegraph_explore instead."*
+2. `tool.execute.after`: Runs after file write/edit tools (`replace_file_content`, `write_to_file`, `multi_replace_file_content`) finish successfully. It triggers an asynchronous `codegraph index` update command in the background.
+

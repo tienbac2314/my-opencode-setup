@@ -31,7 +31,8 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 ├── plugins/                          # Auto-discovered file-based plugins
 │   ├── 0-tokens-source.ts            # Token usage breakdown (prefix ensures load order)
 │   ├── lazy-load.ts                  # Lazy tool loading to save tokens
-│   └── models-discovery.js           # Auto-discover 9router models with modalities
+│   ├── models-discovery.js           # Auto-discover 9router models with modalities
+│   └── codegraph-helper.ts           # Enforces and auto-updates CodeGraph index
 ├── opencode-mem0-plugin/             # (LEGACY, can be removed — replaced by fetch patch)
 │   ├── dist/index.js                 # Was: patched Bun bundle for self-hosted
 │   └── opencode-skills/              # mem0-remember, mem0-search, etc.
@@ -51,9 +52,10 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 │   ├── opencode.jsonc.example        # Template config (no secrets)
 │   └── oh-my-opencode-slim.json      # Agent preset config (9router default)
 ├── plugins/
-│   ├── opencode-lazy-load.ts         # Snapshot of lazy-load plugin
-│   ├── tokens-source.ts              # Snapshot of tokens-source plugin
-│   └── models-discovery.js           # Custom model discovery plugin
+│   ├── lazy-load.ts                  # Snapshot of lazy-load plugin
+│   ├── 0-tokens-source.ts            # Snapshot of tokens-source plugin
+│   ├── models-discovery.js           # Custom model discovery plugin
+│   └── codegraph-helper.ts           # CodeGraph dynamic helper plugin
 ├── mem0-plugin/                      # Patched Mem0 plugin for self-hosted
 ├── mem0-selfhost-patch.ts            # Fetch interceptor for self-hosted Mem0
 ├── skills/                           # All skills
@@ -214,6 +216,12 @@ This tests:
 Custom plugin that queries `9router/v1/models` on startup and auto-registers discovered models with correct `modalities` (text+image input). Solves the "this model does not support image input" error for 9router models.
 
 Falls back to `text+image` input for models without explicit capabilities metadata.
+
+### codegraph-helper.ts
+
+Enforces CodeGraph search and automates database updates using OpenCode hooks:
+- **Enforcement (`tool.execute.before`)**: Intercepts `grep_search` and `glob_search`. If the repository is indexed by CodeGraph (`.codegraph` folder exists), it blocks standard grep/glob and returns a redirect error instructing the model to use `codegraph_explore` instead.
+- **Auto-Update (`tool.execute.after`)**: Watches for successful file write/edit tool executions (`replace_file_content`, `write_to_file`, `multi_replace_file_content`) and triggers `codegraph index` in the background asynchronously to ensure the database is always up-to-date with agent changes.
 
 ### opencode-update-notifier
 
