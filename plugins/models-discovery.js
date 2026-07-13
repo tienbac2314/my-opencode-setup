@@ -144,8 +144,3 @@ function inferContext(id) {
   if (/\b(32k|32-k)\b/.test(s)) return { context: 32000, output: 8192 }
   return null
 }
-
-export default {
-  id: "opencode-models-discovery",
-  server: ModelDiscovery,
-}

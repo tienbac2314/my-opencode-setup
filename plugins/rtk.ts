@@ -1,11 +1,15 @@
 import type { Plugin } from "@opencode-ai/plugin"
 
-export const RtkOpenCodePlugin: Plugin = async ({ $ }) => {
-  if ((globalThis as any).__rtk_opencode_loaded__) return {}
-  ;(globalThis as any).__rtk_opencode_loaded__ = true
+// RTK OpenCode plugin — rewrites commands to use rtk for token savings.
+// Requires: rtk >= 0.23.0 in PATH.
+//
+// This is a thin delegating plugin: all rewrite logic lives in `rtk rewrite`,
+// which is the single source of truth (src/discover/registry.rs).
+// To add or change rewrite rules, edit the Rust registry — not this file.
 
+export const RtkOpenCodePlugin: Plugin = async ({ $ }) => {
   try {
-    await $`which rtk`.quiet()
+    await $`where rtk`.quiet()
   } catch {
     console.warn("[rtk] rtk binary not found in PATH — plugin disabled")
     return {}
@@ -32,9 +36,4 @@ export const RtkOpenCodePlugin: Plugin = async ({ $ }) => {
       }
     },
   }
-}
-
-export default {
-  id: "opencode-rtk",
-  server: RtkOpenCodePlugin,
 }
