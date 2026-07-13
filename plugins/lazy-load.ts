@@ -54,6 +54,7 @@ const originalSchemas = new Map<string, any>()
  * Cleared when the SSE stream ends (finish_reason or [DONE]).
  */
 const turnLoaded = new Map<string, Set<string>>()
+let activeLoadToolName = "load_tool"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ function briefOf(description: string): string {
 function buildPointerList(): string {
   const pointers: string[] = []
   for (const [name, desc] of originals) {
-    if (name === "load_tool") continue
+    if (name.includes("load_tool")) continue
     const brief = briefOf(desc)
     pointers.push(brief ? `- ${name} - ${brief}` : `- ${name}`)
   }
@@ -162,11 +163,20 @@ function wrapFetch(): void {
         try {
           const body = JSON.parse(bodyText)
           if (Array.isArray(body.tools)) {
+            // Find the active name of load_tool (could be namespaced)
+            const loadToolEntry = body.tools.find((t: any) => {
+              const name = t?.function?.name || t?.name || ""
+              return name.includes("load_tool")
+            })
+            if (loadToolEntry) {
+              activeLoadToolName = loadToolEntry.function?.name || loadToolEntry.name || "load_tool"
+            }
+
             // Capture schemas and descriptions for all tools on the fly
             for (const t of body.tools) {
               const fn = t?.function
               const name = fn?.name || t?.name || ""
-              if (!name || name === "load_tool") continue
+              if (!name || name.includes("load_tool")) continue
 
               const desc = fn?.description || t?.description || ""
               const params = fn?.parameters || t?.parameters
@@ -182,7 +192,7 @@ function wrapFetch(): void {
             // Keep ONLY load_tool in the tools array
             body.tools = body.tools.filter((t: any) => {
               const name = t?.function?.name || t?.name || ""
-              return name === "load_tool"
+              return name.includes("load_tool")
             })
 
             // STRIP prior load_tool calls AND their results from the messages
@@ -211,7 +221,7 @@ function wrapFetch(): void {
                 for (const m of priorMessages) {
                   if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
                     for (const tc of m.tool_calls) {
-                      if (tc?.function?.name === "load_tool" && tc?.id) {
+                      if (tc?.function?.name && tc.function.name.includes("load_tool") && tc?.id) {
                         loadToolCallIds.add(tc.id)
                       }
                     }
@@ -224,7 +234,7 @@ function wrapFetch(): void {
                     continue
                   }
                   if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
-                    m.tool_calls = m.tool_calls.filter((tc: any) => tc?.function?.name !== "load_tool")
+                    m.tool_calls = m.tool_calls.filter((tc: any) => !tc?.function?.name || !tc.function.name.includes("load_tool"))
                     if (m.tool_calls.length === 0) {
                       // Delete the empty tool_calls array — some providers (DeepSeek)
                       // reject "tool_calls: []" with "Expected an array with minimum length 1"
@@ -395,7 +405,7 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
                     id: buf.id,
                     type: "function",
                     function: {
-                      name: "load_tool",
+                      name: buf.name,
                       arguments: buf.arguments,
                     },
                   })
@@ -429,7 +439,7 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
                         id: buf.id,
                         type: "function",
                         function: {
-                          name: "load_tool",
+                          name: activeLoadToolName,
                           arguments: JSON.stringify({ name }),
                         },
                       })
@@ -482,7 +492,7 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
       // Emit any remaining buffered tool calls (incomplete arguments).
       // Pass through as-is using whatever name was captured.
       for (const [idx, buf] of toolBuffers) {
-        const name = buf.name || "load_tool"
+        const name = buf.name || activeLoadToolName
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           choices: [{ delta: { tool_calls: [{
             index: idx,
@@ -573,7 +583,7 @@ const LazyLoadPlugin: Plugin = async (_input, _options) => {
 
     async "tool.definition"(input, output) {
       // Never modify our own tool
-      if (input.toolID === "load_tool") return
+      if (input.toolID.includes("load_tool")) return
 
       if (!originals.has(input.toolID)) {
         originals.set(input.toolID, output.description)
