@@ -709,11 +709,6 @@ export function createSSETransform(sessionID: string): TransformStream<Uint8Arra
 // ─── Plugin ──────────────────────────────────────────────────────────────────
 
 const LazyLoadPlugin: Plugin = async (_input, _options) => {
-  if ((globalThis as any).__lazy_load_loaded__) {
-    return {}
-  }
-  (globalThis as any).__lazy_load_loaded__ = true
-
   // Wrap fetch BEFORE the first LLM call. The wrapper removes all tools
   // except load_tool from the request body, and rewrites load_tool execute
   // calls to real tool calls in the SSE response — no throw, no error, no prompt.

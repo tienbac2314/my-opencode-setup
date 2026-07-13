@@ -76,6 +76,7 @@ export const ModelDiscovery = async ({ client }) => {
         for (const m of models) {
           const id = m.id || m.name
           if (!id) continue
+          if (id.startsWith('opencode/')) continue
           if (include && !include.test(id)) continue
           if (exclude && exclude.test(id)) continue
 

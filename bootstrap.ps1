@@ -122,13 +122,18 @@ Write-Output "  npm install complete"
 Write-Output "[4/8] Installing oh-my-opencode-slim..."
 $bunx = Get-Command bunx -ErrorAction SilentlyContinue
 if ($bunx) {
-  bunx oh-my-opencode-slim@latest install 2>&1 | Out-Null
+  bunx oh-my-opencode-slim@2.1.1 install 2>&1 | Out-Null
   Write-Output "  oh-my-opencode-slim installed"
   # Restore our 9router preset if the installer overwrote it
   if (Test-Path "$RepoDir\config\oh-my-opencode-slim.json") {
     Copy-Item "$RepoDir\config\oh-my-opencode-slim.json" "$ConfigDir\oh-my-opencode-slim.json" -Force
     Write-Output "  Restored 9router preset config"
   }
+  Copy-Item "$RepoDir\config\tui.json" "$ConfigDir\tui.json" -Force
+  Write-Output "  Restored pinned TUI plugin config"
+  $activeConfigPath = "$ConfigDir\opencode.jsonc"
+  & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $activeConfigPath -Name "oh-my-opencode-slim" -Version "2.1.1"
+  Write-Output "  Restored pinned global plugin config"
 } else {
   Write-Output "  [warn] bunx not found — install bun first: https://bun.sh"
 }
@@ -191,6 +196,8 @@ if (-not $SkipRtk) {
   if ($rtk) {
     Write-Output "RTK found, installing OpenCode plugin..."
     rtk init -g --opencode 2>$null
+    Copy-Item "$RepoDir\plugins\rtk.ts" "$ConfigDir\plugins\rtk.ts" -Force
+    Write-Output "  Restored audited RTK plugin"
   }
 }
 

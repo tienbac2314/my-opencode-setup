@@ -93,6 +93,13 @@ afterAll(() => {
 })
 
 describe("lazy-load SSE transform", () => {
+  test("re-registers load_tool when OpenCode initializes the plugin again", async () => {
+    const hooks = await (lazyLoadPlugin.server as any)({}, {})
+
+    expect(hooks.tool?.load_tool).toBeDefined()
+    expect(hooks["tool.definition"]).toBeFunction()
+  })
+
   test("preserves a standard load_tool call split across argument chunks", async () => {
     const output = await transform("standard-load", [
       toolCall("load_tool", '{"na'),
