@@ -47,6 +47,8 @@ OpenCode process
 
 OpenCode auto-discovers every file under `~/.config/opencode/plugins/`. Local file plugins must not also appear in `opencode.jsonc` or `tui.json`; duplicate registration changes hook order, nests `fetch` wrappers, and can make Desktop behavior differ from TUI behavior. Explicit plugin arrays contain pinned npm packages only.
 
+Project config `.opencode/opencode.json` must omit the `plugin` property. An empty project value (`"plugin": []`) overrides Desktop's displayed plugin list even while resolved `plugin_origins` and `load_tool` remain functional. If Desktop briefly shows eight or nine plugins, returns to eight, then shows only `Plugins configured in opencode.json`, follow [Desktop Plugin List Hidden by Project Override](knownbug.md#desktop-plugin-list-hidden-by-project-override) before debugging lazy load or Supermemory.
+
 `mem0-archive/` contains historical Mem0 implementation and documentation. Bootstrap removes legacy Mem0 runtime artifacts and never deploys this directory.
 
 ## Tool Execution Flow
@@ -173,6 +175,8 @@ rtk opencode run --model 9router/oc/deepseek-v4-flash-free "Use load_tool to loa
 ```
 
 Expected lazy-load trace contains `load_tool`, shell command, and `LAZY_LOAD_OK`.
+
+Desktop plugin-status verification is separate from tool execution: resolved `plugin` and `plugin_origins` must both contain eight entries, and the Plugins tab must remain at eight across repeated opens after a full App reload.
 
 Plugin-specific upgrade gates and patch excerpts: [pr.md](pr.md). Current runtime edge cases: [knownbug.md](knownbug.md).
 

@@ -19,6 +19,35 @@ Expected: eight origins; every local file once.
 
 **Recovery:** remove explicit file entries, run bootstrap to restore active plugin directory and pinned npm entries, restart all OpenCode processes.
 
+## Desktop Plugin List Hidden by Project Override
+
+**Symptom:** Desktop status opens with eight plugins, may briefly show nine during reload, settles at eight, then later displays only `Plugins configured in opencode.json`. Tool calls can still work because plugin origins remain loaded.
+
+**Cause:** project-scoped `.opencode/opencode.json` contains `"plugin": []`. In OpenCode `1.17.18`, runtime loading uses resolved `plugin_origins`, while Desktop status reads resolved `plugin`. Empty project array overwrites displayed list without unloading eight origins. This is a configuration-layer bug, not evidence that `load_tool`, local plugins, or Supermemory failed.
+
+**Rule:** omit `plugin` entirely from project `.opencode/opencode.json`. Never use an empty array to mean “no project plugins.” Runtime npm plugin pins remain in user config; local plugins remain auto-discovered from plugin directory.
+
+**Safe detection:** inspect only counts and origin specs. Do not print full resolved config because it contains provider and plugin credentials.
+
+```powershell
+$config = (opencode debug config | Out-String) | ConvertFrom-Json
+[pscustomobject]@{
+  Plugins = @($config.plugin).Count
+  Origins = @($config.plugin_origins).Count
+}
+$config.plugin_origins | ForEach-Object { $_.spec }
+```
+
+Expected: `Plugins = 8`, `Origins = 8`, with two npm and six local origins listed once each. `Plugins = 0`, `Origins = 8` fingerprints project override; do not change lazy-load code.
+
+**Recovery:** remove only project `plugin` property, preserve `$schema`, then fully reload Desktop with `Ctrl+R` or start a new process. Open status Plugins tab at least three times and confirm count stays eight. Run one `load_tool` shell marker afterward; plugin display and tool execution are independent checks.
+
+**Regression guard:** `tests/bootstrap.test.ts` asserts `.opencode/opencode.json` has no `plugin` property. Run `rtk bun test` before committing or after changing project configuration.
+
+**Log attribution:** one Desktop `run=` log can contain events from multiple workspaces. Associate plugin errors with nearest surrounding `directory=` record before treating them as this repository's failure.
+
+**Fresh-agent order:** check project override, compare safe counts, reload App, verify repeated status, then test `load_tool`. Investigate plugin implementation only if counts or tool execution still fail. This order prevents needless rollback of working lazy-load and Supermemory migration code.
+
 ## Desktop Plugin Module Shape
 
 **Symptom:** TUI loads plugin; Desktop reports missing default export, unavailable tool, or `input.$ is not a function`.

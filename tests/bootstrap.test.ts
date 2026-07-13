@@ -6,6 +6,11 @@ import { fileURLToPath } from "node:url"
 
 const script = readFileSync(new URL("../bootstrap.ps1", import.meta.url), "utf8")
 const pinPluginScript = fileURLToPath(new URL("../scripts/pin-opencode-plugin.ps1", import.meta.url))
+const projectConfig = JSON.parse(readFileSync(new URL("../.opencode/opencode.json", import.meta.url), "utf8"))
+
+test("project config does not override global plugins", () => {
+  expect(projectConfig).not.toHaveProperty("plugin")
+})
 
 describe("bootstrap plugin pinning", () => {
   test("keeps oh-my-opencode-slim pinned after its installer runs", () => {
