@@ -7,9 +7,15 @@ import type { Plugin } from "@opencode-ai/plugin"
 // which is the single source of truth (src/discover/registry.rs).
 // To add or change rewrite rules, edit the Rust registry — not this file.
 
-export const RtkOpenCodePlugin: Plugin = async ({ $ }) => {
+export const RtkOpenCodePlugin: Plugin = async (input) => {
   if ((globalThis as any).__rtk_opencode_loaded__) return {}
   ;(globalThis as any).__rtk_opencode_loaded__ = true
+
+  const $ = input?.$;
+  if (typeof $ !== "function") {
+    console.warn("[rtk] Bun shell '$' is not available — plugin disabled")
+    return {}
+  }
 
   try {
     await $`where rtk`.quiet()
