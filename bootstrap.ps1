@@ -26,6 +26,12 @@ if (-not (Test-Path $jsonc)) {
 # Copy AGENTS.md
 Copy-Item "$RepoDir\AGENTS.md" "$ConfigDir\AGENTS.md" -Force
 
+# Copy tui.json
+if (Test-Path "$RepoDir\config\tui.json") {
+  Copy-Item "$RepoDir\config\tui.json" "$ConfigDir\tui.json" -Force
+  Write-Output "  Copied tui.json"
+}
+
 # Copy skills
 Copy-Item -Recurse "$RepoDir\skills" $ConfigDir -Force
 
