@@ -253,3 +253,10 @@ These prevent re-registration on second load. The guards are safe because the re
 
 The domain list (`api.openai.com`, `api.deepseek.com`, etc.) only matters for providers that use non-standard paths. For any standard `/chat/completions` endpoint, the plugin works out of the box.
 
+---
+
+## 9router missing free opencode models
+
+**Symptom:** OpenCode cannot select or resolve `9router/oc/deepseek-v4-flash-free` or other free models under the `9router` provider because they are missing from the proxy's `/v1/models` endpoint list, preventing registration by the discovery plugin.
+
+**Fix:** Modified `plugins/models-discovery.js` to explicitly inject these free models (`oc/big-pickle`, `oc/deepseek-v4-flash-free`, `oc/hy3-free`, `oc/mimo-v2.5-free`, `oc/north-mini-code-free`, and `oc/nemotron-3-ultra-free`) into the discovered models array when `providerId === '9router'`. This registers them with correct capabilities (vision for flash/hy3/mimo, reasoning for flash/hy3) and proper token limits (`context: 190000`, `output: 16384`) so OpenCode can route them through the `9router` proxy.

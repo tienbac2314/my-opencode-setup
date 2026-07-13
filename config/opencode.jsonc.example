@@ -28,10 +28,12 @@
       "model": "opencode/deepseek-v4-flash-free"
     },
     "general": {
-      "model": "opencode/deepseek-v4-flash-free"
+      "model": "opencode/deepseek-v4-flash-free",
+      "disable": true
     },
     "explore": {
-      "model": "opencode/deepseek-v4-flash-free"
+      "model": "opencode/deepseek-v4-flash-free",
+      "disable": true
     },
     "compaction": {
       "model": "9router/ag/claude-opus-4-6-thinking"

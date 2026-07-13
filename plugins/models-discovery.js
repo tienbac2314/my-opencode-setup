@@ -43,6 +43,29 @@ export const ModelDiscovery = async ({ client }) => {
             }
           }
         }
+        
+        if (providerId === '9router') {
+          const freeModels = [
+            { id: 'oc/big-pickle', caps: { vision: false } },
+            { id: 'oc/deepseek-v4-flash-free', caps: { vision: true, thinking: true } },
+            { id: 'oc/hy3-free', caps: { vision: true, thinking: true } },
+            { id: 'oc/mimo-v2.5-free', caps: { vision: true } },
+            { id: 'oc/north-mini-code-free', caps: { vision: false } },
+            { id: 'oc/nemotron-3-ultra-free', caps: { vision: false } }
+          ]
+          for (const fm of freeModels) {
+            if (!models.some(m => (m.id || m.name) === fm.id)) {
+              models.push({
+                id: fm.id,
+                capabilities: {
+                  ...fm.caps,
+                  contextWindow: 190000,
+                  maxOutput: 16384
+                }
+              })
+            }
+          }
+        }
 
         if (!models.length) continue
 
