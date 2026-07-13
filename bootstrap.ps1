@@ -108,6 +108,8 @@ $pkgPath = "$ConfigDir\package.json"
     "@ai-sdk/openai-compatible" = "latest"
     "@mem0/opencode-plugin" = "latest"
     "opencode-supermemory" = "latest"
+    "opencode-update-notifier" = "latest"
+    "oh-my-opencode-slim" = "latest"
   }
 } | ConvertTo-Json | Set-Content $pkgPath -Encoding UTF8
 Push-Location $ConfigDir
