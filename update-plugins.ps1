@@ -153,7 +153,7 @@ if ($DryRun) {
       }
     }
     # Remove deps that are no longer in plugin config (except core)
-    $core = @("@opencode-ai/plugin", "@ai-sdk/openai-compatible")
+    $core = @("@opencode-ai/plugin", "@ai-sdk/openai-compatible", "opencode-supermemory")
     $toRemove = @()
     foreach ($key in $pkg.dependencies.PSObject.Properties.Name) {
       if ($key -in $core) { continue }

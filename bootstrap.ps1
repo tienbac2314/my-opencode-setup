@@ -98,6 +98,7 @@ foreach ($p in $parsed.plugin) {
 $deps = [ordered]@{
   "@opencode-ai/plugin"      = "latest"
   "@ai-sdk/openai-compatible" = "latest"
+  "opencode-supermemory"     = "latest"
 }
 foreach ($pkg in $npmPlugins) {
   $deps[$pkg] = "latest"
