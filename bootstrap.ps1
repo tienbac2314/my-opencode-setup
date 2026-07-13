@@ -65,9 +65,17 @@ foreach ($lp in $legacyPlugins) {
 }
 
 Copy-Item -Recurse "$RepoDir\plugins\*" "$pluginsDir\" -Force
-Copy-Item "$RepoDir\mem0-selfhost-patch.ts" "$ConfigDir\mem0-selfhost-patch.ts" -Force
 Copy-Item "$RepoDir\verify-patch.ts" "$ConfigDir\verify-patch.ts" -Force
-Write-Output "  Installed: models-discovery.js, mem0-selfhost-patch.ts, and verify-patch.ts"
+
+# Detect active provider
+$supermemoryActive = (Test-Path "$ConfigDir\supermemory.jsonc") -or (Test-Path "$ConfigDir\mem0-selfhost-patch.ts.disabled")
+if ($supermemoryActive) {
+  Copy-Item "$RepoDir\mem0-selfhost-patch.ts" "$ConfigDir\mem0-selfhost-patch.ts.disabled" -Force
+  Write-Output "  Installed: models-discovery.js, verify-patch.ts (Mem0 patch is disabled)"
+} else {
+  Copy-Item "$RepoDir\mem0-selfhost-patch.ts" "$ConfigDir\mem0-selfhost-patch.ts" -Force
+  Write-Output "  Installed: models-discovery.js, mem0-selfhost-patch.ts, and verify-patch.ts"
+}
 
 # Download tokens command
 New-Item -ItemType Directory -Path "$ConfigDir\commands" -Force | Out-Null
@@ -87,6 +95,7 @@ $pkgPath = "$ConfigDir\package.json"
     "@opencode-ai/plugin" = "latest"
     "@ai-sdk/openai-compatible" = "latest"
     "@mem0/opencode-plugin" = "latest"
+    "opencode-supermemory" = "latest"
   }
 } | ConvertTo-Json | Set-Content $pkgPath -Encoding UTF8
 Push-Location $ConfigDir
@@ -129,7 +138,10 @@ if (-not $SkipCodeGraph) {
 }
 
 # ─── 6. Mem0 self-hosted fetch patch ───
-if (-not $SkipMem0) {
+if ($supermemoryActive) {
+  Write-Output "[6/8] SuperMemory is active. Skipping Mem0 patch configuration."
+  Write-Output "  Required SuperMemory configuration lives in supermemory.jsonc"
+} elseif (-not $SkipMem0) {
   Write-Output "[6/8] Installing Mem0 self-hosted patch..."
   # The patch plugin (mem0-selfhost-patch.ts) is copied to the root ConfigDir
   # and loaded explicitly in the plugin array of opencode.jsonc to run before

@@ -1,0 +1,7 @@
+{
+  // Your Supermemory API key (starts with sm_)
+  "apiKey": "sm_your_api_key_here",
+  
+  // Base URL of your self-hosted Supermemory instance or platform
+  "baseUrl": "https://supermemory.tienbac.dpdns.org"
+}
