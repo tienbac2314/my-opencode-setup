@@ -124,20 +124,61 @@ if ($cg) {
   Write-Host "  [skip] codegraph not found" -ForegroundColor DarkGray
 }
 
-# --- 5. npm deps in ~/.config/opencode/package.json ---
-Write-Host "`n[5/5] npm dependencies (package.json)..." -ForegroundColor Yellow
+# --- 5. Sync npm deps with opencode.jsonc plugin list ---
+Write-Host "`n[5/5] Syncing npm dependencies with plugin config..." -ForegroundColor Yellow
 if ($DryRun) {
-  Write-Host "  [dry-run] Would run: npm update in $ConfigDir" -ForegroundColor DarkGray
+  Write-Host "  [dry-run] Would sync package.json with opencode.jsonc plugin list" -ForegroundColor DarkGray
 } else {
   try {
-    Push-Location $ConfigDir
-    npm update --save 2>&1 | Out-Null
-    Pop-Location
-    $updated += "npm-deps"
-    Write-Host "  [ok] npm deps updated" -ForegroundColor Green
+    $config = Get-Content "$ConfigDir\opencode.jsonc" -Raw
+    $parsed = $config | ConvertFrom-Json
+    $npmPlugins = @()
+    foreach ($p in $parsed.plugin) {
+      if ($p -is [string] -and $p -notmatch '^\./') {
+        $npmPlugins += $p
+      }
+    }
+    $pkgPath = "$ConfigDir\package.json"
+    $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
+    # Ensure dependencies exist as PSCustomObject
+    if (-not $pkg.dependencies) {
+      $pkg | Add-Member -NotePropertyName dependencies -NotePropertyValue ([PSCustomObject]@{})
+    }
+    $changed = $false
+    foreach ($pkgName in $npmPlugins) {
+      $existing = $pkg.dependencies.$pkgName
+      if (-not $existing) {
+        $pkg.dependencies | Add-Member -NotePropertyName $pkgName -NotePropertyValue "latest"
+        $changed = $true
+      }
+    }
+    # Remove deps that are no longer in plugin config (except core)
+    $core = @("@opencode-ai/plugin", "@ai-sdk/openai-compatible", "@mem0/opencode-plugin")
+    $toRemove = @()
+    foreach ($key in $pkg.dependencies.PSObject.Properties.Name) {
+      if ($key -in $core) { continue }
+      if ($key -notin $npmPlugins) { $toRemove += $key }
+    }
+    foreach ($key in $toRemove) {
+      $pkg.dependencies.PSObject.Properties.Remove($key)
+      $changed = $true
+    }
+    if ($changed) {
+      $pkg | ConvertTo-Json -Depth 5 | Set-Content $pkgPath -Encoding UTF8
+      Push-Location $ConfigDir
+      npm update --save 2>&1 | Out-Null
+      Pop-Location
+      $updated += "npm-sync"
+      Write-Host "  [ok] package.json synced, deps updated" -ForegroundColor Green
+    } else {
+      Push-Location $ConfigDir
+      npm update --save 2>&1 | Out-Null
+      Pop-Location
+      Write-Host "  [ok] package.json already in sync" -ForegroundColor DarkGray
+    }
   } catch {
-    Pop-Location
-    Write-Host "  [warn] npm update failed: $($_.Exception.Message)" -ForegroundColor Red
+    Pop-Location -ErrorAction SilentlyContinue
+    Write-Host "  [warn] npm sync failed: $($_.Exception.Message)" -ForegroundColor Red
   }
 }
 

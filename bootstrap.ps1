@@ -101,17 +101,25 @@ try {
 # ─── 3. Write package.json + npm install ───
 Write-Output "[3/8] Installing npm dependencies..."
 $pkgPath = "$ConfigDir\package.json"
-@{
-  type = "module"
-  dependencies = @{
-    "@opencode-ai/plugin" = "latest"
-    "@ai-sdk/openai-compatible" = "latest"
-    "@mem0/opencode-plugin" = "latest"
-    "opencode-supermemory" = "latest"
-    "opencode-update-notifier" = "latest"
-    "oh-my-opencode-slim" = "latest"
+# Read npm plugin names from opencode.jsonc's plugin array so deps
+# stay in sync with config automatically — no separate hardcoded list.
+$config = Get-Content "$ConfigDir\opencode.jsonc" -Raw
+$parsed = $config | ConvertFrom-Json
+$npmPlugins = @()
+foreach ($p in $parsed.plugin) {
+  if ($p -is [string] -and $p -notmatch '^\./') {
+    $npmPlugins += $p
   }
-} | ConvertTo-Json | Set-Content $pkgPath -Encoding UTF8
+}
+$deps = [ordered]@{
+  "@opencode-ai/plugin"      = "latest"
+  "@ai-sdk/openai-compatible" = "latest"
+  "@mem0/opencode-plugin"    = "latest"
+}
+foreach ($pkg in $npmPlugins) {
+  $deps[$pkg] = "latest"
+}
+@{ type = "module"; dependencies = $deps } | ConvertTo-Json | Set-Content $pkgPath -Encoding UTF8
 Push-Location $ConfigDir
 Remove-Item package-lock.json -Force -ErrorAction SilentlyContinue
 npm install 2>&1 | Out-Null
