@@ -115,6 +115,25 @@ function parseDSML(xml: string): Array<{ name: string; args: any }> {
   return invokes
 }
 
+function resolveOriginalToolName(name: string): string {
+  const lower = name.toLowerCase()
+  for (const k of originals.keys()) {
+    if (k.toLowerCase() === lower) return k
+  }
+  return name
+}
+
+function getPartialTagLength(str: string): number {
+  const tag = "<｜｜DSML｜｜tool_calls>"
+  for (let len = tag.length - 1; len > 0; len--) {
+    const prefix = tag.slice(0, len)
+    if (str.endsWith(prefix)) {
+      return len
+    }
+  }
+  return 0
+}
+
 // ─── Fetch wrapper (request + response interception) ─────────────────────────
 //
 // REQUEST side: Remove ALL tools except load_tool from body.tools. The LLM
@@ -344,7 +363,7 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
   const decoder = new TextDecoder()
   const encoder = new TextEncoder()
   let buffer = ""
-  let dsmlBuffer = ""
+  let streamText = ""
   // Per-index buffer for ALL tool calls: {id, name, arguments}
   const toolBuffers = new Map<number, { id?: string; name?: string; arguments: string }>()
   // Get or create this session's turn-loaded set. Persists across multiple
@@ -377,43 +396,86 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
           try {
             const parsed = JSON.parse(data)
             const delta = parsed?.choices?.[0]?.delta
-            const content = delta?.content || ""
+            if (delta) {
+              const content = delta.content || ""
+              const reasoning = delta.reasoning_content || ""
 
-            // ─── DSML parsing and interception ───
-            if (content.includes("<｜｜DSML｜｜") || dsmlBuffer !== "") {
-              dsmlBuffer += content
-              if (delta) {
-                delete delta.content
-              }
+              if (content) streamText += content
+              if (reasoning) streamText += reasoning
 
-              if (dsmlBuffer.includes("</｜｜DSML｜｜tool_calls>")) {
-                const parsedCalls = parseDSML(dsmlBuffer)
-                dsmlBuffer = ""
+              const isReasoning = reasoning.length > 0 && !content
 
-                if (parsedCalls.length > 0) {
-                  const filtered: any[] = []
-                  for (let i = 0; i < parsedCalls.length; i++) {
-                    const call = parsedCalls[i]
-                    const name = call.name
-                    const bufArgs = JSON.stringify(call.args)
-                    const idx = i
-                    const callId = `dsml_${Date.now()}_${Math.random().toString(36).slice(2)}`
+              // Strip them from the current delta by default
+              delete delta.content
+              delete delta.reasoning_content
 
-                    if (name.includes("load_tool")) {
-                      const loadName = call.args.name
-                      if (loadName) getTurnLoaded().add(loadName)
-                      filtered.push({
-                        index: idx,
-                        id: callId,
-                        type: "function",
-                        function: {
-                          name: activeLoadToolName,
-                          arguments: bufArgs,
-                        },
-                      })
-                    } else {
-                      if (originals.has(name)) {
-                        if (getTurnLoaded().has(name)) {
+              const tagStart = "<｜｜DSML｜｜tool_calls>"
+              const tagEnd = "</｜｜DSML｜｜tool_calls>"
+
+              const startIdx = streamText.indexOf(tagStart)
+              if (startIdx >= 0) {
+                // We found the start tag!
+                const preText = streamText.slice(0, startIdx)
+                if (preText) {
+                  if (isReasoning) delta.reasoning_content = preText
+                  else delta.content = preText
+                }
+
+                const endIdx = streamText.indexOf(tagEnd, startIdx)
+                if (endIdx >= 0) {
+                  // We found the complete XML block!
+                  const xmlEnd = endIdx + tagEnd.length
+                  const xml = streamText.slice(startIdx, xmlEnd)
+                  streamText = streamText.slice(xmlEnd)
+
+                  // Parse and rewrite
+                  const parsedCalls = parseDSML(xml)
+                  if (parsedCalls.length > 0) {
+                    const filtered: any[] = []
+                    for (let i = 0; i < parsedCalls.length; i++) {
+                      const call = parsedCalls[i]
+                      const name = resolveOriginalToolName(call.name)
+                      const bufArgs = JSON.stringify(call.args)
+                      const idx = i
+                      const callId = `dsml_${Date.now()}_${Math.random().toString(36).slice(2)}`
+
+                      if (name.includes("load_tool")) {
+                        const loadName = call.args.name
+                        if (loadName) getTurnLoaded().add(loadName)
+                        filtered.push({
+                          index: idx,
+                          id: callId,
+                          type: "function",
+                          function: {
+                            name: activeLoadToolName,
+                            arguments: bufArgs,
+                          },
+                        })
+                      } else {
+                        if (originals.has(name)) {
+                          if (getTurnLoaded().has(name)) {
+                            filtered.push({
+                              index: idx,
+                              id: callId,
+                              type: "function",
+                              function: {
+                                name,
+                                arguments: bufArgs,
+                              },
+                            })
+                          } else {
+                            getTurnLoaded().add(name)
+                            filtered.push({
+                              index: idx,
+                              id: callId,
+                              type: "function",
+                              function: {
+                                name: activeLoadToolName,
+                                arguments: JSON.stringify({ name }),
+                              },
+                            })
+                          }
+                        } else {
                           filtered.push({
                             index: idx,
                             id: callId,
@@ -423,44 +485,46 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
                               arguments: bufArgs,
                             },
                           })
-                        } else {
-                          getTurnLoaded().add(name)
-                          filtered.push({
-                            index: idx,
-                            id: callId,
-                            type: "function",
-                            function: {
-                              name: activeLoadToolName,
-                              arguments: JSON.stringify({ name }),
-                            },
-                          })
                         }
-                      } else {
-                        filtered.push({
-                          index: idx,
-                          id: callId,
-                          type: "function",
-                          function: {
-                            name,
-                            arguments: bufArgs,
-                          },
-                        })
                       }
                     }
+                    if (filtered.length > 0) {
+                      delta.tool_calls = filtered
+                    }
                   }
-                  if (filtered.length > 0) {
-                    parsed.choices[0].delta.tool_calls = filtered
+
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`))
+                  continue
+                } else {
+                  // We have the start tag but not the end tag yet.
+                  streamText = streamText.slice(startIdx)
+                  const hasText = isReasoning ? delta.reasoning_content : delta.content
+                  if (hasText) {
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`))
-                    continue
                   }
+                  continue
                 }
               } else {
-                // Still buffering DSML - emit chunk without content
-                const hasText = delta && (delta.reasoning || parsed.choices[0].finish_reason)
-                if (hasText) {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`))
+                // No start tag in streamText.
+                const partialLen = getPartialTagLength(streamText)
+                if (partialLen > 0) {
+                  const emitText = streamText.slice(0, -partialLen)
+                  streamText = streamText.slice(-partialLen)
+                  if (emitText) {
+                    if (isReasoning) delta.reasoning_content = emitText
+                    else delta.content = emitText
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`))
+                  }
+                  continue
+                } else {
+                  if (streamText) {
+                    if (isReasoning) delta.reasoning_content = streamText
+                    else delta.content = streamText
+                    streamText = ""
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`))
+                  }
+                  continue
                 }
-                continue
               }
             }
             const toolCalls = parsed?.choices?.[0]?.delta?.tool_calls
