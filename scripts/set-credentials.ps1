@@ -57,11 +57,7 @@ if (Test-Path $ConfigFile) {
   Write-Output "[warn] $ConfigFile does not exist — run bootstrap.ps1 first"
 }
 
-# ─── 2. Mem0 env vars ───
-[System.Environment]::SetEnvironmentVariable('MEM0_HOST', $Credentials.mem0_host, 'User')
-Write-Output "[ok] MEM0_HOST set: $($Credentials.mem0_host)"
-[System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', $Credentials.mem0_api_key, 'User')
-Write-Output "[ok] MEM0_API_KEY set"
+# ─── 2. (removed) Mem0 env vars — Mem0 has been archived ───
 
 # ─── 3. OpenCode experimental flag ───
 [System.Environment]::SetEnvironmentVariable('OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS', 'true', 'User')

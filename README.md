@@ -11,7 +11,7 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 | **Default Model** | `9router/ag/gemini-3.5-flash-low` | Free tier via 9router |
 | **Agent Orchestrator** | [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) | Multi-agent delegation (Orchestrator, Oracle, Explorer, Librarian, Designer, Fixer) |
 | **Code Intelligence** | [CodeGraph](https://github.com/colbymchenry/codegraph) | Semantic code graph — surgical context, fewer tool calls |
-| **Long-Term Memory** | [SuperMemory](https://supermemory.ai) (self-hosted) | Persistent memory across sessions via VPS (default). Toggleable back to Mem0. |
+| **Long-Term Memory** | [SuperMemory](https://supermemory.ai) (self-hosted) | Persistent memory across sessions via VPS |
 | **Token Optimization** | [opencode-lazy-loading](https://github.com/omarwaly-ai/opencode-lazy-loading) | Strips tool schemas, saves ~85% base tokens |
 | **Token Monitoring** | [OpenCode-tokens-source](https://github.com/omarwaly-ai/OpenCode-tokens-source) | Per-source token usage breakdown |
 | **Model Discovery** | `models-discovery.js` (custom) | Auto-discovers models from 9router with correct modalities |
@@ -50,16 +50,16 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 │   ├── oh-my-opencode-slim.json      # Agent preset config (9router default)
 │   └── supermemory.jsonc.example     # Template SuperMemory config
 ├── scripts/
-│   └── toggle-memory.ps1             # Toggle script to swap between SuperMemory and Mem0
+│   └── toggle-memory.ps1             # Deprecated — SuperMemory is now the only memory provider
 ├── plugins/
 │   ├── lazy-load.ts                  # Snapshot of lazy-load plugin
 │   ├── 0-tokens-source.ts            # Snapshot of tokens-source plugin
 │   ├── models-discovery.js           # Custom model discovery plugin
 │   └── codegraph-helper.ts           # CodeGraph dynamic helper plugin
-├── mem0-archive/                     # Archived legacy Mem0 files (for contribution)
+├── mem0-archive/                     # Archived legacy Mem0 files (historical reference, no longer active)
 │   ├── mem0-plugin/                  # Patched Mem0 plugin for self-hosted
-│   ├── mem0-selfhost-patch.ts        # Fetch interceptor for self-hosted Mem0
-│   └── verify-patch.ts               # Verification script for Mem0
+│   ├── mem0-selfhost-patch.ts        # Fetch interceptor for self-hosted Mem0 (archived)
+│   └── verify-patch.ts               # Verification script for Mem0 (archived)
 ├── skills/                           # All skills
 ├── agents/                           # Sub-agents
 ├── docs/
@@ -128,23 +128,11 @@ For details on how to set up, update, or maintain the VPS hosting stack, read th
 
 ---
 
-### Switching Memory Providers
+### Memory Provider
 
-You can dynamically toggle your local OpenCode environment between **SuperMemory** (default) and **Mem0** (legacy/contribution backup) using the toggle script:
+OpenCode now uses **SuperMemory** exclusively. Mem0 has been archived to `mem0-archive/` for future reference.
 
-```powershell
-# Toggle to SuperMemory (default)
-.\scripts\toggle-memory.ps1 -Provider supermemory
-
-# Toggle back to Mem0
-.\scripts\toggle-memory.ps1 -Provider mem0
-```
-
-The script manages:
-1. Swapping active plugins inside `opencode.jsonc`.
-2. Disabling or enabling conflicting context recovery hooks in `oh-my-opencode-slim.json`.
-3. Creating or cleaning up the corresponding skill junctions inside `~/.config/opencode/skills`.
-4. Copying or disabling local interceptor scripts.
+To configure SuperMemory, see the [Self-Hosting SuperMemory Setup Guide](docs/supermemory-setup.md).
 
 ---
 
@@ -198,7 +186,6 @@ What it updates:
 
 **Not auto-updated** (intentionally):
 - `models-discovery.js` -- custom, only you maintain it
-- `mem0-selfhost-patch.ts` -- only changes if Mem0's self-hosted API routes change
 - `opencode-update-notifier` — updated via npm deps step
 
 ## Environment Variables
@@ -206,8 +193,6 @@ What it updates:
 | Variable | Scope | Value | Purpose |
 |----------|-------|-------|---------|
 | `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS` | User | `true` | Enable omo-slim background agent dispatch |
-| `MEM0_HOST` | User | `https://mem0.tienbac.dpdns.org` | Self-hosted Mem0 endpoint |
-| `MEM0_API_KEY` | User | (your admin key) | Mem0 API authentication |
 
 Set via:
 ```powershell
@@ -228,9 +213,6 @@ Key ones:
 
 **Daily:** The `update-plugins.ps1` script handles routine updates with a 12h cooldown.
 
-**When Mem0 upstream changes routes:**
-The `mem0-selfhost-patch.ts` fetch interceptor handles route mapping. If Mem0 changes its self-hosted API routes, update the `ROUTE_REWRITES` array in `mem0-selfhost-patch.ts`. No need to re-patch the npm package.
-
 **When switching models:** Edit both files:
 - `~/.config/opencode/opencode.jsonc` — `model` and `agent` section
 - `~/.config/opencode/oh-my-opencode-slim.json` — active preset's agent models
@@ -243,7 +225,6 @@ codegraph init
 
 ## Architecture Notes
 
-- **Plugin load order:** The patch `./mem0-selfhost-patch.ts` is placed at the root ConfigDir and loaded explicitly as the first entry in the config `plugin` array to guarantee it intercepts requests before `@mem0/opencode-plugin` initializes at startup. Auto-discovered plugins (`0-tokens-source.ts`, `lazy-load.ts`, `models-discovery.js`) load alphabetically after the config array, chaining their fetch wrappers cleanly.
 - **omo-slim overrides default agents:** The installer disables OpenCode's built-in `general` and `explore` agents, replacing them with the Pantheon (Orchestrator, Oracle, etc.).
 - **Context window strategy:** lazy-load strips ~85% of tool schemas. Compaction is enabled with `keep.tokens: 20000` (~10-15 turns verbatim). A dedicated `compaction` agent (`9router/ag/claude-opus-4-6-thinking`) writes the summary — decoupling summary generation from the working model avoids DeepSeek XML format regression. CodeGraph provides surgical context to avoid file-crawling bloat.
-- **No Honcho:** We replaced Honcho with self-hosted Mem0. Honcho was cloud-dependent. Mem0 runs on your VPS with your own LLM routing.
+- **No Honcho:** We replaced Honcho with self-hosted SuperMemory. Honcho was cloud-dependent.

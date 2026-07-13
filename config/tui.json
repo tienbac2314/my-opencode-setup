@@ -2,7 +2,6 @@
   "plugin": [
     "./plugins/0-tokens-source.ts",
     "./plugins/lazy-load.ts",
-    "./mem0-selfhost-patch.ts",
     "oh-my-opencode-slim"
   ]
 }

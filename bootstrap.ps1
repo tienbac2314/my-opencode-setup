@@ -1,7 +1,6 @@
 param(
   [switch]$SkipRtk,
-  [switch]$SkipCodeGraph,
-  [switch]$SkipMem0
+  [switch]$SkipCodeGraph
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,29 +64,14 @@ foreach ($lp in $legacyPlugins) {
 }
 
 Copy-Item -Recurse "$RepoDir\plugins\*" "$pluginsDir\" -Force
-Copy-Item "$RepoDir\mem0-archive\verify-patch.ts" "$ConfigDir\verify-patch.ts" -Force
-
-# Detect active provider (default to SuperMemory on fresh install)
-$supermemoryActive = $true
-if ((Test-Path "$ConfigDir\opencode.jsonc") -and (-not (Test-Path "$ConfigDir\supermemory.jsonc")) -and (Test-Path "$ConfigDir\mem0-selfhost-patch.ts")) {
-  $supermemoryActive = $false
+# Ensure supermemory.jsonc exists
+if (-not (Test-Path "$ConfigDir\supermemory.jsonc")) {
+  Copy-Item "$RepoDir\config\supermemory.jsonc.example" "$ConfigDir\supermemory.jsonc"
+  Write-Output "  Created supermemory.jsonc from template"
 }
-
-if ($supermemoryActive) {
-  if (Test-Path "$RepoDir\mem0-archive\mem0-selfhost-patch.ts") {
-    Copy-Item "$RepoDir\mem0-archive\mem0-selfhost-patch.ts" "$ConfigDir\mem0-selfhost-patch.ts.disabled" -Force
-  }
-  if (-not (Test-Path "$ConfigDir\supermemory.jsonc")) {
-    Copy-Item "$RepoDir\config\supermemory.jsonc.example" "$ConfigDir\supermemory.jsonc"
-    Write-Output "  Created supermemory.jsonc from template"
-  }
-  Write-Output "  Installed: models-discovery.js, verify-patch.ts (Mem0 patch is disabled)"
-} else {
-  if (Test-Path "$RepoDir\mem0-archive\mem0-selfhost-patch.ts") {
-    Copy-Item "$RepoDir\mem0-archive\mem0-selfhost-patch.ts" "$ConfigDir\mem0-selfhost-patch.ts" -Force
-  }
-  Write-Output "  Installed: models-discovery.js, mem0-selfhost-patch.ts, and verify-patch.ts"
-}
+# Remove any stale mem0 files (archived in repo, no longer needed)
+Remove-Item "$ConfigDir\mem0-selfhost-patch.ts" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ConfigDir\mem0-selfhost-patch.ts.disabled" -Force -ErrorAction SilentlyContinue
 
 # Download tokens command
 New-Item -ItemType Directory -Path "$ConfigDir\commands" -Force | Out-Null
@@ -114,7 +98,6 @@ foreach ($p in $parsed.plugin) {
 $deps = [ordered]@{
   "@opencode-ai/plugin"      = "latest"
   "@ai-sdk/openai-compatible" = "latest"
-  "@mem0/opencode-plugin"    = "latest"
 }
 foreach ($pkg in $npmPlugins) {
   $deps[$pkg] = "latest"
@@ -159,25 +142,11 @@ if (-not $SkipCodeGraph) {
   Write-Output "[5/8] Skipping CodeGraph (--SkipCodeGraph)"
 }
 
-# ─── 6. Mem0 self-hosted fetch patch ───
-if ($supermemoryActive) {
-  Write-Output "[6/8] SuperMemory is active. Skipping Mem0 patch configuration."
-  Write-Output "  Required SuperMemory configuration lives in supermemory.jsonc"
-} elseif (-not $SkipMem0) {
-  Write-Output "[6/8] Installing Mem0 self-hosted patch..."
-  # The patch plugin (mem0-selfhost-patch.ts) is copied to the root ConfigDir
-  # and loaded explicitly in the plugin array of opencode.jsonc to run before
-  # the official @mem0/opencode-plugin is loaded at startup.
-  Write-Output "  mem0-selfhost-patch.ts installed (loaded explicitly in opencode.jsonc)"
-  Write-Output "  Required env vars: MEM0_HOST, MEM0_API_KEY"
-  if (-not $env:MEM0_HOST) {
-    Write-Output "  [warn] MEM0_HOST not set — run: [System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')"
-  }
-  if (-not $env:MEM0_API_KEY) {
-    Write-Output "  [warn] MEM0_API_KEY not set — run: [System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', 'YOUR_KEY', 'User')"
-  }
+# ─── 6. SuperMemory config ───
+if (-not (Test-Path "$ConfigDir\supermemory.jsonc")) {
+  Write-Output "  SuperMemory config not found — run '/supermemory:setup' in OpenCode"
 } else {
-  Write-Output "[6/8] Skipping Mem0 (--SkipMem0)"
+  Write-Output "  SuperMemory is active (config: supermemory.jsonc)"
 }
 
 # ─── 7. Set environment variables ───
@@ -221,7 +190,7 @@ Write-Output ""
 Write-Output "Next steps:"
 Write-Output "  1. Edit API key in: $ConfigDir\opencode.jsonc"
 Write-Output "  2. Run 'codegraph init' in each project you want indexed"
-Write-Output "  3. Run '/supermemory:setup' or '/mem0:setup' in OpenCode for memory"
+Write-Output "  3. Run '/supermemory:setup' in OpenCode for memory"
 Write-Output "  4. Run 'ping all agents' in OpenCode to verify omo-slim"
 Write-Output "  5. Restart your terminal for env vars to take effect"
 Write-Output ""
