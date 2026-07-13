@@ -54,6 +54,7 @@ const originalSchemas = new Map<string, any>()
  * Cleared when the SSE stream ends (finish_reason or [DONE]).
  */
 const turnLoaded = new Map<string, Set<string>>()
+let activeLoadToolName = "load_tool"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ function briefOf(description: string): string {
 function buildPointerList(): string {
   const pointers: string[] = []
   for (const [name, desc] of originals) {
-    if (name === "load_tool") continue
+    if (isLoadToolName(name)) continue
     const brief = briefOf(desc)
     pointers.push(brief ? `- ${name} - ${brief}` : `- ${name}`)
   }
@@ -94,6 +95,48 @@ function buildPointerList(): string {
 function isParsableJson(str: string): boolean {
   if (!str) return false
   try { JSON.parse(str); return true } catch { return false }
+}
+
+const DSML_START = "<｜｜DSML｜｜tool_calls>"
+const DSML_END = "</｜｜DSML｜｜tool_calls>"
+
+function isLoadToolName(name: string): boolean {
+  return name === "load_tool" || name.endsWith("_load_tool")
+}
+
+function parseDSML(xml: string): Array<{ name: string; args: Record<string, string> }> {
+  const calls: Array<{ name: string; args: Record<string, string> }> = []
+  const invokePattern = /<｜｜DSML｜｜invoke name="([^"]+)">([\s\S]*?)<\/｜｜DSML｜｜invoke>/g
+  let invoke: RegExpExecArray | null
+
+  while ((invoke = invokePattern.exec(xml)) !== null) {
+    const args: Record<string, string> = {}
+    const parameterPattern = /<｜｜DSML｜｜parameter name="([^"]+)"[^>]*>([\s\S]*?)<\/｜｜DSML｜｜parameter>/g
+    let parameter: RegExpExecArray | null
+
+    while ((parameter = parameterPattern.exec(invoke[2])) !== null) {
+      args[parameter[1]] = parameter[2]
+    }
+
+    calls.push({ name: invoke[1], args })
+  }
+
+  return calls
+}
+
+function resolveOriginalToolName(name: string): string {
+  const normalized = name.toLowerCase()
+  for (const original of originals.keys()) {
+    if (original.toLowerCase() === normalized) return original
+  }
+  return name
+}
+
+function partialDSMLStartLength(text: string): number {
+  for (let length = DSML_START.length - 1; length > 0; length--) {
+    if (text.endsWith(DSML_START.slice(0, length))) return length
+  }
+  return 0
 }
 
 // ─── Fetch wrapper (request + response interception) ─────────────────────────
@@ -162,11 +205,19 @@ function wrapFetch(): void {
         try {
           const body = JSON.parse(bodyText)
           if (Array.isArray(body.tools)) {
+            const loadTool = body.tools.find((entry: any) => {
+              const name = entry?.function?.name || entry?.name || ""
+              return isLoadToolName(name)
+            })
+            if (loadTool) {
+              activeLoadToolName = loadTool.function?.name || loadTool.name || "load_tool"
+            }
+
             // Capture schemas and descriptions for all tools on the fly
             for (const t of body.tools) {
               const fn = t?.function
               const name = fn?.name || t?.name || ""
-              if (!name || name === "load_tool") continue
+              if (!name || isLoadToolName(name)) continue
 
               const desc = fn?.description || t?.description || ""
               const params = fn?.parameters || t?.parameters
@@ -182,7 +233,7 @@ function wrapFetch(): void {
             // Keep ONLY load_tool in the tools array
             body.tools = body.tools.filter((t: any) => {
               const name = t?.function?.name || t?.name || ""
-              return name === "load_tool"
+              return isLoadToolName(name)
             })
 
             // STRIP prior load_tool calls AND their results from the messages
@@ -211,7 +262,7 @@ function wrapFetch(): void {
                 for (const m of priorMessages) {
                   if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
                     for (const tc of m.tool_calls) {
-                      if (tc?.function?.name === "load_tool" && tc?.id) {
+                      if (tc?.function?.name && isLoadToolName(tc.function.name) && tc?.id) {
                         loadToolCallIds.add(tc.id)
                       }
                     }
@@ -224,7 +275,9 @@ function wrapFetch(): void {
                     continue
                   }
                   if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
-                    m.tool_calls = m.tool_calls.filter((tc: any) => tc?.function?.name !== "load_tool")
+                    m.tool_calls = m.tool_calls.filter((tc: any) =>
+                      !tc?.function?.name || !isLoadToolName(tc.function.name)
+                    )
                     if (m.tool_calls.length === 0) {
                       // Delete the empty tool_calls array — some providers (DeepSeek)
                       // reject "tool_calls: []" with "Expected an array with minimum length 1"
@@ -254,7 +307,7 @@ function wrapFetch(): void {
             if (pointerList) {
               for (const t of body.tools) {
                 const fn = t?.function
-                if (fn && fn.name === "load_tool") {
+                if (fn?.name && isLoadToolName(fn.name)) {
                   fn.description = [
                     "Gateway tool — the only tool you can call directly.",
                     "All other tools are accessed through this tool.",
@@ -312,10 +365,13 @@ function wrapFetch(): void {
  *   - Line 826: subsequent chunks APPEND to toolCalls[index].function.arguments
  *   - Line 833: when accumulated args become parseable JSON, emits tool-call
  */
-function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint8Array> {
+export function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint8Array> {
   const decoder = new TextDecoder()
   const encoder = new TextEncoder()
   let buffer = ""
+  let textBuffer = ""
+  let textField: "content" | "reasoning_content" | null = null
+  let textEnvelope: any = null
   // Per-index buffer for ALL tool calls: {id, name, arguments}
   const toolBuffers = new Map<number, { id?: string; name?: string; arguments: string }>()
   // Get or create this session's turn-loaded set. Persists across multiple
@@ -326,6 +382,141 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
   function getTurnLoaded(): Set<string> {
     if (!turnLoaded.has(sessionID)) turnLoaded.set(sessionID, new Set())
     return turnLoaded.get(sessionID)!
+  }
+
+  function rewriteToolCall(name: string, argumentsJSON: string, index: number, id?: string): any {
+    const resolvedName = resolveOriginalToolName(name)
+    const args = JSON.parse(argumentsJSON)
+
+    if (isLoadToolName(resolvedName)) {
+      if (args.name) getTurnLoaded().add(args.name)
+      return {
+        index,
+        id,
+        type: "function",
+        function: { name: activeLoadToolName, arguments: argumentsJSON },
+      }
+    }
+
+    if (originals.has(resolvedName)) {
+      if (getTurnLoaded().has(resolvedName)) {
+        return {
+          index,
+          id,
+          type: "function",
+          function: { name: resolvedName, arguments: argumentsJSON },
+        }
+      }
+
+      getTurnLoaded().add(resolvedName)
+      return {
+        index,
+        id,
+        type: "function",
+        function: {
+          name: activeLoadToolName,
+          arguments: JSON.stringify({ name: resolvedName }),
+        },
+      }
+    }
+
+    return {
+      index,
+      id,
+      type: "function",
+      function: { name: resolvedName, arguments: argumentsJSON },
+    }
+  }
+
+  function emitDelta(
+    controller: TransformStreamDefaultController<Uint8Array>,
+    envelope: any,
+    delta: Record<string, unknown>,
+  ): void {
+    const choices = Array.isArray(envelope?.choices) ? [...envelope.choices] : []
+    if (!choices[0]) return
+    choices[0] = { ...choices[0], delta }
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ ...envelope, choices })}\n\n`))
+  }
+
+  function baseDelta(envelope: any): Record<string, unknown> {
+    const delta = { ...(envelope?.choices?.[0]?.delta ?? {}) }
+    delete (delta as any).content
+    delete (delta as any).reasoning_content
+    delete (delta as any).tool_calls
+    return delta
+  }
+
+  function flushText(controller: TransformStreamDefaultController<Uint8Array>): void {
+    if (textBuffer && textField && textEnvelope) {
+      emitDelta(controller, textEnvelope, { ...baseDelta(textEnvelope), [textField]: textBuffer })
+    }
+    textBuffer = ""
+    textField = null
+    textEnvelope = null
+  }
+
+  function processText(
+    controller: TransformStreamDefaultController<Uint8Array>,
+    envelope: any,
+    field: "content" | "reasoning_content",
+    text: string,
+  ): void {
+    if (textBuffer && textField !== field) flushText(controller)
+
+    textField = field
+    textEnvelope = envelope
+    textBuffer += text
+
+    while (textBuffer) {
+      const start = textBuffer.indexOf(DSML_START)
+      if (start < 0) {
+        const partialLength = partialDSMLStartLength(textBuffer)
+        const safeLength = textBuffer.length - partialLength
+        if (safeLength > 0) {
+          emitDelta(controller, envelope, {
+            ...baseDelta(envelope),
+            [field]: textBuffer.slice(0, safeLength),
+          })
+          textBuffer = textBuffer.slice(safeLength)
+        }
+        return
+      }
+
+      if (start > 0) {
+        emitDelta(controller, envelope, {
+          ...baseDelta(envelope),
+          [field]: textBuffer.slice(0, start),
+        })
+        textBuffer = textBuffer.slice(start)
+      }
+
+      const end = textBuffer.indexOf(DSML_END, DSML_START.length)
+      if (end < 0) return
+
+      const blockEnd = end + DSML_END.length
+      const xml = textBuffer.slice(0, blockEnd)
+      const calls = parseDSML(xml)
+
+      if (calls.length > 0) {
+        emitDelta(controller, envelope, {
+          ...baseDelta(envelope),
+          tool_calls: calls.map((call, index) => rewriteToolCall(
+            call.name,
+            JSON.stringify(call.args),
+            index,
+            `dsml_${Date.now()}_${index}_${Math.random().toString(36).slice(2)}`,
+          )),
+        })
+      } else {
+        emitDelta(controller, envelope, { ...baseDelta(envelope), [field]: xml })
+      }
+
+      textBuffer = textBuffer.slice(blockEnd)
+    }
+
+    textField = null
+    textEnvelope = null
   }
 
   return new TransformStream<Uint8Array, Uint8Array>({
@@ -341,12 +532,26 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
           if (!line.startsWith("data:")) continue
           const data = line.startsWith("data: ") ? line.slice(6) : line.slice(5)
           if (data === "[DONE]") {
+            flushText(controller)
             controller.enqueue(encoder.encode("data: [DONE]\n\n"))
             continue
           }
 
           try {
             const parsed = JSON.parse(data)
+            const delta = parsed?.choices?.[0]?.delta
+            let hadText = false
+
+            if (delta) {
+              for (const field of ["content", "reasoning_content"] as const) {
+                if (typeof delta[field] === "string" && delta[field].length > 0) {
+                  processText(controller, parsed, field, delta[field])
+                  delete delta[field]
+                  hadText = true
+                }
+              }
+            }
+
             const toolCalls = parsed?.choices?.[0]?.delta?.tool_calls
 
             if (Array.isArray(toolCalls)) {
@@ -381,11 +586,11 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
                 }
 
                 // Arguments complete — process by name
-                const name = buf.name || ""
+                const name = resolveOriginalToolName(buf.name || "")
                 const callArgs = JSON.parse(buf.arguments)
                 toolBuffers.delete(idx)
 
-                if (name === "load_tool") {
+                if (isLoadToolName(name)) {
                   // load_tool passes through. Track the loaded tool in this
                   // stream so subsequent direct calls within the SAME turn work.
                   const loadName = callArgs.name
@@ -395,7 +600,7 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
                     id: buf.id,
                     type: "function",
                     function: {
-                      name: "load_tool",
+                      name: activeLoadToolName,
                       arguments: buf.arguments,
                     },
                   })
@@ -429,7 +634,7 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
                         id: buf.id,
                         type: "function",
                         function: {
-                          name: "load_tool",
+                          name: activeLoadToolName,
                           arguments: JSON.stringify({ name }),
                         },
                       })
@@ -461,11 +666,12 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`))
                 }
               }
-            } else {
+            } else if (!hadText || parsed?.choices?.[0]?.finish_reason) {
               // No tool_calls in this chunk — pass through
               // Check for finish_reason "stop" — that's the LLM's end-of-turn
               // signal. Clear turnLoaded so the next turn starts fresh.
               const fr = parsed?.choices?.[0]?.finish_reason
+              if (fr) flushText(controller)
               if (fr === "stop") {
                 turnLoaded.delete(sessionID)
               }
@@ -479,10 +685,11 @@ function createSSETransform(sessionID: string): TransformStream<Uint8Array, Uint
       }
     },
     flush(controller) {
+      flushText(controller)
       // Emit any remaining buffered tool calls (incomplete arguments).
       // Pass through as-is using whatever name was captured.
       for (const [idx, buf] of toolBuffers) {
-        const name = buf.name || "load_tool"
+        const name = buf.name || activeLoadToolName
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           choices: [{ delta: { tool_calls: [{
             index: idx,
@@ -573,7 +780,7 @@ const LazyLoadPlugin: Plugin = async (_input, _options) => {
 
     async "tool.definition"(input, output) {
       // Never modify our own tool
-      if (input.toolID === "load_tool") return
+      if (isLoadToolName(input.toolID)) return
 
       if (!originals.has(input.toolID)) {
         originals.set(input.toolID, output.description)
