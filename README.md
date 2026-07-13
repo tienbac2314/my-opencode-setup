@@ -11,7 +11,7 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 | **Default Model** | `9router/ag/gemini-3.5-flash-low` | Free tier via 9router |
 | **Agent Orchestrator** | [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) | Multi-agent delegation (Orchestrator, Oracle, Explorer, Librarian, Designer, Fixer) |
 | **Code Intelligence** | [CodeGraph](https://github.com/colbymchenry/codegraph) | Semantic code graph — surgical context, fewer tool calls |
-| **Long-Term Memory** | [Mem0](https://github.com/mem0ai/mem0) (self-hosted) | Persistent memory across sessions via VPS |
+| **Long-Term Memory** | [SuperMemory](https://supermemory.ai) (self-hosted) | Persistent memory across sessions via VPS (default). Toggleable back to Mem0. |
 | **Token Optimization** | [opencode-lazy-loading](https://github.com/omarwaly-ai/opencode-lazy-loading) | Strips tool schemas, saves ~85% base tokens |
 | **Token Monitoring** | [OpenCode-tokens-source](https://github.com/omarwaly-ai/OpenCode-tokens-source) | Per-source token usage breakdown |
 | **Model Discovery** | `models-discovery.js` (custom) | Auto-discovers models from 9router with correct modalities |
@@ -27,15 +27,12 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 ├── tui.json                          # TUI plugin config
 ├── AGENTS.md                         # Behavioral instructions
 ├── package.json                      # npm deps (plugin SDK + provider SDK)
-├── mem0-selfhost-patch.ts            # Fetch interceptor for self-hosted Mem0 (loaded first explicitly)
+├── supermemory.jsonc                 # Active SuperMemory backend configuration
 ├── plugins/                          # Auto-discovered file-based plugins
 │   ├── 0-tokens-source.ts            # Token usage breakdown (prefix ensures load order)
 │   ├── lazy-load.ts                  # Lazy tool loading to save tokens
 │   ├── models-discovery.js           # Auto-discover 9router models with modalities
 │   └── codegraph-helper.ts           # Enforces and auto-updates CodeGraph index
-├── opencode-mem0-plugin/             # (LEGACY, can be removed — replaced by fetch patch)
-│   ├── dist/index.js                 # Was: patched Bun bundle for self-hosted
-│   └── opencode-skills/              # mem0-remember, mem0-search, etc.
 ├── commands/
 │   └── tokens.md                     # /tokens slash command
 ├── skills/                           # 30+ skills (security, research, debugging, etc.)
@@ -50,18 +47,24 @@ Personal OpenCode configuration: multi-agent orchestration, semantic code intell
 ├── update-plugins.ps1                # Plugin auto-updater (12h cooldown)
 ├── config/
 │   ├── opencode.jsonc.example        # Template config (no secrets)
-│   └── oh-my-opencode-slim.json      # Agent preset config (9router default)
+│   ├── oh-my-opencode-slim.json      # Agent preset config (9router default)
+│   └── supermemory.jsonc.example     # Template SuperMemory config
+├── scripts/
+│   └── toggle-memory.ps1             # Toggle script to swap between SuperMemory and Mem0
 ├── plugins/
 │   ├── lazy-load.ts                  # Snapshot of lazy-load plugin
 │   ├── 0-tokens-source.ts            # Snapshot of tokens-source plugin
 │   ├── models-discovery.js           # Custom model discovery plugin
 │   └── codegraph-helper.ts           # CodeGraph dynamic helper plugin
-├── mem0-plugin/                      # Patched Mem0 plugin for self-hosted
-├── mem0-selfhost-patch.ts            # Fetch interceptor for self-hosted Mem0
+├── mem0-archive/                     # Archived legacy Mem0 files (for contribution)
+│   ├── mem0-plugin/                  # Patched Mem0 plugin for self-hosted
+│   ├── mem0-selfhost-patch.ts        # Fetch interceptor for self-hosted Mem0
+│   └── verify-patch.ts               # Verification script for Mem0
 ├── skills/                           # All skills
 ├── agents/                           # Sub-agents
 ├── docs/
-│   └── opencode-bugs-known.md        # Known bugs and workarounds
+│   ├── opencode-bugs-known.md        # Known bugs and workarounds
+│   └── supermemory-setup.md          # Guide to setting up self-hosted SuperMemory
 ├── AGENTS.md                         # LLM behavioral instructions
 └── README.md                         # This file
 ```
@@ -111,97 +114,39 @@ Semantic code intelligence. Builds a knowledge graph of symbols, call edges, and
 
 Reduces tool calls by 40-80% and speeds up responses by providing surgical context.
 
-### Mem0 (Self-Hosted)
+### SuperMemory (Self-Hosted)
 
-Persistent long-term memory via self-hosted Mem0 on VPS.
+Persistent long-term memory via self-hosted SuperMemory on your VPS.
 
 **Architecture:**
-- VPS runs Mem0 REST API (Docker: `mem0-dev-mem0-1`) on port 8888
-- Cloudflare tunnel exposes it as `https://mem0.tienbac.dpdns.org`
-- LLM/embedding calls route through 9router on the same VPS
-- pgvector for vector storage
+- VPS runs SuperMemory API Server (listening locally on port 6767).
+- Cloudflare tunnel routes public requests to `https://supermemory.tienbac.dpdns.org`.
+- Local embeddings are computed using `Xenova/bge-base-en-v1.5` natively.
+- Memory summaries are processed through your custom 9router gateway on the VPS.
 
-**Dashboard:**
-- URL: `http://161.118.215.190:3000`
-- Email: `admin@mem0.dev`
-- Password: `skibidi123`
+For details on how to set up, update, or maintain the VPS hosting stack, read the [Self-Hosting SuperMemory Setup Guide](file:///C:/Users/bacnt/opencode-dotfiles/docs/supermemory-setup.md).
 
-**Self-Hosted Setup & Custom Embedding Model Configuration:**
-The self-hosted instance is configured to use the embedding model `openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free` (2048 dimensions). 
-- **Bypass HNSW Dimension limit**: pgvector's HNSW index has a strict limit of 2000 dimensions. To run the 2048-dimensional Nemotron model, `"hnsw": False` is added to `main.py`'s `DEFAULT_CONFIG` on the VPS to default to exact search (extremely fast/accurate for agent memories).
-- **Environment variables on the VPS (`~/mem0/server/.env`)**:
-  ```env
-  MEM0_DEFAULT_EMBEDDER_MODEL=openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free
-  MEM0_DEFAULT_EMBEDDER_DIMS=2048
-  ```
-- **Dimension Changes**: Changing embedding models requires dropping the existing memories table so that pgvector recreates it with the correct dimensions:
-  ```bash
-  docker exec -i mem0-dev-postgres-1 psql -U postgres -d postgres -c 'DROP TABLE IF EXISTS memories;'
-  ```
+---
 
-**How to Update the Self-Hosted Stack:**
-1. Pull the latest updates on the VPS:
-   ```bash
-   cd ~/mem0 && git pull
-   ```
-2. Re-apply the `hnsw: False` and `embedding_model_dims` configuration to `main.py` on the VPS if it was overwritten:
-   ```bash
-   python3 -c '
-   with open("/home/ubuntu/mem0/server/main.py", "r") as f:
-       content = f.read()
-   target = "\"collection_name\": POSTGRES_COLLECTION_NAME,\n        },"
-   replacement = "\"collection_name\": POSTGRES_COLLECTION_NAME,\n            \"embedding_model_dims\": int(os.environ.get(\"MEM0_DEFAULT_EMBEDDER_DIMS\", 1536)),\n            \"hnsw\": False,\n        },"
-   if target in content:
-       with open("/home/ubuntu/mem0/server/main.py", "w") as f:
-           f.write(content.replace(target, replacement))
-   '
-   ```
-3. Rebuild and recreate the containers:
-   ```bash
-   cd ~/mem0/server && docker compose up -d --build --force-recreate mem0
-   ```
+### Switching Memory Providers
 
-**Plugin:** Official `@mem0/opencode-plugin` npm package (auto-updated) + `mem0-selfhost-patch.ts` hybrid plugin.
+You can dynamically toggle your local OpenCode environment between **SuperMemory** (default) and **Mem0** (legacy/contribution backup) using the toggle script:
 
-The patch plugin (`mem0-selfhost-patch.ts`, loaded explicitly at the root):
-1. Monkey-patches `globalThis.fetch` to rewrite Cloud API routes to self-hosted paths, inject `X-API-Key`, and mock missing endpoints (`/v1/ping/`, projects).
-2. Imports the official `@mem0/opencode-plugin` via **dynamic import** (inside `try/catch`) for its extra hooks (auto-memory, session compaction, etc.).
-3. **Always** registers its own fallback mem0 tools (`add_memory`, `search_memories`, `get_memories`, `get_memory`, `update_memory`, `delete_memory`, `delete_all_memories`, `list_entities`, `delete_entities`, `get_event_status`) using `tool()` from `@opencode-ai/plugin`. These call the self-hosted API directly, so the tools are **always available** even if the official plugin fails to load (e.g. Bun/Node mismatch).
-
-Key advantages:
-- `@mem0/opencode-plugin` auto-updates via npm — no re-patching needed
-- Mem0 tools are ALWAYS registered — never a "tool not found" error for LLM agents
-- The fetch interceptor handles body format translation (`text` → `messages`) and strips unsupported fields (`app_id`, `scope`) silently
-
-**When Mem0 Is Unavailable:**
-
-| Scenario | What happens | Fallback |
-|----------|-------------|----------|
-| Self-hosted API is down / unreachable | Tools still register; `mem0Fetch()` calls fail at runtime with HTTP connection error | Error message returned to LLM, operation fails gracefully |
-| Official `@mem0/opencode-plugin` fails to load (Node/Bun mismatch) | Dynamic import catches the error, logs a warning via ctx | Fallback tools (line above) take over — full mem0 CRUD via REST API |
-| Both official plugin AND REST API are down | Tools register, but every call returns connection error | LLM sees the error and can report it to the user |
-| `MEM0_HOST` or `MEM0_API_KEY` missing | `mem0Fetch()` helper throws "API error" | Operations fail with clear error message |
-| Storage is reset (pgvector table dropped) | REST API returns empty results for all queries | Tools work normally, just no data — same as fresh install |
-
-The system degrades gracefully: tools are always callable, they just fail at the network layer if the server is unreachable. No silent failures.
-
-**Required environment variables (User scope):**
 ```powershell
-[System.Environment]::SetEnvironmentVariable('MEM0_HOST', 'https://mem0.tienbac.dpdns.org', 'User')
-[System.Environment]::SetEnvironmentVariable('MEM0_API_KEY', 'YOUR_MEM0_ADMIN_KEY', 'User')
+# Toggle to SuperMemory (default)
+.\scripts\toggle-memory.ps1 -Provider supermemory
+
+# Toggle back to Mem0
+.\scripts\toggle-memory.ps1 -Provider mem0
 ```
 
-**Testing & Verification:**
-Verify the setup and patch execution by running the diagnosis script:
-```bash
-bun verify-patch.ts
-```
-This tests:
-1. Mocked `GET /v1/ping/` returns self-hosted identity.
-2. Mocked `GET /v1/organizations/.../projects/...` returns custom categories.
-3. Rewritten `POST /v3/memories/search/` successfully queries your self-hosted VPS backend.
+The script manages:
+1. Swapping active plugins inside `opencode.jsonc`.
+2. Disabling or enabling conflicting context recovery hooks in `oh-my-opencode-slim.json`.
+3. Creating or cleaning up the corresponding skill junctions inside `~/.config/opencode/skills`.
+4. Copying or disabling local interceptor scripts.
 
-**Skills:** mem0-remember, mem0-search, mem0-forget, mem0-dream, mem0-pin, mem0-scope, mem0-status, mem0-tour, mem0-context-loader
+---
 
 ### Token Optimization Plugins
 

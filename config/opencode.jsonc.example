@@ -71,7 +71,7 @@
   "plugin": [
     "./plugins/0-tokens-source.ts",
     "./plugins/lazy-load.ts",
-    "./mem0-selfhost-patch.ts",
+    "opencode-supermemory",
     "opencode-update-notifier",
     "oh-my-opencode-slim"
   ],

@@ -13,9 +13,9 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [ValidateSet("mem0", "supermemory")]
-    [string]$Provider
+    [string]$Provider = "supermemory"
 )
 
 $configDir = "$env:USERPROFILE\.config\opencode"
@@ -102,10 +102,18 @@ if ($Provider -eq "supermemory") {
     }
 } else {
     # Provider is mem0
-    # Enable Mem0 patch file
+    # Enable or copy Mem0 patch file
     if (Test-Path $mem0PatchDisabled) {
         Rename-Item -Path $mem0PatchDisabled -NewName (Split-Path $mem0PatchLocal -Leaf) -Force
         Write-Output "Enabled local mem0-selfhost-patch.ts."
+    } elseif (-not (Test-Path $mem0PatchLocal)) {
+        $archivedPatch = "$dotfilesDir\mem0-archive\mem0-selfhost-patch.ts"
+        if (Test-Path $archivedPatch) {
+            Copy-Item -Path $archivedPatch -Destination $mem0PatchLocal -Force
+            Write-Output "Copied mem0-selfhost-patch.ts from archive."
+        } else {
+            Write-Warning "Archived Mem0 patch file not found."
+        }
     }
     
     # Disable SuperMemory configuration
@@ -168,7 +176,7 @@ if ($Provider -eq "supermemory") {
     }
 } else {
     # Re-create Mem0 skills junctions
-    $sourceSkillsDir = "$dotfilesDir\mem0-plugin\opencode-skills"
+    $sourceSkillsDir = "$dotfilesDir\mem0-archive\mem0-plugin\opencode-skills"
     if (Test-Path $sourceSkillsDir) {
         if (-not (Test-Path $skillsDir)) {
             New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
