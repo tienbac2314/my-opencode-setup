@@ -23,10 +23,10 @@ export const CodeGraphHelperPlugin: Plugin = async ({ client, $, directory }) =>
       const hasCodeGraph = fs.existsSync(path.join(workspaceRoot, ".codegraph"));
 
       // Intercept and redirect exploration tools in indexed repositories
-      if (hasCodeGraph && ["grep_search", "glob_search"].includes(toolName)) {
+      if (hasCodeGraph && ["grep", "glob"].includes(toolName)) {
         throw new Error(
           `This repository is indexed by CodeGraph. Standard '${toolName}' is blocked. ` +
-          `You MUST use the 'codegraph_explore' tool or run 'codegraph explore' command instead.`
+          `You MUST use the 'codegraph_explore' tool instead.`
         );
       }
     },
@@ -37,7 +37,7 @@ export const CodeGraphHelperPlugin: Plugin = async ({ client, $, directory }) =>
       const hasCodeGraph = fs.existsSync(path.join(workspaceRoot, ".codegraph"));
 
       // Auto-update CodeGraph index after successful file writes/edits
-      if (hasCodeGraph && ["replace_file_content", "write_to_file", "multi_replace_file_content"].includes(toolName)) {
+      if (hasCodeGraph && ["edit", "write", "apply_patch"].includes(toolName)) {
         try {
           if (shell) { shell\`codegraph index\`.catch(() => {}) }
         } catch {
