@@ -1,0 +1,163 @@
+{
+  "$schema": "./components.schema.json",
+  "schemaVersion": 1,
+  "expectedServerPlugins": 8,
+  "retired": {
+    "npmLocal": ["opencode-update-notifier"],
+    "pluginSpecs": ["opencode-update-notifier"]
+  },
+  "components": [
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "kind": "npm-global",
+      "package": "opencode-ai",
+      "target": "1.17.20",
+      "command": "opencode",
+      "repository": "https://github.com/anomalyco/opencode",
+      "verify": "opencode --version"
+    },
+    {
+      "id": "opencode-plugin",
+      "name": "OpenCode plugin SDK",
+      "kind": "npm-local",
+      "package": "@opencode-ai/plugin",
+      "target": "1.17.20",
+      "repository": "https://github.com/anomalyco/opencode",
+      "verify": "npm ls @opencode-ai/plugin --depth=0"
+    },
+    {
+      "id": "openai-compatible",
+      "name": "AI SDK OpenAI-compatible provider",
+      "kind": "npm-local",
+      "package": "@ai-sdk/openai-compatible",
+      "target": "3.0.10",
+      "repository": "https://github.com/vercel/ai",
+      "verify": "npm ls @ai-sdk/openai-compatible --depth=0"
+    },
+    {
+      "id": "supermemory",
+      "name": "Supermemory",
+      "kind": "npm-local",
+      "package": "opencode-supermemory",
+      "target": "2.0.8",
+      "repository": "https://github.com/supermemoryai/opencode-supermemory",
+      "patch": "patches/opencode-supermemory-2.0.8-selfhost.patch",
+      "wrapper": "plugins/supermemory.ts",
+      "removeWhen": "Package exports an OpenCode default plugin module and the self-hosted lifecycle passes without wrapper.",
+      "verify": "Supermemory add/search/profile/list/forget lifecycle"
+    },
+    {
+      "id": "omo-slim",
+      "name": "Oh My OpenCode Slim",
+      "kind": "omo",
+      "package": "oh-my-opencode-slim",
+      "target": "2.2.1",
+      "repository": "https://github.com/alvinunreal/oh-my-opencode-slim",
+      "verify": "ping all agents"
+    },
+    {
+      "id": "goal",
+      "name": "Goal plugin",
+      "kind": "npm-local",
+      "package": "@prevalentware/opencode-goal-plugin",
+      "target": "0.1.24",
+      "repository": "https://github.com/prevalentWare/opencode-goal-plugin",
+      "patch": "patches/opencode-goal-plugin-0.1.24.patch",
+      "tuiCache": true,
+      "removeWhen": "Remove package patch after upstream TUI rescans state and renders an empty Goal block.",
+      "verify": "/goal lifecycle and sidebar"
+    },
+    {
+      "id": "codegraph",
+      "name": "CodeGraph",
+      "kind": "npm-global",
+      "package": "@colbymchenry/codegraph",
+      "target": "1.4.1",
+      "command": "codegraph",
+      "repository": "https://github.com/colbymchenry/codegraph",
+      "verify": "indexed and unindexed workspace checks"
+    },
+    {
+      "id": "rtk",
+      "name": "RTK",
+      "kind": "github-release",
+      "target": "v0.43.0",
+      "command": "rtk",
+      "repository": "https://github.com/rtk-ai/rtk",
+      "wrapper": "plugins/rtk.ts",
+      "removeWhen": "Generated upstream hook supports Windows/Desktop input without injected shell.",
+      "verify": "rtk rewrite and Desktop-shaped plugin test"
+    },
+    {
+      "id": "headroom-python",
+      "name": "Headroom Python proxy",
+      "kind": "pypi",
+      "optional": true,
+      "package": "headroom-ai",
+      "target": "0.31.0",
+      "command": "headroom",
+      "repository": "https://github.com/headroomlabs-ai/headroom",
+      "verify": "headroom --version"
+    },
+    {
+      "id": "headroom-source",
+      "name": "Headroom OpenCode transport",
+      "kind": "github-commit",
+      "optional": true,
+      "target": "a0699794660132313446e8c52c588d6ead05af21",
+      "branch": "main",
+      "cache": "~/.cache/opencode-headroom/source",
+      "repository": "https://github.com/headroomlabs-ai/headroom",
+      "verify": "9router and native OpenCode interception"
+    },
+    {
+      "id": "lazy-load",
+      "name": "Lazy loading fork",
+      "kind": "github-file",
+      "target": "11ee1745e34235c90ce3fbe3167a344096afbb83",
+      "branch": "main",
+      "repository": "https://github.com/omarwaly-ai/opencode-lazy-loading",
+      "upstreamFile": "plugins/opencode-lazy-load.ts",
+      "localFile": "plugins/lazy-load.ts",
+      "verify": "tests/lazy-load.test.ts"
+    },
+    {
+      "id": "tokens-source",
+      "name": "Token source fork",
+      "kind": "github-file",
+      "target": "004e35f371a8bf23b22d02c63819fc91e44bc0ef",
+      "branch": "main",
+      "repository": "https://github.com/omarwaly-ai/OpenCode-tokens-source",
+      "upstreamFile": "plugins/tokens-source.ts",
+      "localFile": "plugins/0-tokens-source.ts",
+      "removeWhen": "Upstream includes repeated-initialization guard.",
+      "verify": "/tokens lifecycle and repeated initialization"
+    },
+    {
+      "id": "deep-research",
+      "name": "Deep Research skills",
+      "kind": "github-copy",
+      "target": "e5479f857f484cde13fe69d2f3ce8de7af193bc7",
+      "branch": "master",
+      "repository": "https://github.com/Weizhena/Deep-Research-skills",
+      "verify": "research workflow and @ autocomplete"
+    },
+    {
+      "id": "models-discovery",
+      "name": "9router model discovery",
+      "kind": "local",
+      "target": "local",
+      "localFile": "plugins/models-discovery.js",
+      "verify": "tests/models-discovery.test.ts"
+    },
+    {
+      "id": "codegraph-helper",
+      "name": "CodeGraph workspace guard",
+      "kind": "local",
+      "target": "local",
+      "localFile": "plugins/codegraph-helper.ts",
+      "verify": "tests/codegraph-helper.test.ts"
+    }
+  ]
+}

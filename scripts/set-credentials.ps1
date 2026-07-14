@@ -128,7 +128,7 @@ foreach ($name in $required) {
 }
 
 if (-not (Test-Path -LiteralPath $ConfigFile)) {
-  throw "$ConfigFile not found. Run bootstrap.ps1 first."
+  throw "$ConfigFile not found. Run setup.ps1 first."
 }
 
 $configText = Get-Content -Raw -LiteralPath $ConfigFile

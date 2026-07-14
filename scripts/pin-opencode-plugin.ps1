@@ -8,7 +8,9 @@ param(
 
   [string]$Version,
 
-  [switch]$Remove
+  [switch]$Remove,
+
+  [switch]$Add
 )
 
 if (-not $Remove -and -not $Version) {
@@ -72,6 +74,8 @@ for ($index = 0; $index -lt $content.Length;) {
 }
 
 $target = $null
+$arrayEnd = $null
+$arrayHasEntries = $false
 $containerDepth = 0
 for ($index = 0; $index + 2 -lt $tokens.Count; $index++) {
   $current = $tokens[$index]
@@ -94,12 +98,14 @@ for ($index = 0; $index + 2 -lt $tokens.Count; $index++) {
     if ($token.Kind -eq 'Symbol' -and $token.Text -in '[', '{') { $depth++ }
     elseif ($token.Kind -eq 'Symbol' -and $token.Text -in ']', '}') {
       $depth--
-      if ($depth -eq 0) { break }
+      if ($depth -eq 0) { $arrayEnd = $token; break }
     }
     elseif ($depth -eq 1 -and $token.Kind -eq 'String' -and
       ($token.Text -eq $Name -or $token.Text.StartsWith("$Name@"))) {
       $target = $token
-      break
+      $arrayHasEntries = $true
+    } elseif ($depth -eq 1 -and $token.Kind -eq 'String') {
+      $arrayHasEntries = $true
     }
   }
   break
@@ -121,6 +127,22 @@ if ($null -ne $target) {
   } else {
     $replacement = '"' + $Name + '@' + $Version + '"'
     $updated = $content.Substring(0, $target.Start) + $replacement + $content.Substring($target.End)
+  }
+} elseif ($Add -and $null -ne $arrayEnd) {
+  $entry = '"' + $Name + '@' + $Version + '"'
+  if (-not $arrayHasEntries) {
+    $updated = $content.Substring(0, $arrayEnd.Start) + $entry + $content.Substring($arrayEnd.Start)
+  } else {
+    $trailingStart = $arrayEnd.Start
+    while ($trailingStart -gt 0 -and [char]::IsWhiteSpace($content[$trailingStart - 1])) { $trailingStart-- }
+    $trailing = $content.Substring($trailingStart, $arrayEnd.Start - $trailingStart)
+    $newline = [regex]::Match($trailing, '(\r?\n)([ \t]*)$')
+    if ($newline.Success) {
+      $insertion = ',' + $newline.Groups[1].Value + $newline.Groups[2].Value + '  ' + $entry + $trailing
+    } else {
+      $insertion = ', ' + $entry + $trailing
+    }
+    $updated = $content.Substring(0, $trailingStart) + $insertion + $content.Substring($arrayEnd.Start)
   }
 }
 

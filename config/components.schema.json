@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schemaVersion", "expectedServerPlugins", "components"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "expectedServerPlugins": { "type": "integer", "minimum": 1 },
+    "retired": { "type": "object" },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "kind", "target", "verify"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "name": { "type": "string", "minLength": 1 },
+          "kind": {
+            "enum": ["npm-global", "npm-local", "omo", "github-release", "github-commit", "github-file", "github-copy", "pypi", "local"]
+          },
+          "target": { "type": "string", "minLength": 1 },
+          "verify": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}
