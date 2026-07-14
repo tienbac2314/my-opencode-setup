@@ -165,6 +165,7 @@ $dependencies = [ordered]@{
   "@opencode-ai/plugin"       = $versions.OPENCODE_PLUGIN_VERSION
   "@ai-sdk/openai-compatible" = $versions.AI_SDK_OPENAI_COMPATIBLE_VERSION
   "opencode-supermemory"      = $versions.OPENCODE_SUPERMEMORY_VERSION
+  "opencode-goal-plugin"      = $versions.OPENCODE_GOAL_PLUGIN_VERSION
 }
 foreach ($plugin in $config.plugin) {
   if ($plugin -is [string] -and $plugin -notmatch '^\./') {
