@@ -13,6 +13,7 @@ Verified host:
 - User configuration root: `$HOME\.config\opencode`
 - Repository checkout: `$HOME\opencode-dotfiles`
 - 9router OpenAI-compatible provider
+- Headroom isolated OpenAI-compatible provider targeting local proxy at port 8787
 - Optional Oracle VPS entry named `Oracle VPS` in VibeShell
 
 Use native Windows paths. WSL can run OpenCode, but this repository's bootstrap and Desktop validation target native Windows.
@@ -118,7 +119,8 @@ Bootstrap performs these mutations under `$HOME\.config\opencode`:
 3. Copies `AGENTS.md`, `tui.json`, skills, agents, and data.
 4. removes legacy duplicate plugins and Mem0 runtime artifacts.
 5. Copies six repository plugins into auto-discovery directory.
-6. Creates `supermemory.jsonc` from example only when missing.
+6. Pins `@prevalentware/opencode-goal-plugin@0.1.24` and configurations.
+7. Creates `supermemory.jsonc` from example only when missing.
 7. Downloads `/tokens` command definition when network permits.
 8. Generates `package.json` and runs `npm install`.
 9. Runs pinned OMO Slim installer, then restores repository preset and plugin pins.
@@ -168,6 +170,16 @@ Replace provider placeholder, then replace tracked user-specific skills path:
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "https://tienbac.dpdns.org/v1",
+        "apiKey": "YOUR_API_KEY_HERE",
+        "modelsDiscovery": {
+          "enabled": true
+        }
+      }
+    },
+    "headroom": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:8787/v1",
         "apiKey": "YOUR_API_KEY_HERE",
         "modelsDiscovery": {
           "enabled": true
@@ -228,6 +240,7 @@ Fresh bootstrap reads `$HOME\.config\opencode\versions.env` and generates `$HOME
 |---|---|
 | `@opencode-ai/plugin` | `1.17.18` |
 | `@ai-sdk/openai-compatible` | `3.0.7` |
+| `@prevalentware/opencode-goal-plugin` | `0.1.24` |
 | `opencode-supermemory` | `2.0.8` |
 | `opencode-update-notifier` | `0.3.3` |
 | `oh-my-opencode-slim` | `2.2.0` |
@@ -244,7 +257,7 @@ Bootstrap preserves existing `opencode.jsonc`, then private version values win f
 
 ```powershell
 Push-Location "$HOME\.config\opencode"
-npm install --save-exact "@opencode-ai/plugin@1.17.18" "@ai-sdk/openai-compatible@3.0.7" "opencode-supermemory@2.0.8" "opencode-update-notifier@0.3.3" "oh-my-opencode-slim@2.2.0"
+npm install --save-exact "@opencode-ai/plugin@1.17.18" "@ai-sdk/openai-compatible@3.0.7" "@prevalentware/opencode-goal-plugin@0.1.24" "opencode-supermemory@2.0.8" "opencode-update-notifier@0.3.3" "oh-my-opencode-slim@2.2.0"
 Pop-Location
 ```
 
@@ -260,10 +273,11 @@ $config = $raw | ConvertFrom-Json
 $config.plugin_origins | ForEach-Object { $_.spec }
 ```
 
-Expected count: eight. Expected set:
+Expected count: nine. Expected set:
 
 ```text
 opencode-update-notifier@0.3.3
+@prevalentware/opencode-goal-plugin@0.1.24
 oh-my-opencode-slim@2.2.0
 file:///.../plugins/supermemory.ts
 file:///.../plugins/rtk.ts
@@ -375,6 +389,14 @@ Expected: `.codegraph/` exists, status reports current index, explore returns la
 ### OMO Slim
 
 Run `ping all agents`. Expected orchestration loads configured agents, tools, MCPs, and commands without missing-model or duplicate-plugin errors.
+
+### Goal Plugin
+
+Set a goal using `/goal <objective>` in the TUI or calling the `set_goal` tool. Verify sidebar progress timer is running and objective status updates.
+
+### Headroom Proxy
+
+Ensure Headroom proxy is running locally (`headroom proxy --port 8787`). Check `opencode models headroom` listing. Verify headroom-routed requests are optimized without affecting direct `9router` operations.
 
 ### RTK
 

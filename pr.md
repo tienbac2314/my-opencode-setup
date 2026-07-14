@@ -12,6 +12,7 @@ Use this document when you need to understand where a plugin came from, what thi
 | `plugins/codegraph-helper.ts` | Made in this repository | Whole file |
 | `plugins/rtk.ts` | Generated from [RTK OpenCode hook](https://github.com/rtk-ai/rtk/tree/master/hooks/opencode) | Windows/Desktop checks and OpenCode file-plugin wrapper |
 | `plugins/supermemory.ts` | Small wrapper around [opencode-supermemory](https://github.com/supermemoryai/opencode-supermemory) | Wrapper only; package owns memory behavior |
+| `@prevalentware/opencode-goal-plugin` | [Upstream npm package](https://github.com/prevalentWare/opencode-goal-plugin) | Version pins, command setup, and TUI configuration |
 | `oh-my-opencode-slim` | [Upstream npm package](https://github.com/alvinunreal/oh-my-opencode-slim) | Version pins, installer cleanup, and 9router preset |
 | `opencode-update-notifier` | [Upstream npm package](https://github.com/tim-hilde/opencode-update-notifier) | Version pin and setup only |
 | Research skills and web-search files | [Weizhena/Deep-Research-skills](https://github.com/Weizhena/Deep-Research-skills) | OpenCode metadata/tool changes, model choice, and hidden strategy-module layout |
@@ -25,6 +26,7 @@ Comparison date: 2026-07-14. Compared upstream commits:
 | opencode-supermemory | `dd7cf6273b1440a55a2e448a166de04db9e334d3` |
 | RTK (`develop`) | `5d32d0736f686b69d1e8b9dc45c007d4eb77a0a2` |
 | Deep-Research-skills (`master`) | `e5479f857f484cde13fe69d2f3ce8de7af193bc7` |
+| opencode-goal-plugin (`main`, package `0.1.24`) | `c023974740aa5c7da55b61152f287812184e1f89` |
 | oh-my-opencode-slim (`master`, package `2.2.0`) | `cb4ee1aa077d68354160214c9baa9612f66297ab` |
 | opencode-update-notifier (`main`) | `ff12e7824d501862368910d01b04936744ae8ea1` |
 
@@ -37,7 +39,7 @@ Do not remove a fix only because upstream published a new version. First prove a
 3. Local and upstream files are compared before copying.
 4. `rtk proxy bun test` passes.
 5. Changed local plugins bundle under `$HOME\.config\opencode`.
-6. Resolved `plugin` and `plugin_origins` both contain the expected eight entries once each.
+6. Resolved `plugin` and `plugin_origins` both contain the expected nine entries once each.
 7. CLI, TUI, and Desktop complete a real `load_tool` shell call.
 8. The changed plugin completes its own tests below.
 
@@ -481,10 +483,11 @@ Current tested stack:
 - OpenCode 1.17.18
 - @opencode-ai/plugin 1.17.18
 - @ai-sdk/openai-compatible 3.0.7
+- @prevalentware/opencode-goal-plugin 0.1.24
 - opencode-supermemory 2.0.8
 - opencode-update-notifier 0.3.3
 - oh-my-opencode-slim 2.2.0
-- eight effective plugins: two npm plus six local files
+- nine effective plugins: three npm plus six local files
 
 Required work:
 1. State source URL, current version/commit, target version/commit, and exact local differences.
