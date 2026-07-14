@@ -204,8 +204,7 @@ No upstream file exists. Keep changes here. If publishing it as its own project 
 - Acts only when current workspace has `.codegraph/`.
 - Redirects grep/glob until current session attempts CodeGraph, then allows fallback search.
 - Always allows file reads.
-- Debounces `codegraph sync` after supported write tools, including `apply_patch`.
-- Keeps missing shell runners and background failures from crashing Desktop.
+- Leaves index refresh to CodeGraph MCP file watcher. No OpenCode edit hook or duplicate `codegraph sync`.
 - Does nothing in repositories without a CodeGraph index.
 
 ### Tests to run
@@ -216,7 +215,7 @@ rtk codegraph explore "CodeGraphHelperPlugin"
 rtk proxy bun test tests/codegraph-helper.test.ts
 ```
 
-Also test indexed and unindexed folders, session isolation, grep/glob fallback after one CodeGraph attempt, and a failed background runner.
+Also test indexed and unindexed folders, session isolation, and grep/glob fallback after one CodeGraph attempt. Current MCP command is `codegraph serve --mcp`; adding `--no-watch` requires a separate sync strategy.
 
 ### How to update
 

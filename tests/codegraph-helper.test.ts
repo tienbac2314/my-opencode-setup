@@ -13,13 +13,8 @@ function workspace(indexed = true): string {
   return directory
 }
 
-async function plugin(directory: string, commands: string[] = []) {
-  const $ = (parts: TemplateStringsArray) => {
-    commands.push(parts.join(""))
-    return Promise.resolve()
-  }
-
-  return (CodeGraphHelperPlugin as any)({ directory, $, client: {} })
+async function plugin(directory: string) {
+  return (CodeGraphHelperPlugin as any)({ directory, client: {} })
 }
 
 afterEach(() => {
@@ -77,29 +72,10 @@ describe("CodeGraph search guard", () => {
   })
 })
 
-describe("CodeGraph index sync", () => {
-  test("refreshes after apply_patch", async () => {
-    const commands: string[] = []
-    const hooks = await plugin(workspace(), commands)
+describe("CodeGraph index ownership", () => {
+  test("leaves edit syncing to the CodeGraph MCP watcher", async () => {
+    const hooks = await plugin(workspace())
 
-    await hooks["tool.execute.after"](
-      { tool: "apply_patch", sessionID: "session-a" },
-      {},
-    )
-    await Bun.sleep(350)
-
-    expect(commands).toEqual(["codegraph sync"])
-  })
-
-  test("debounces supported edits into one index refresh", async () => {
-    const commands: string[] = []
-    const hooks = await plugin(workspace(), commands)
-    const after = hooks["tool.execute.after"]
-
-    await after({ tool: "write_to_file", sessionID: "session-a" }, {})
-    await after({ tool: "multi_replace_file_content", sessionID: "session-a" }, {})
-    await Bun.sleep(350)
-
-    expect(commands).toEqual(["codegraph sync"])
+    expect(hooks["tool.execute.after"]).toBeUndefined()
   })
 })
