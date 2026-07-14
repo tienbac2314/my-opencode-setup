@@ -70,16 +70,8 @@
   "lsp": true,
   "plugin": [
     "opencode-update-notifier@0.3.3",
-    "oh-my-opencode-slim@2.2.1",
-    "@prevalentware/opencode-goal-plugin/server@0.1.24"
+    "oh-my-opencode-slim@2.2.1"
   ],
-  "command": {
-    "goal": {
-      "description": "Set a session-scoped goal and auto-continue until complete.",
-      "template": "$ARGUMENTS",
-      "agent": "build"
-    }
-  },
   "experimental": {
     "mcp_timeout": 60000
   },

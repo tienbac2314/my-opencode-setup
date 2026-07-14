@@ -14,6 +14,7 @@ const bootstrapScript = fileURLToPath(new URL("../bootstrap.ps1", import.meta.ur
 const updaterScript = readFileSync(new URL("../update-plugins.ps1", import.meta.url), "utf8")
 const projectConfig = JSON.parse(readFileSync(new URL("../.opencode/opencode.json", import.meta.url), "utf8"))
 const globalConfig = JSON.parse(readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8"))
+const goalAdapter = readFileSync(new URL("../plugins/goal.ts", import.meta.url), "utf8")
 
 const versionFileBody = `
 # machine-local tested versions
@@ -34,6 +35,12 @@ test("Headroom stays launcher-only", () => {
   expect(globalConfig.provider?.headroom).toBeUndefined()
   expect(globalConfig.plugin ?? []).not.toContain("headroom-opencode")
   expect(globalConfig.mcp?.headroom).toBeUndefined()
+})
+
+test("goal plugin uses local server adapter and owns its command", () => {
+  expect(goalAdapter).toContain('config.command?.goal?.template === "$ARGUMENTS"')
+  expect(globalConfig.plugin ?? []).not.toContain("@prevalentware/opencode-goal-plugin/server@0.1.24")
+  expect(globalConfig.command?.goal).toBeUndefined()
 })
 
 describe("private version file", () => {
@@ -291,6 +298,33 @@ describe("bootstrap plugin pinning", () => {
       expect(updated).toContain('// keep example "oh-my-opencode-slim"')
       expect(updated).toContain('"token": "oh-my-opencode-slim"')
       expect(updated).toContain('"oh-my-opencode-slim@2.1.1"')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test("removes a legacy plugin without rewriting JSONC", () => {
+    const directory = mkdtempSync(join(tmpdir(), "opencode-remove-plugin-"))
+    const configPath = join(directory, "opencode.jsonc")
+    const original = `{
+  // keep comment
+  "plugin": ["first@1", "@prevalentware/opencode-goal-plugin/server@0.1.24", "last@1"],
+  "provider": { "9router": { "options": { "apiKey": "keep-secret" } } }
+}`
+
+    try {
+      writeFileSync(configPath, original)
+      const result = Bun.spawnSync([
+        "rtk", "proxy", "pwsh", "-NoProfile", "-File", pinPluginScript,
+        "-Path", configPath, "-Name", "@prevalentware/opencode-goal-plugin/server", "-Remove",
+      ])
+
+      expect(result.exitCode).toBe(0)
+      const updated = readFileSync(configPath, "utf8")
+      expect(updated).not.toContain("opencode-goal-plugin/server")
+      expect(updated).toContain("// keep comment")
+      expect(updated).toContain('"apiKey": "keep-secret"')
+      expect(updated).toContain('"plugin": ["first@1",  "last@1"]')
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

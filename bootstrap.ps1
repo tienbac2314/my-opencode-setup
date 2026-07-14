@@ -55,14 +55,12 @@ function Install-OmoSlim {
     throw "Active OpenCode config not found: $activeConfigPath"
   }
   & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $activeConfigPath -Name "oh-my-opencode-slim" -Version $Version
-  if ($versions.OPENCODE_GOAL_PLUGIN_VERSION) {
-    & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $activeConfigPath -Name "@prevalentware/opencode-goal-plugin/server" -Version $versions.OPENCODE_GOAL_PLUGIN_VERSION
-  }
+  & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $activeConfigPath -Name "@prevalentware/opencode-goal-plugin/server" -Remove
   Write-Output "  Restored pinned global plugin config"
 
   New-Item -ItemType Directory -Path "$ConfigDir\plugins" -Force | Out-Null
   Copy-Item "$RepoDir\plugins\*" "$ConfigDir\plugins" -Force
-  Write-Output "  Restored six audited local plugins"
+  Write-Output "  Restored seven audited local plugins"
 
   Push-Location $ConfigDir
   try {

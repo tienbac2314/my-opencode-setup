@@ -6,9 +6,14 @@ param(
   [Parameter(Mandatory)]
   [string]$Name,
 
-  [Parameter(Mandatory)]
-  [string]$Version
+  [string]$Version,
+
+  [switch]$Remove
 )
+
+if (-not $Remove -and -not $Version) {
+  throw "-Version is required unless -Remove is used"
+}
 
 $resolvedPath = (Resolve-Path -LiteralPath $Path).Path
 $content = [IO.File]::ReadAllText($resolvedPath)
@@ -102,8 +107,21 @@ for ($index = 0; $index + 2 -lt $tokens.Count; $index++) {
 
 $updated = $content
 if ($null -ne $target) {
-  $replacement = '"' + $Name + '@' + $Version + '"'
-  $updated = $content.Substring(0, $target.Start) + $replacement + $content.Substring($target.End)
+  if ($Remove) {
+    $start = $target.Start
+    $end = $target.End
+    while ($end -lt $content.Length -and [char]::IsWhiteSpace($content[$end])) { $end++ }
+    if ($end -lt $content.Length -and $content[$end] -eq ',') {
+      $end++
+    } else {
+      while ($start -gt 0 -and [char]::IsWhiteSpace($content[$start - 1])) { $start-- }
+      if ($start -gt 0 -and $content[$start - 1] -eq ',') { $start-- }
+    }
+    $updated = $content.Substring(0, $start) + $content.Substring($end)
+  } else {
+    $replacement = '"' + $Name + '@' + $Version + '"'
+    $updated = $content.Substring(0, $target.Start) + $replacement + $content.Substring($target.End)
+  }
 }
 
 if ($updated -ne $content) {
