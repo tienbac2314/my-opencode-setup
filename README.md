@@ -8,6 +8,7 @@ Personal OpenCode setup for Windows and Linux. One component manifest controls v
 - Check or apply updates: `pwsh ./maintain.ps1 check|plan|apply|verify`
 - Understand local differences: [PATCHES.md](PATCHES.md)
 - Prepare upstream reports: [pr.md](pr.md)
+- Understand this refactor and past failures: [docs/maintenance-refactor.md](docs/maintenance-refactor.md)
 
 ## Architecture
 
