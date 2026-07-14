@@ -1,7 +1,5 @@
----
-
-**OpenCode Guidelines** (Merge with project rules)
-**Tradeoff:** Focused execution > broad autonomy. Trivial tasks: use judgment.
+# OpenCode Guidelines
+**Tradeoff:** Focused execution > broad autonomy. Trivial tasks: use judgment. (Merge with project rules)
 
 ## 1. Think Before Coding
 
@@ -38,7 +36,7 @@
 **Define success criteria. Loop until verified.**
 
 * Transform tasks into verifiable goals (e.g., "Fix bug" -> "Write failing test, make pass").
-* Multi-step plan: `1. Do X — verify: Y`
+* Multi-step plan: `1. Do X - verify: Y`
 * Use narrowest meaningful verification (unit test, typecheck, build).
 * Never claim unrun verification. State exactly what was checked.
 
@@ -61,17 +59,13 @@
 
 **Auto-clarity:** Full prose for security warnings, irreversible ops, ambiguous multi-step order. Resume caveman after.
 
-## 6. Runtime Tools and Plugins
+## 6. Runtime Tools
 
-**Use installed behavior. Do not guess names, hooks, or ownership.**
+**Use runtime names and loaded schemas. Do not guess how integrations work.**
 
-* **Lazy loading:** `load_tool` exposes unloaded tools on demand. Load exact runtime name before calling tool. MCP names may be namespaced by client. If tool is listed but deferred, load it instead of claiming it is missing.
-* **CodeGraph:** If `.codegraph/` exists, use CodeGraph before grep/find or broad file reads. OpenCode tool is `codegraph_codegraph_explore`; other clients may show `codegraph_explore`. Shell command is `codegraph explore "<symbol names or question>"`. Different names are client namespacing, not duplicate tools.
-* **RTK:** Write `rtk` explicitly for supported shell commands. Native Windows hook may rewrite commands, but never assume it ran. Treat successful RTK output as command result: obey requested output shape; do not explain rewrite, rerun raw command, or second-guess changed formatting. Use user PATH such as `~/.local/bin`; never install or fall back to `C:\Windows\System32`.
-* **Supermemory:** Active long-term memory path. Mem0 is archive only. Use exposed Supermemory tools and their loaded schemas; do not invent tool names, modes, or fields. Never print full config or credentials while debugging.
-* **Agents:** Main-tab agents are primary agents. `@` agents are callable subagents controlled by caller's `permission.task`. Skills and data files guide agents; they are not extra main-tab agents. Read [docs/opencode-agents.md](docs/opencode-agents.md) before changing agent visibility or delegation.
-* **Skills:** Runtime skill list is authoritative. Read matching `SKILL.md` before use. Do not guess skill paths or assume every repository data module is exposed as skill. Deep Research intentionally hides some web-search modules from agents.
-* **Other plugins:** Token source provides `/tokens`. Models discovery builds 9router model entries. Update notifier checks pinned npm plugins, not custom local wrappers. Local plugins are auto-discovered; do not add them to project `plugin` arrays or set `"plugin": []`.
-* **Source of truth:** [README.md](README.md) explains runtime layout. [setup.md](setup.md) covers install and updates. [pr.md](pr.md) records local plugin changes and upstream comparison. Read these before updating plugins or replacing local files.
-
-**Debug safely:** Inspect filtered `plugin_origins` and exact errors. Do not dump full resolved config; it may contain provider keys and Supermemory credentials.
+* **Lazy loading:** Tools may be hidden until loaded. Call `load_tool` with exact name shown by current client, then call tool.
+* **CodeGraph:** If `.codegraph/` exists, use CodeGraph before grep/find for code discovery. OpenCode exposes `codegraph_codegraph_explore`; other clients may expose `codegraph_explore`; shell uses `codegraph explore`.
+* **RTK:** Prefix supported shell commands with `rtk`. Hooks can rewrite commands or output. If command succeeds, treat output as final and follow user's requested output shape; do not rerun raw command. Use user PATH.
+* **Memory:** Supermemory is active memory. Read loaded schema before use; never guess fields or print credentials.
+* **Agents/skills:** Main tabs are primary agents. `@` invokes subagents allowed by `permission.task`. Runtime skill list is authoritative; read matching `SKILL.md`. Hidden Deep Research web search is intentional.
+* **Plugins:** `/tokens` reports token sources; model discovery builds 9router entries; notifier checks npm packages only. Local plugins auto-discover, so never add their paths or set `"plugin": []`.
