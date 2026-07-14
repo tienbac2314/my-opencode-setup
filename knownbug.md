@@ -12,40 +12,26 @@ Use this page when the setup starts but behaves incorrectly. Find the matching s
 
 **Isolation check:** after launcher exits, port 8787 has no listener unless healthy proxy existed before launch. Hashes of active `opencode.jsonc`, `tui.json`, and `AGENTS.md` must remain unchanged.
 
-## TUI Sidebar Crash and `/goal` Input Desync (prevalentWare)
+## `/goal` appears but does not create a goal
 
-**Symptom:** Both sidebar UIs (oh-my-opencode-slim and goal plugin) disappear from the terminal, and typing any slash command (like `/goal`) instantly gets erased or repeats a previous input (like `'yo'`).
+**Symptom:** TUI accepts `/goal`, but model receives only objective text, goal sidebar stays empty, or plugin list settles at eight entries.
 
-**Cause:** The `"command"` key is registered inside `~/.config/opencode/tui.json`. OpenCode's TUI loader rejects layout configuration files with unrecognized top-level keys, causing the entire layout engine to unmount. When unmounted, SolidJS textarea stashes the active text context, falling back to the last stable prompt (e.g. `'yo'`) when the TUI recovers, creating a submission loop.
+**Cause:** package `0.1.24` exports its server entrypoint as `{ id, server }`, while OpenCode `1.17.x` server loading expects a callable export. The failed npm server entry disappears from loaded plugins. Old config then masks failure with `"template": "$ARGUMENTS"`, which sends raw text without goal-tool instructions.
 
-**Rule:** TUI configuration file (`tui.json`) must strictly contain plugin arrays only. All custom command mapping definitions belong strictly in `opencode.jsonc`.
+**Fix:** keep package as dependency and TUI entrypoint, but load server half through auto-discovered `plugins/goal.ts`. Remove explicit `@prevalentware/opencode-goal-plugin/server` from `opencode.jsonc`. Do not define raw `$ARGUMENTS` goal command; adapter lets upstream server hook register full template.
 
-**Recovery:**
-1. Clean `tui.json`: Keep only the plugin array (with `oh-my-opencode-slim` listed first so it takes top priority):
-   ```json
-   {
-     "plugin": [
-       "oh-my-opencode-slim@2.2.0",
-       "@prevalentware/opencode-goal-plugin@0.1.24"
-     ]
-   }
-   ```
-2. Set up `opencode.jsonc`: Declare the plugins and custom command mappings there:
-   ```jsonc
-   "plugin": [
-     "opencode-update-notifier@0.3.3",
-     "oh-my-opencode-slim@2.2.0",
-     "@prevalentware/opencode-goal-plugin@0.1.24"
-   ],
-   "command": {
-     "goal": {
-       "description": "Set a session-scoped goal and auto-continue until complete.",
-       "template": "$ARGUMENTS",
-       "agent": "build"
-     }
-   }
-   ```
-3. Close the terminal session completely, start a new OpenCode instance, and verify the UIs mount and `/goal` processes properly.
+**Check:** `opencode debug config` must show nine server plugins, including `plugins/goal.ts`, no `/server` npm origin, and `command.goal.template` containing `create_goal`. A live `/goal test objective` must create matching entry in `%APPDATA%\opencode-goal-plugin\goals.json`.
+
+`tui.json` remains plugin-only:
+
+```json
+{
+  "plugin": [
+    "oh-my-opencode-slim@2.2.1",
+    "@prevalentware/opencode-goal-plugin/tui@0.1.24"
+  ]
+}
+```
 
 ## CodeGraph error outside indexed projects
 
@@ -70,7 +56,7 @@ $config = (opencode debug config | Out-String) | ConvertFrom-Json
 $config.plugin_origins | ForEach-Object { $_.spec }
 ```
 
-Expected: eight origins; every local file once.
+Expected: nine origins; every local file once. Eight means goal server adapter is missing.
 
 **Recovery:** remove explicit file entries, run bootstrap to restore active plugin directory and pinned npm entries, restart all OpenCode processes.
 
@@ -78,7 +64,7 @@ Expected: eight origins; every local file once.
 
 **Symptom:** Desktop status opens with eight plugins, may briefly show nine during reload, settles at eight, then later displays only `Plugins configured in opencode.json`. Tool calls can still work because plugin origins remain loaded.
 
-**Cause:** project-scoped `.opencode/opencode.json` contains `"plugin": []`. In OpenCode `1.17.18`, runtime loading uses resolved `plugin_origins`, while Desktop status reads resolved `plugin`. Empty project array overwrites displayed list without unloading eight origins. This is a configuration-layer bug, not evidence that `load_tool`, local plugins, or Supermemory failed.
+**Cause:** project-scoped `.opencode/opencode.json` contains `"plugin": []`. In OpenCode `1.17.18`, runtime loading uses resolved `plugin_origins`, while Desktop status reads resolved `plugin`. Empty project array overwrites displayed list without unloading origins. This is a configuration-layer bug, not evidence that `load_tool`, local plugins, or Supermemory failed.
 
 **Rule:** omit `plugin` entirely from project `.opencode/opencode.json`. Never use an empty array to mean “no project plugins.” Runtime npm plugin pins remain in user config; local plugins remain auto-discovered from plugin directory.
 
@@ -93,7 +79,7 @@ $config = (opencode debug config | Out-String) | ConvertFrom-Json
 $config.plugin_origins | ForEach-Object { $_.spec }
 ```
 
-Expected: `Plugins = 8`, `Origins = 8`, with two npm and six local origins listed once each. `Plugins = 0`, `Origins = 8` fingerprints project override; do not change lazy-load code.
+Expected: `Plugins = 9`, `Origins = 9`, with two npm and seven local origins listed once each. `Plugins = 0`, `Origins = 9` fingerprints project override; do not change lazy-load code. `Plugins = 8`, `Origins = 8` means goal server adapter is missing.
 
 **Recovery:** remove only project `plugin` property, preserve `$schema`, then fully reload Desktop with `Ctrl+R` or start a new process. Open status Plugins tab at least three times and confirm count stays eight. Run one `load_tool` shell marker afterward; plugin display and tool execution are independent checks.
 
@@ -270,7 +256,7 @@ Expected: 0.
 
 **Rule:** close Desktop fully after plugin update, reopen it, wait about 15 seconds for sidecar, then create a new session before checking Status.
 
-**Detection:** compare fresh-session Status with `plugin_origins` and `bun pm ls`. Current verified OMO Slim value is `2.2.0`.
+**Detection:** compare fresh-session Status with `plugin_origins`, generated `package.json`, and `npm ls --depth=0`. Current verified OMO Slim value is `2.2.1`. `bun pm ls` may omit npm-installed packages when Bun lock metadata is stale.
 
 **Recovery:** restart Desktop and open new session. If value still differs, rerun targeted update and inspect newest Desktop server log.
 
@@ -282,7 +268,7 @@ Expected: 0.
 
 **Current rule:** private `$HOME\.config\opencode\versions.env` holds exact target. Use `update-plugins.ps1 -Component OmoSlim -DryRun`, then `bootstrap.ps1 -UpdateOnly -Component OmoSlim`. Current updater delegates only selected exact OMO update and restores tailored config plus both plugin pins.
 
-**Detection:** compare `bun pm ls`, `plugin_origins`, `tui.json`, root plugin array, and six local SHA-256 values.
+**Detection:** compare `npm ls --depth=0`, `plugin_origins`, `tui.json`, root plugin array, and seven local SHA-256 values.
 
 **Recovery for old state:** run targeted OMO update, verify exact pins, restart OpenCode, then run OMO and Desktop lifecycle checks.
 

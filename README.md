@@ -15,25 +15,25 @@ New here: start with [setup.md](setup.md). Confused by main agents, `@` workers,
 | Plugin API | `@opencode-ai/plugin@1.17.18` |
 | Provider adapter | `@ai-sdk/openai-compatible@3.0.7` |
 | Goal plugin | `@prevalentware/opencode-goal-plugin@0.1.24` |
-| Orchestration | `oh-my-opencode-slim@2.2.0` |
+| Orchestration | `oh-my-opencode-slim@2.2.1` |
 | Memory client | `opencode-supermemory@2.0.8` |
 | Update notifier | `opencode-update-notifier@0.3.3` |
 | Supermemory endpoint | `https://supermemory.tienbac.dpdns.org` |
 | Recovery baseline | `d8fa757af2f97a640610fb00e32d4d811a255fab` |
 | Broken reference tip | `c286bb890666528fbdfed486f1851b1226a075b6` |
 
-Recovery verification completed with 16 Bun tests, local and Supermemory plugin bundles, CLI/TUI/Desktop `load_tool` execution, eight effective plugin origins, six repository-to-runtime plugin hash matches, 52 discovered 9router models, a complete Supermemory add/search/profile/list/forget lifecycle, and Oracle VPS local/public HTTP 200 checks.
+Recovery verification completed with Bun tests, local and Supermemory plugin bundles, CLI/TUI/Desktop `load_tool` execution, nine effective server plugin origins, seven repository-to-runtime plugin hash matches, 52 discovered 9router models, a complete Supermemory add/search/profile/list/forget lifecycle, and Oracle VPS local/public HTTP 200 checks.
 
 ## Architecture
 
 ```text
 Repository source
   bootstrap.ps1
-    copies configs, agents, skills, data, and six local plugins
+    copies configs, agents, skills, data, and seven local plugins
     reads exact package versions from private versions.env
     installs npm dependencies derived from active plugin entries and private versions
     runs OMO Slim and RTK installers
-    restores repository-controlled pins and all six audited local plugins
+    restores repository-controlled pins and all seven audited local plugins
 
 ~/.config/opencode/
   opencode.jsonc       provider, npm plugins, permissions, compaction
@@ -81,19 +81,19 @@ Effective origins must contain exactly nine entries:
 
 ```text
 opencode-update-notifier@0.3.3
-oh-my-opencode-slim@2.2.0
-@prevalentware/opencode-goal-plugin@0.1.24
+oh-my-opencode-slim@2.2.1
 plugins/supermemory.ts
 plugins/rtk.ts
 plugins/models-discovery.js
 plugins/lazy-load.ts
+plugins/goal.ts
 plugins/codegraph-helper.ts
 plugins/0-tokens-source.ts
 ```
 
 Local plugin filename order matters. `0-tokens-source.ts` sorts before `lazy-load.ts`, making token source inner `fetch` wrapper. Lazy load modifies request before token source observes final API body, so `/tokens` reports schemas actually sent to model.
-- Note: TUI `tui.json` config must not contain a `"command"` key. Custom commands (like `"/goal"`) belong strictly in `opencode.jsonc`. Putting `"command"` in `tui.json` will cause OpenCode's SolidJS TUI loader to abort config loading, breaking the sidebar layout and causing input session prompt-stashing bugs.
-- Note: The prevalentWare goal plugin `@prevalentware/opencode-goal-plugin` has separate entrypoints: `@prevalentware/opencode-goal-plugin/server` for headless command/auto-continue and `@prevalentware/opencode-goal-plugin/tui` for TUI sidebar mounting. They can be registered independently.
+- Note: TUI `tui.json` contains plugin entries only. Its goal entry is `@prevalentware/opencode-goal-plugin/tui@0.1.24`.
+- Note: `plugins/goal.ts` adapts the package's object-shaped server export to OpenCode's callable file-plugin loader. It also replaces only the old broken `"template": "$ARGUMENTS"` command with the package's complete goal command.
 
 Bootstrap runs two installers that mutate active files:
 
@@ -104,12 +104,13 @@ Bootstrap runs two installers that mutate active files:
 
 | Component | Load source | What it does | What must keep working | How we tested it |
 |---|---|---|---|---|
-| `oh-my-opencode-slim@2.2.0` | npm plugin | Orchestrator, Librarian, Oracle, Designer, Fixer, Observer, and Councillor agents | Installer result must be re-pinned; repository preset restored | Agent/tool/MCP/command registration plus bounded Fixer `PONG` |
+| `oh-my-opencode-slim@2.2.1` | npm plugin | Orchestrator, Librarian, Oracle, Designer, Fixer, Observer, and Councillor agents | Installer result must be re-pinned; repository preset restored | Agent/tool/MCP/command registration plus bounded Fixer `PONG` |
 | `opencode-update-notifier@0.3.3` | npm plugin | Read-only npm update notification | Version remains pinned so installed/published comparison is meaningful | Initialization and registry check without file mutation |
 | `0-tokens-source.ts` | auto-discovered file | System, tool, message, and API token accounting; `/tokens` | Loads before lazy load; request body is never modified | Persistent session produced non-empty system/tool/message/usage output |
 | `codegraph-helper.ts` | auto-discovered file | Enables CodeGraph only in indexed workspaces; requires one CodeGraph attempt before grep/glob fallback | Per-session guard; database gate; MCP watcher owns index refresh | 8 hook tests plus indexed/unindexed startup, live status, and explore |
 | `lazy-load.ts` | auto-discovered file | `load_tool`, request schema reduction, SSE/DSML rewriting, per-turn state | Standard tool calls, finish events, content, reasoning, and MCP calls must survive | 9 regression tests plus CLI/TUI/Desktop shell markers |
 | `models-discovery.js` | auto-discovered file | Fetches provider models and keeps configured 9router models available during startup failures | Six `oc/*` fallbacks; OMO and compaction models remain valid; skip `opencode/*` source IDs | Mocked discovery failure plus live 52-model inventory |
+| `goal.ts` | auto-discovered file | Loads prevalentWare goal server hooks and tools | Object export adapted to function; complete `/goal` template; no duplicate server package origin | Adapter regression, resolved config, and live TUI goal persistence |
 | `rtk.ts` | auto-discovered file | Rewrites eligible bash/shell commands through RTK | Use injected shell in TUI and child-process fallback in Desktop; every repeated initialization returns hook | Rewrite equivalence, Desktop-shaped input, and repeated init passed |
 | `supermemory.ts` | auto-discovered file | Adapts named Supermemory plugin export; memory CRUD tools | Default `{ id, server }` object; ignored credentials; no Mem0 runtime | Add, search, profile, list, forget, and absence-after-delete passed |
 

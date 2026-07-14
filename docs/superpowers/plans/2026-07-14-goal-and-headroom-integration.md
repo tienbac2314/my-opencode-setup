@@ -1,5 +1,7 @@
 # Goal and Headroom Integration Implementation Plan
 
+> Superseded historical draft. Goal runtime now uses `plugins/goal.ts`; Headroom final design is recorded in `2026-07-14-isolated-headroom-launcher.md`. Do not implement persistent provider steps below.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Integrate the Goal plugin and configure Headroom with strict provider-level isolation.

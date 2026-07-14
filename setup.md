@@ -118,7 +118,7 @@ Bootstrap performs these mutations under `$HOME\.config\opencode`:
 2. Creates `opencode.jsonc` from tracked example only when missing.
 3. Copies `AGENTS.md`, `tui.json`, skills, agents, and data.
 4. removes legacy duplicate plugins and Mem0 runtime artifacts.
-5. Copies six repository plugins into auto-discovery directory.
+5. Copies seven repository plugins into auto-discovery directory.
 6. Pins `@prevalentware/opencode-goal-plugin@0.1.24` and configurations.
 7. Creates `supermemory.jsonc` from example only when missing.
 7. Downloads `/tokens` command definition when network permits.
@@ -141,7 +141,7 @@ Bootstrap preserves existing provider and Supermemory credential files. It overw
 
 - `-SkipRtk`: skip `rtk init -g --opencode`.
 - `-SkipCodeGraph`: skip CodeGraph installation and agent wiring.
-- `-UpdateOnly -Component OmoSlim`: update only OMO Slim, then restore tailored OMO/TUI/global configuration and six audited local plugins.
+- `-UpdateOnly -Component OmoSlim`: update only OMO Slim, then restore tailored OMO/TUI/global configuration and seven audited local plugins.
 - `-VersionsFile PATH`: use alternate private version file. Normal path is `$HOME\.config\opencode\versions.env`.
 
 No dry-run or `-WhatIf` contract exists. Use isolated Windows account or disposable config root when testing bootstrap side effects.
@@ -233,7 +233,7 @@ Fresh bootstrap reads `$HOME\.config\opencode\versions.env` and generates `$HOME
 | `@prevalentware/opencode-goal-plugin` | `0.1.24` |
 | `opencode-supermemory` | `2.0.8` |
 | `opencode-update-notifier` | `0.3.3` |
-| `oh-my-opencode-slim` | `2.2.0` |
+| `oh-my-opencode-slim` | `2.2.1` |
 
 Verify:
 
@@ -247,7 +247,7 @@ Bootstrap preserves existing `opencode.jsonc`, then private version values win f
 
 ```powershell
 Push-Location "$HOME\.config\opencode"
-npm install --save-exact "@opencode-ai/plugin@1.17.18" "@ai-sdk/openai-compatible@3.0.7" "@prevalentware/opencode-goal-plugin@0.1.24" "opencode-supermemory@2.0.8" "opencode-update-notifier@0.3.3" "oh-my-opencode-slim@2.2.0"
+npm install --save-exact "@opencode-ai/plugin@1.17.18" "@ai-sdk/openai-compatible@3.0.7" "@prevalentware/opencode-goal-plugin@0.1.24" "opencode-supermemory@2.0.8" "opencode-update-notifier@0.3.3" "oh-my-opencode-slim@2.2.1"
 Pop-Location
 ```
 
@@ -268,7 +268,7 @@ Expected count: nine. Expected set:
 ```text
 opencode-update-notifier@0.3.3
 @prevalentware/opencode-goal-plugin@0.1.24
-oh-my-opencode-slim@2.2.0
+oh-my-opencode-slim@2.2.1
 file:///.../plugins/supermemory.ts
 file:///.../plugins/rtk.ts
 file:///.../plugins/models-discovery.js
@@ -382,7 +382,7 @@ Run `ping all agents`. Expected orchestration loads configured agents, tools, MC
 
 ### Goal Plugin
 
-Set a goal using `/goal <objective>` in the TUI or calling the `set_goal` tool. Verify sidebar progress timer is running and objective status updates.
+Set a goal using `/goal <objective>` in TUI. Server half loads through `plugins/goal.ts`; TUI sidebar loads through pinned `/tui` package entry. Verify resolved config has nine plugin origins, no `/server` npm origin, and a goal command template containing `create_goal`. Then verify `%APPDATA%\opencode-goal-plugin\goals.json` contains exact objective and sidebar timer updates. Clear disposable test goal afterward.
 
 ### Headroom Proxy
 

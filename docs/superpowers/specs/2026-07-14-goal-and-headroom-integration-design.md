@@ -1,5 +1,7 @@
 # OpenCode Goal and Headroom Integration Design Spec
 
+> Superseded historical draft. See `2026-07-14-isolated-headroom-launcher-design.md` for implemented Headroom design and current repository docs for goal adapter architecture.
+
 ## Goal Plugin
 * Pin version `0.1.24` of `@prevalentware/opencode-goal-plugin`.
 * Add `/goal` command configuration to global and TUI config templates.

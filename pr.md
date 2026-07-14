@@ -12,7 +12,7 @@ Use this document when you need to understand where a plugin came from, what thi
 | `plugins/codegraph-helper.ts` | Made in this repository | Whole file |
 | `plugins/rtk.ts` | Generated from [RTK OpenCode hook](https://github.com/rtk-ai/rtk/tree/master/hooks/opencode) | Windows/Desktop checks and OpenCode file-plugin wrapper |
 | `plugins/supermemory.ts` | Small wrapper around [opencode-supermemory](https://github.com/supermemoryai/opencode-supermemory) | Wrapper only; package owns memory behavior |
-| `@prevalentware/opencode-goal-plugin` | [Upstream npm package](https://github.com/prevalentWare/opencode-goal-plugin) | Version pins, command setup, and TUI configuration |
+| `plugins/goal.ts` and `@prevalentware/opencode-goal-plugin` | [Upstream npm package](https://github.com/prevalentWare/opencode-goal-plugin) | Server export adapter, legacy command migration, package pin, and TUI entrypoint |
 | `oh-my-opencode-slim` | [Upstream npm package](https://github.com/alvinunreal/oh-my-opencode-slim) | Version pins, installer cleanup, and 9router preset |
 | `opencode-update-notifier` | [Upstream npm package](https://github.com/tim-hilde/opencode-update-notifier) | Version pin and setup only |
 | Research skills and web-search files | [Weizhena/Deep-Research-skills](https://github.com/Weizhena/Deep-Research-skills) | OpenCode metadata/tool changes, model choice, and hidden strategy-module layout |
@@ -367,7 +367,7 @@ No upstream PR needed for personal model choice. OpenCode-safe module placement 
 - Explorer, Designer, and Fixer get no skills or MCPs.
 - Tracked OpenAI and OpenCode Go presets remain available.
 - Exact version comes from private `$HOME\.config\opencode\versions.env`.
-- Installer runs with exact version, then bootstrap restores tailored config, repins active global/TUI plugin lists, and copies all six audited local plugins.
+- Installer runs with exact version, then bootstrap restores tailored config, repins active global/TUI plugin lists, and copies all seven audited local plugins.
 - `scripts/pin-opencode-plugin.ps1` changes only root `plugin` array. It replaces both unpinned and older pinned entries without touching comments, credentials, nested properties, or other arrays.
 
 ### Tests to run
@@ -414,7 +414,7 @@ Package source is unchanged. Repository pins `opencode-update-notifier@0.3.3` so
 
 ### What it checks
 
-- Exact npm pins such as `oh-my-opencode-slim@2.2.0`.
+- Exact npm pins such as `oh-my-opencode-slim@2.2.1`.
 - GitHub git package specs pinned to SemVer tags.
 
 ### What it does not check
@@ -492,8 +492,8 @@ Current tested stack:
 - @prevalentware/opencode-goal-plugin 0.1.24
 - opencode-supermemory 2.0.8
 - opencode-update-notifier 0.3.3
-- oh-my-opencode-slim 2.2.0
-- nine effective plugins: three npm plus six local files
+- oh-my-opencode-slim 2.2.1
+- nine effective server plugins: two npm plus seven local files; goal TUI entrypoint loads separately
 
 Required work:
 1. State source URL, current version/commit, target version/commit, and exact local differences.
@@ -503,7 +503,7 @@ Required work:
 5. Update private versions.env and related active pins only when target is a pinned package.
 6. Run focused tests and rtk proxy bun test.
 7. Bundle changed local plugin under C:\Users\bacnt\.config\opencode dependency context.
-8. Verify resolved plugin and plugin_origins counts are both 8 without printing full resolved config.
+8. Verify resolved plugin and plugin_origins counts are both 9 without printing full resolved config.
 9. Verify CLI, TUI, and Desktop load_tool shell markers.
 10. Verify affected plugin lifecycle from pr.md.
 11. If Supermemory is touched, run add/search/profile/list/forget and prove test marker is deleted.
@@ -511,6 +511,23 @@ Required work:
 
 Do not push. Leave one focused commit ready for review.
 ```
+
+## Goal Plugin Adapter
+
+### Why it exists
+
+Package `0.1.24` exports `@prevalentware/opencode-goal-plugin/server` as a module object with a `server` member. OpenCode `1.17.x` configured server plugins require a function export, so direct `/server` config is dropped during startup. A manual `$ARGUMENTS` command then looks available but bypasses goal-tool instructions.
+
+### Local behavior
+
+- `plugins/goal.ts` exports package `server` function as auto-discovered file plugin.
+- Adapter removes only legacy goal command whose template equals `$ARGUMENTS`, then calls upstream config hook so upstream owns complete command text.
+- `config/tui.json` keeps pinned `/tui` entrypoint for sidebar and command palette.
+- Bootstrap removes legacy `/server` config entry and still installs exact root package dependency.
+
+### Update test
+
+When package changes, inspect both exported shapes first. Remove adapter only after new package loads directly as callable OpenCode server plugin and live `/goal` still persists exact objective. Run bootstrap tests, resolved-config count check, fresh TUI `/goal`, persistence check, and disposable-goal cleanup.
 
 ## Headroom Native Transport
 
@@ -541,10 +558,10 @@ Private `$HOME\.config\opencode\versions.env` controls installed targets. Tracke
 @ai-sdk/openai-compatible@3.0.7
 opencode-supermemory@2.0.8
 opencode-update-notifier@0.3.3
-oh-my-opencode-slim@2.2.0
+oh-my-opencode-slim@2.2.1
 ```
 
-After any package update, `bun pm ls` and resolved plugin specs must show exact intended versions.
+After any package update, inspect generated `package.json`, run `npm ls --depth=0`, and verify resolved plugin specs. `bun pm ls` can omit packages installed by npm when Bun lock metadata is stale.
 
 ## Old Mem0 Work
 
