@@ -1,5 +1,8 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { execFile } from "node:child_process"
+import { existsSync } from "node:fs"
+import { homedir } from "node:os"
+import { join } from "node:path"
 
 // RTK OpenCode plugin — rewrites commands to use rtk for token savings.
 // Requires: rtk >= 0.23.0 in PATH.
@@ -17,6 +20,11 @@ function runFile(command: string, args: string[]): Promise<string> {
   })
 }
 
+function rtkCommand(): string {
+  const userBinary = join(homedir(), ".local", "bin", process.platform === "win32" ? "rtk.exe" : "rtk")
+  return existsSync(userBinary) ? userBinary : "rtk"
+}
+
 export const RtkOpenCodePlugin: Plugin = async (input) => {
   const $ = input?.$
 
@@ -29,7 +37,7 @@ export const RtkOpenCodePlugin: Plugin = async (input) => {
     }
   } else {
     try {
-      await runFile("rtk", ["--version"])
+      await runFile(rtkCommand(), ["--version"])
     } catch {
       console.warn("[rtk] rtk binary not found in PATH — plugin disabled")
       return {}
@@ -53,7 +61,7 @@ export const RtkOpenCodePlugin: Plugin = async (input) => {
           const result = await $`rtk rewrite ${command}`.quiet().nothrow()
           rewritten = String(result.stdout).trim()
         } else {
-          rewritten = (await runFile("rtk", ["rewrite", command])).trim()
+          rewritten = (await runFile(rtkCommand(), ["rewrite", command])).trim()
         }
         if (rewritten && rewritten !== command) {
           ;(args as Record<string, unknown>).command = rewritten

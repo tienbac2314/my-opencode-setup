@@ -1,0 +1,73 @@
+diff --git a/src/tui.tsx b/src/tui.tsx
+--- a/src/tui.tsx
++++ b/src/tui.tsx
+@@ -338,6 +338,7 @@ function GoalSidebar(props: { api: TuiPluginApi; sessionID: string }) {
+   const timer = setInterval(() => setNowSeconds(currentEpochSeconds()), 1000)
+   onCleanup(() => clearInterval(timer))
+   const state = createMemo(() => {
++    nowSeconds()
+     props.api.state.session.messages(props.sessionID)
+     return goalStateFromSession(props.api, props.sessionID)
+   })
+@@ -347,9 +348,32 @@ function GoalSidebar(props: { api: TuiPluginApi; sessionID: string }) {
+     return value ? liveTimeUsedSeconds(value, nowSeconds()) : 0
+   })
+   const objective = createMemo(() => goal()?.objective ?? "")
++  const details = createMemo(() => {
++    const value = goal()
++    if (!value) return ""
++    const lines = [
++      `Status: ${value.status}`,
++      `Time: ${formatDuration(elapsed())}`,
++      `Tokens: ${value.tokensUsed}${value.tokenBudget == null ? "" : `/${value.tokenBudget}`}`,
++      `Auto-continues: ${value.autoTurns}${value.maxAutoTurns == null ? "" : `/${value.maxAutoTurns}`}`,
++    ]
++    if (value.lastCheckpoint) lines.push(`Checkpoint: ${value.lastCheckpoint.summary}`)
++    if (value.stopReason) lines.push(`Stop: ${value.stopReason}`)
++    if (value.lastStatus) lines.push(value.lastStatus)
++    lines.push(objective())
++    return lines.join("\n")
++  })
+ 
+   return (
+-    <Show when={goal()}>
++    <Show
++      when={goal()}
++      fallback={
++        <box>
++          <text fg={theme().text}><b>Goal</b></text>
++          <text fg={theme().textMuted}>No active goal</text>
++        </box>
++      }
++    >
+       {(value: () => GoalSnapshot) => (
+         <Show
+           when={value().status === "complete" || value().status === "unmet"}
+@@ -358,26 +382,7 @@ function GoalSidebar(props: { api: TuiPluginApi; sessionID: string }) {
+               <text fg={theme().text}>
+                 <b>Goal</b>
+               </text>
+-              <text fg={theme().textMuted}>Status: {value().status}</text>
+-              <text fg={theme().textMuted}>Time: {formatDuration(elapsed())}</text>
+-              <text fg={theme().textMuted}>
+-                Tokens: {value().tokensUsed}
+-                <Show when={value().tokenBudget}>{(budget: () => number) => <>/{budget()}</>}</Show>
+-              </text>
+-              <text fg={theme().textMuted}>
+-                Auto-continues: {value().autoTurns}
+-                <Show when={value().maxAutoTurns}>{(budget: () => number) => <>/{budget()}</>}</Show>
+-              </text>
+-              <Show when={value().lastCheckpoint}>
+-                {(checkpoint: () => GoalCheckpoint) => <text fg={theme().textMuted}>Checkpoint: {checkpoint().summary}</text>}
+-              </Show>
+-              <Show when={value().stopReason}>
+-                {(reason: () => string) => <text fg={theme().textMuted}>Stop: {reason()}</text>}
+-              </Show>
+-              <Show when={value().lastStatus}>
+-                {(status: () => string) => <text fg={theme().textMuted}>{status()}</text>}
+-              </Show>
+-              <text fg={theme().textMuted}>{objective()}</text>
++              <text fg={theme().textMuted}>{details()}</text>
+             </box>
+           }
+         >

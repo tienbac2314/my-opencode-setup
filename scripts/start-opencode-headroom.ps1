@@ -1,5 +1,5 @@
 param(
-  [string]$PluginEntry = "$HOME\.cache\opencode-headroom\source\plugins\opencode\dist\entry.opencode.js",
+  [string]$PluginEntry = [IO.Path]::Combine($HOME, ".cache", "opencode-headroom", "source", "plugins", "opencode", "dist", "entry.opencode.js"),
   [int]$Port = 8787,
   [int]$StartupTimeoutSeconds = 30,
   [string]$OpenCodeArgsJson = "[]"
@@ -9,15 +9,12 @@ $ErrorActionPreference = "Stop"
 $proxy = $null
 $exitCode = 1
 $proxyUrl = "http://127.0.0.1:$Port"
-$logDir = Join-Path $env:TEMP "opencode-headroom"
+$logDir = Join-Path ([IO.Path]::GetTempPath()) "opencode-headroom"
 $stdout = Join-Path $logDir "proxy.log"
 $stderr = Join-Path $logDir "proxy-error.log"
 $requestsLog = Join-Path $logDir "requests.jsonl"
-$configFiles = @(
-  "$HOME\.config\opencode\opencode.jsonc",
-  "$HOME\.config\opencode\tui.json",
-  "$HOME\.config\opencode\AGENTS.md"
-)
+$configRoot = [IO.Path]::Combine($HOME, ".config", "opencode")
+$configFiles = @("opencode.jsonc", "tui.json", "AGENTS.md") | ForEach-Object { Join-Path $configRoot $_ }
 
 try {
   $parsedArgs = $OpenCodeArgsJson | ConvertFrom-Json -NoEnumerate
@@ -35,6 +32,18 @@ function Test-HeadroomHealth {
     return $true
   } catch {
     return $false
+  }
+}
+
+function Test-TcpPort {
+  $client = [Net.Sockets.TcpClient]::new()
+  try {
+    $task = $client.ConnectAsync("127.0.0.1", $Port)
+    return $task.Wait(500) -and $client.Connected
+  } catch {
+    return $false
+  } finally {
+    $client.Dispose()
   }
 }
 
@@ -84,19 +93,23 @@ $oldConfigContent = $env:OPENCODE_CONFIG_CONTENT
 
 try {
   if (-not (Test-HeadroomHealth)) {
-    $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-    if ($listener) {
+    if (Test-TcpPort) {
       throw "Port $Port is occupied by a service that is not a healthy Headroom proxy"
     }
 
     New-Item -ItemType Directory -Path $logDir -Force | Out-Null
-    $proxy = Start-Process -FilePath $headroom.Source `
-      -ArgumentList @(
+    $start = @{
+      FilePath = $headroom.Source
+      ArgumentList = @(
         "proxy", "--host", "127.0.0.1", "--port", "$Port",
         "--no-ccr", "--no-telemetry", "--log-file", $requestsLog
-      ) `
-      -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
-      -WindowStyle Hidden -PassThru
+      )
+      RedirectStandardOutput = $stdout
+      RedirectStandardError = $stderr
+      PassThru = $true
+    }
+    if ($IsWindows) { $start.WindowStyle = "Hidden" }
+    $proxy = Start-Process @start
 
     $deadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
     while (-not (Test-HeadroomHealth)) {
@@ -128,7 +141,7 @@ try {
   $env:OPENCODE_CONFIG_CONTENT = $oldConfigContent
   if ($proxy -and -not $proxy.HasExited) {
     Stop-Process -Id $proxy.Id -ErrorAction SilentlyContinue
-    $proxy.WaitForExit(5000)
+    $proxy.WaitForExit(5000) | Out-Null
   }
 
   $afterHashes = Get-ConfigHashes
