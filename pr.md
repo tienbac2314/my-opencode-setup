@@ -512,6 +512,26 @@ Required work:
 Do not push. Leave one focused commit ready for review.
 ```
 
+## Headroom Native Transport
+
+### Where it came from
+
+Python proxy is `headroom-ai[all]` installed with `uv`. Native OpenCode transport comes from `headroomlabs-ai/headroom` at exact private `HEADROOM_GIT_COMMIT`; it is built locally because `headroom-opencode` is not published on npm.
+
+### What we changed
+
+- Added pinned source builder under `scripts/install-headroom-plugin.ps1`.
+- Added process-isolated launcher under `scripts/start-opencode-headroom.ps1`.
+- Removed broken persistent `provider.headroom` block.
+- Launcher injects plugin path, `HEADROOM_PROXY_URL`, and process-local upstream routing into child environment.
+- No fixed upstream, persistent plugin, MCP, RTK, Serena, memory, learning, or instruction edits.
+
+### How to update and test
+
+Compare upstream plugin and proxy changes, set private full commit SHA, rebuild, run `tests/headroom-launcher.test.ts`, then run full suite. Live test at least two providers and confirm distinct upstream targets while original model names remain visible. Normal OpenCode with proxy stopped must still work.
+
+Do not upstream these scripts as generic Headroom behavior; they enforce this repository's Windows and isolation policy.
+
 ## Package Pins
 
 Private `$HOME\.config\opencode\versions.env` controls installed targets. Tracked example starts with this tested stack:

@@ -13,7 +13,7 @@ Verified host:
 - User configuration root: `$HOME\.config\opencode`
 - Repository checkout: `$HOME\opencode-dotfiles`
 - 9router OpenAI-compatible provider
-- Headroom isolated OpenAI-compatible provider targeting local proxy at port 8787
+- Optional isolated Headroom launcher on local port 8787
 - Optional Oracle VPS entry named `Oracle VPS` in VibeShell
 
 Use native Windows paths. WSL can run OpenCode, but this repository's bootstrap and Desktop validation target native Windows.
@@ -170,16 +170,6 @@ Replace provider placeholder, then replace tracked user-specific skills path:
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "https://tienbac.dpdns.org/v1",
-        "apiKey": "YOUR_API_KEY_HERE",
-        "modelsDiscovery": {
-          "enabled": true
-        }
-      }
-    },
-    "headroom": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "http://localhost:8787/v1",
         "apiKey": "YOUR_API_KEY_HERE",
         "modelsDiscovery": {
           "enabled": true
@@ -396,7 +386,25 @@ Set a goal using `/goal <objective>` in the TUI or calling the `set_goal` tool. 
 
 ### Headroom Proxy
 
-Ensure Headroom proxy is running locally (`headroom proxy --port 8787`). Check `opencode models headroom` listing. Verify headroom-routed requests are optimized without affecting direct `9router` operations.
+Headroom is launcher-only. Normal OpenCode and Desktop sessions do not load it. Install `headroom-ai[all]` with `uv`, build the pinned native transport plugin, then start an isolated OpenCode process:
+
+```powershell
+uv tool install "headroom-ai[all]"
+pwsh -File scripts/install-headroom-plugin.ps1
+pwsh -File scripts/start-opencode-headroom.ps1
+```
+
+Pass CLI arguments as a JSON array:
+
+```powershell
+pwsh -File scripts/start-opencode-headroom.ps1 -OpenCodeArgsJson '["run","--model","opencode/deepseek-v4-flash-free","Return exact text: HEADROOM_OK"]'
+```
+
+OpenCode arguments use a JSON array so PowerShell does not consume flags such as `--model`. Request metadata is written to `$env:TEMP\opencode-headroom\requests.jsonl`; message content is not logged.
+
+Model names and providers stay unchanged. Launcher injects transport plugin only into child process, starts proxy without fixed upstream, and stops proxy it owns when OpenCode exits. It does not call `headroom wrap`, edit `AGENTS.md`, add a `headroom/*` provider, or install Headroom MCP/RTK/Serena configuration.
+
+Update Headroom by reviewing new upstream commit, changing private `HEADROOM_GIT_COMMIT`, running installer and tests, then updating tracked example pin. Roll back by closing launched OpenCode and deleting `$HOME\.cache\opencode-headroom`; no OpenCode config restoration is needed.
 
 ### RTK
 

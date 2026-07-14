@@ -2,6 +2,16 @@
 
 Use this page when the setup starts but behaves incorrectly. Find the matching symptom, run its safe check, then apply only the listed fix. For installation use [setup.md](setup.md); for plugin source changes use [pr.md](pr.md).
 
+## Headroom provider missing or proxy does nothing
+
+**Symptom:** `opencode models headroom` says provider not found, port 8787 is closed, or starting normal OpenCode produces no Headroom traffic.
+
+**Cause:** old setup added an empty persistent `headroom` provider but did not start proxy or build native transport plugin. Normal OpenCode is intentionally not intercepted now.
+
+**Fix:** run `scripts/install-headroom-plugin.ps1`, then use `scripts/start-opencode-headroom.ps1`. Keep original provider/model selection inside launched session. Do not add persistent provider entry or fixed upstream. Check `$env:TEMP\opencode-headroom\requests.jsonl` to confirm traffic reached Headroom.
+
+**Isolation check:** after launcher exits, port 8787 has no listener unless healthy proxy existed before launch. Hashes of active `opencode.jsonc`, `tui.json`, and `AGENTS.md` must remain unchanged.
+
 ## TUI Sidebar Crash and `/goal` Input Desync (prevalentWare)
 
 **Symptom:** Both sidebar UIs (oh-my-opencode-slim and goal plugin) disappear from the terminal, and typing any slash command (like `/goal`) instantly gets erased or repeats a previous input (like `'yo'`).

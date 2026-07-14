@@ -10,7 +10,8 @@ $requiredKeys = @(
   "AI_SDK_OPENAI_COMPATIBLE_VERSION",
   "OPENCODE_SUPERMEMORY_VERSION",
   "OPENCODE_UPDATE_NOTIFIER_VERSION",
-  "OH_MY_OPENCODE_SLIM_VERSION"
+  "OH_MY_OPENCODE_SLIM_VERSION",
+  "HEADROOM_GIT_COMMIT"
 )
 $versions = [ordered]@{}
 
@@ -41,6 +42,10 @@ foreach ($key in $requiredKeys) {
   if (-not $versions.Contains($key)) {
     throw "Missing required version key: $key"
   }
+}
+
+if ($versions.HEADROOM_GIT_COMMIT -notmatch '^[0-9a-fA-F]{40}$') {
+  throw "HEADROOM_GIT_COMMIT must be a full 40-character Git SHA"
 }
 
 $versions | ConvertTo-Json -Compress

@@ -175,6 +175,8 @@ opencode --model 9router/oc/deepseek-v4-flash-free
 
 Desktop App retains per-session model choice. Select provider `9router`, then model `oc/deepseek-v4-flash-free` before first smoke test. Default OpenCode free model may return `Free usage exceeded, subscribe to Go` even when local plugins are healthy.
 
+Optional Headroom interception uses `scripts/start-opencode-headroom.ps1`. It keeps selected provider/model names and affects only OpenCode child process it launches. Normal CLI, TUI, and Desktop sessions remain direct. Build pinned native plugin first with `scripts/install-headroom-plugin.ps1`; no persistent `headroom/*` provider is configured.
+
 Full prerequisites, credential handling, App path, and lifecycle commands: [setup.md](setup.md).
 
 ## Verification Entry Points

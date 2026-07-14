@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -9,9 +9,11 @@ const script = readFileSync(new URL("../bootstrap.ps1", import.meta.url), "utf8"
 const pinPluginScript = fileURLToPath(new URL("../scripts/pin-opencode-plugin.ps1", import.meta.url))
 const setCredentialsScript = fileURLToPath(new URL("../scripts/set-credentials.ps1", import.meta.url))
 const readVersionsScript = fileURLToPath(new URL("../scripts/read-versions.ps1", import.meta.url))
+const installHeadroomScript = fileURLToPath(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))
 const bootstrapScript = fileURLToPath(new URL("../bootstrap.ps1", import.meta.url))
 const updaterScript = readFileSync(new URL("../update-plugins.ps1", import.meta.url), "utf8")
 const projectConfig = JSON.parse(readFileSync(new URL("../.opencode/opencode.json", import.meta.url), "utf8"))
+const globalConfig = JSON.parse(readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8"))
 
 const versionFileBody = `
 # machine-local tested versions
@@ -21,10 +23,17 @@ AI_SDK_OPENAI_COMPATIBLE_VERSION=3.0.7
 OPENCODE_SUPERMEMORY_VERSION=2.0.8
 OPENCODE_UPDATE_NOTIFIER_VERSION=0.3.3
 OH_MY_OPENCODE_SLIM_VERSION=9.8.7
+HEADROOM_GIT_COMMIT=4e30dde2aca801c6dbdcdc78412132805c496bb4
 `
 
 test("project config does not override global plugins", () => {
   expect(projectConfig).not.toHaveProperty("plugin")
+})
+
+test("Headroom stays launcher-only", () => {
+  expect(globalConfig.provider?.headroom).toBeUndefined()
+  expect(globalConfig.plugin ?? []).not.toContain("headroom-opencode")
+  expect(globalConfig.mcp?.headroom).toBeUndefined()
 })
 
 describe("private version file", () => {
@@ -47,6 +56,7 @@ describe("private version file", () => {
       expect(versions.OPENCODE_SUPERMEMORY_VERSION).toBe("2.0.8")
       expect(versions.OPENCODE_UPDATE_NOTIFIER_VERSION).toBe("0.3.3")
       expect(versions.OH_MY_OPENCODE_SLIM_VERSION).toBe("9.8.7")
+      expect(versions.HEADROOM_GIT_COMMIT).toBe("4e30dde2aca801c6dbdcdc78412132805c496bb4")
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
@@ -69,6 +79,31 @@ describe("private version file", () => {
       rmSync(directory, { recursive: true, force: true })
     }
   }, 15000)
+
+  test("rejects a mutable or abbreviated Headroom ref", () => {
+    const directory = mkdtempSync(join(tmpdir(), "opencode-versions-"))
+    const versionsPath = join(directory, "versions.env")
+
+    try {
+      writeFileSync(versionsPath, versionFileBody.replace(
+        "4e30dde2aca801c6dbdcdc78412132805c496bb4",
+        "main",
+      ))
+      const result = Bun.spawnSync([
+        "rtk", "proxy", "pwsh", "-NoProfile", "-File", readVersionsScript,
+        "-Path", versionsPath,
+      ])
+
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr.toString()).toContain("full 40-character Git SHA")
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  }, 15000)
+})
+
+test("Headroom native plugin installer is tracked", () => {
+  expect(existsSync(installHeadroomScript)).toBe(true)
 })
 
 test("OMO update mode changes only OMO files and restores tailored config", () => {
