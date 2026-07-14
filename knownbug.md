@@ -2,6 +2,41 @@
 
 Use this page when the setup starts but behaves incorrectly. Find the matching symptom, run its safe check, then apply only the listed fix. For installation use [setup.md](setup.md); for plugin source changes use [pr.md](pr.md).
 
+## TUI Sidebar Crash and `/goal` Input Desync (prevalentWare)
+
+**Symptom:** Both sidebar UIs (oh-my-opencode-slim and goal plugin) disappear from the terminal, and typing any slash command (like `/goal`) instantly gets erased or repeats a previous input (like `'yo'`).
+
+**Cause:** The `"command"` key is registered inside `~/.config/opencode/tui.json`. OpenCode's TUI loader rejects layout configuration files with unrecognized top-level keys, causing the entire layout engine to unmount. When unmounted, SolidJS textarea stashes the active text context, falling back to the last stable prompt (e.g. `'yo'`) when the TUI recovers, creating a submission loop.
+
+**Rule:** TUI configuration file (`tui.json`) must strictly contain plugin arrays only. All custom command mapping definitions belong strictly in `opencode.jsonc`.
+
+**Recovery:**
+1. Clean `tui.json`: Keep only the plugin array (with `oh-my-opencode-slim` listed first so it takes top priority):
+   ```json
+   {
+     "plugin": [
+       "oh-my-opencode-slim@2.2.0",
+       "@prevalentware/opencode-goal-plugin@0.1.24"
+     ]
+   }
+   ```
+2. Set up `opencode.jsonc`: Declare the plugins and custom command mappings there:
+   ```jsonc
+   "plugin": [
+     "opencode-update-notifier@0.3.3",
+     "oh-my-opencode-slim@2.2.0",
+     "@prevalentware/opencode-goal-plugin@0.1.24"
+   ],
+   "command": {
+     "goal": {
+       "description": "Set a session-scoped goal and auto-continue until complete.",
+       "template": "$ARGUMENTS",
+       "agent": "build"
+     }
+   }
+   ```
+3. Close the terminal session completely, start a new OpenCode instance, and verify the UIs mount and `/goal` processes properly.
+
 ## CodeGraph error outside indexed projects
 
 **Symptom:** OpenCode shows `[ERR] CodeGraph not initialized in <folder>` and TUI freezes or exits when started in a folder without `.codegraph/`.

@@ -14,6 +14,7 @@ New here: start with [setup.md](setup.md). Confused by main agents, `@` workers,
 | Validation model | `9router/oc/deepseek-v4-flash-free` |
 | Plugin API | `@opencode-ai/plugin@1.17.18` |
 | Provider adapter | `@ai-sdk/openai-compatible@3.0.7` |
+| Goal plugin | `@prevalentware/opencode-goal-plugin@0.1.24` |
 | Orchestration | `oh-my-opencode-slim@2.2.0` |
 | Memory client | `opencode-supermemory@2.0.8` |
 | Update notifier | `opencode-update-notifier@0.3.3` |
@@ -76,11 +77,12 @@ Repeated OpenCode plugin initialization still returns `load_tool` and `tool.defi
 
 ## Plugin Loading and Ordering
 
-Effective origins must contain exactly eight entries:
+Effective origins must contain exactly nine entries:
 
 ```text
 opencode-update-notifier@0.3.3
 oh-my-opencode-slim@2.2.0
+@prevalentware/opencode-goal-plugin@0.1.24
 plugins/supermemory.ts
 plugins/rtk.ts
 plugins/models-discovery.js
@@ -90,6 +92,8 @@ plugins/0-tokens-source.ts
 ```
 
 Local plugin filename order matters. `0-tokens-source.ts` sorts before `lazy-load.ts`, making token source inner `fetch` wrapper. Lazy load modifies request before token source observes final API body, so `/tokens` reports schemas actually sent to model.
+- Note: TUI `tui.json` config must not contain a `"command"` key. Custom commands (like `"/goal"`) belong strictly in `opencode.jsonc`. Putting `"command"` in `tui.json` will cause OpenCode's SolidJS TUI loader to abort config loading, breaking the sidebar layout and causing input session prompt-stashing bugs.
+- Note: The prevalentWare goal plugin `@prevalentware/opencode-goal-plugin` has separate entrypoints: `@prevalentware/opencode-goal-plugin/server` for headless command/auto-continue and `@prevalentware/opencode-goal-plugin/tui` for TUI sidebar mounting. They can be registered independently.
 
 Bootstrap runs two installers that mutate active files:
 
