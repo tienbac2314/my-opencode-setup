@@ -1,22 +1,52 @@
 import type { Plugin } from "@opencode-ai/plugin"
+import { execFile } from "node:child_process"
+
+// RTK OpenCode plugin — rewrites commands to use rtk for token savings.
+// Requires: rtk >= 0.23.0 in PATH or the Windows system directory.
+//
+// This is a thin delegating plugin: all rewrite logic lives in `rtk rewrite`,
+// which is the single source of truth (src/discover/registry.rs).
+// To add or change rewrite rules, edit the Rust registry — not this file.
+
+function runFile(command: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { windowsHide: true }, (error, stdout) => {
+      if (error && !stdout) reject(error)
+      else resolve(String(stdout))
+    })
+  })
+}
 
 export const RtkOpenCodePlugin: Plugin = async (input) => {
-  if ((globalThis as any).__rtk_opencode_loaded__) return {}
-
   const $ = input?.$
-  if (typeof $ !== "function") {
-    console.warn("[rtk] Bun shell '$' is not available — plugin disabled")
-    return {}
-  }
+  let rtkCommand = "rtk"
+  const fallback = `${process.env.SystemRoot ?? "C:\\Windows"}\\System32\\rtk.exe`
 
-  try {
-    await $`where rtk`.quiet()
-  } catch {
-    console.warn("[rtk] rtk binary not found in PATH — plugin disabled")
-    return {}
+  if (typeof $ === "function") {
+    try {
+      await $`where rtk`.quiet()
+    } catch {
+      try {
+        await $`${fallback} --version`.quiet()
+        rtkCommand = fallback
+      } catch {
+        console.warn("[rtk] rtk binary not found in PATH or Windows system directory — plugin disabled")
+        return {}
+      }
+    }
+  } else {
+    try {
+      await runFile(rtkCommand, ["--version"])
+    } catch {
+      try {
+        await runFile(fallback, ["--version"])
+        rtkCommand = fallback
+      } catch {
+        console.warn("[rtk] rtk binary not found in PATH or Windows system directory — plugin disabled")
+        return {}
+      }
+    }
   }
-
-  ;(globalThis as any).__rtk_opencode_loaded__ = true
 
   return {
     "tool.execute.before": async (input, output) => {
@@ -30,13 +60,18 @@ export const RtkOpenCodePlugin: Plugin = async (input) => {
       if (typeof command !== "string" || !command) return
 
       try {
-        const result = await $`rtk rewrite ${command}`.quiet().nothrow()
-        const rewritten = String(result.stdout).trim()
+        let rewritten = ""
+        if (typeof $ === "function") {
+          const result = await $`${rtkCommand} rewrite ${command}`.quiet().nothrow()
+          rewritten = String(result.stdout).trim()
+        } else {
+          rewritten = (await runFile(rtkCommand, ["rewrite", command])).trim()
+        }
         if (rewritten && rewritten !== command) {
           ;(args as Record<string, unknown>).command = rewritten
         }
       } catch {
-        // Rewrite failure leaves original command unchanged.
+        // rtk rewrite failed — pass through unchanged
       }
     },
   }

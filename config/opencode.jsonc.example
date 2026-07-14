@@ -70,7 +70,7 @@
   "lsp": true,
   "plugin": [
     "opencode-update-notifier@0.3.3",
-    "oh-my-opencode-slim@2.1.1"
+    "oh-my-opencode-slim@2.2.0"
   ],
   "experimental": {
     "mcp_timeout": 60000

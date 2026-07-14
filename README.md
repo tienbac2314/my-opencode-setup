@@ -2,6 +2,8 @@
 
 Use this repository to install, understand, test, and safely update a Windows OpenCode setup with 9router, lazy-loaded tools, multi-agent orchestration, CodeGraph, self-hosted Supermemory, token reporting, model discovery, update notifications, and RTK shell rewriting.
 
+New here: start with [setup.md](setup.md). Confused by main agents, `@` workers, or OMO roles: read [OpenCode Agents in This Setup](docs/opencode-agents.md). Updating locally changed plugins: read [Plugin Fixes and Update Notes](pr.md).
+
 ## Verified Runtime
 
 | Component | Verified value |
@@ -12,7 +14,7 @@ Use this repository to install, understand, test, and safely update a Windows Op
 | Validation model | `9router/oc/deepseek-v4-flash-free` |
 | Plugin API | `@opencode-ai/plugin@1.17.18` |
 | Provider adapter | `@ai-sdk/openai-compatible@3.0.7` |
-| Orchestration | `oh-my-opencode-slim@2.1.1` |
+| Orchestration | `oh-my-opencode-slim@2.2.0` |
 | Memory client | `opencode-supermemory@2.0.8` |
 | Update notifier | `opencode-update-notifier@0.3.3` |
 | Supermemory endpoint | `https://supermemory.tienbac.dpdns.org` |
@@ -27,12 +29,14 @@ Recovery verification completed with 16 Bun tests, local and Supermemory plugin 
 Repository source
   bootstrap.ps1
     copies configs, agents, skills, data, and six local plugins
-    installs npm dependencies derived from active plugin entries
+    reads exact package versions from private versions.env
+    installs npm dependencies derived from active plugin entries and private versions
     runs OMO Slim and RTK installers
-    restores repository-controlled pins and RTK plugin after installer mutation
+    restores repository-controlled pins and all six audited local plugins
 
 ~/.config/opencode/
   opencode.jsonc       provider, npm plugins, permissions, compaction
+  versions.env         ignored machine-local exact version targets
   tui.json             pinned TUI npm plugin list
   supermemory.jsonc    ignored Supermemory credentials and endpoint
   package.json         generated pinned runtime dependencies
@@ -50,6 +54,8 @@ OpenCode auto-discovers every file under `~/.config/opencode/plugins/`. Local fi
 Project config `.opencode/opencode.json` must omit the `plugin` property. An empty project value (`"plugin": []`) overrides Desktop's displayed plugin list even while resolved `plugin_origins` and `load_tool` remain functional. If Desktop briefly shows eight or nine plugins, returns to eight, then shows only `Plugins configured in opencode.json`, follow [Desktop Plugin List Hidden by Project Override](knownbug.md#desktop-plugin-list-hidden-by-project-override) before debugging lazy load or Supermemory.
 
 `mem0-archive/` contains historical Mem0 implementation and documentation. Bootstrap removes legacy Mem0 runtime artifacts and never deploys this directory.
+
+Research skills, web-search agent, and strategy files derive from [Weizhena/Deep-Research-skills](https://github.com/Weizhena/Deep-Research-skills). Strategy Markdown lives under `data/web-search-strategies/`, not `agents/`, so OpenCode does not show five reference modules as fake `@` agents. Exact local changes and update steps are in [pr.md](pr.md#deep-research-skills-and-web-search).
 
 ## Tool Execution Flow
 
@@ -74,7 +80,7 @@ Effective origins must contain exactly eight entries:
 
 ```text
 opencode-update-notifier@0.3.3
-oh-my-opencode-slim@2.1.1
+oh-my-opencode-slim@2.2.0
 plugins/supermemory.ts
 plugins/rtk.ts
 plugins/models-discovery.js
@@ -87,20 +93,20 @@ Local plugin filename order matters. `0-tokens-source.ts` sorts before `lazy-loa
 
 Bootstrap runs two installers that mutate active files:
 
-- `bunx oh-my-opencode-slim@2.1.1 install` may rewrite plugin arrays. Bootstrap restores `config/tui.json` and pins only root `plugin` array entry in active `opencode.jsonc` through `scripts/pin-opencode-plugin.ps1`.
+- Exact OMO installer version comes from private `versions.env`. Installer may rewrite plugin arrays, so bootstrap restores tailored OMO/TUI files and repins root `plugin` entries in active global and TUI configs through `scripts/pin-opencode-plugin.ps1`.
 - `rtk init -g --opencode` generates RTK plugin. Bootstrap restores audited `plugins/rtk.ts` afterward.
 
 ## Plugins in This Setup
 
 | Component | Load source | What it does | What must keep working | How we tested it |
 |---|---|---|---|---|
-| `oh-my-opencode-slim@2.1.1` | npm plugin | Orchestrator, Librarian, Oracle, Designer, Fixer, Observer, and Councillor agents | Installer result must be re-pinned; repository preset restored | Agent/tool/MCP/command registration plus bounded Fixer `PONG` |
+| `oh-my-opencode-slim@2.2.0` | npm plugin | Orchestrator, Librarian, Oracle, Designer, Fixer, Observer, and Councillor agents | Installer result must be re-pinned; repository preset restored | Agent/tool/MCP/command registration plus bounded Fixer `PONG` |
 | `opencode-update-notifier@0.3.3` | npm plugin | Read-only npm update notification | Version remains pinned so installed/published comparison is meaningful | Initialization and registry check without file mutation |
 | `0-tokens-source.ts` | auto-discovered file | System, tool, message, and API token accounting; `/tokens` | Loads before lazy load; request body is never modified | Persistent session produced non-empty system/tool/message/usage output |
 | `codegraph-helper.ts` | auto-discovered file | Blocks grep/glob in indexed repositories; updates index after supported writes | `.codegraph/` gate; background runner failure remains nonfatal | Block, index, sync, status, explore, and query paths passed |
 | `lazy-load.ts` | auto-discovered file | `load_tool`, request schema reduction, SSE/DSML rewriting, per-turn state | Standard tool calls, finish events, content, reasoning, and MCP calls must survive | 9 regression tests plus CLI/TUI/Desktop shell markers |
 | `models-discovery.js` | auto-discovered file | Fetches provider models and injects six 9router free models | Skip source IDs starting `opencode/` before provider prefix | 52 models, six `9router/oc/*`, zero `9router/opencode/*` |
-| `rtk.ts` | auto-discovered file | Rewrites eligible bash/shell commands through RTK | Validate Bun shell before load guard; rewrite failure preserves command | Rewrite equivalence and null-shell guard passed |
+| `rtk.ts` | auto-discovered file | Rewrites eligible bash/shell commands through RTK | Use injected shell in TUI and child-process fallback in Desktop; every repeated initialization returns hook | Rewrite equivalence, Desktop-shaped input, and repeated init passed |
 | `supermemory.ts` | auto-discovered file | Adapts named Supermemory plugin export; memory CRUD tools | Default `{ id, server }` object; ignored credentials; no Mem0 runtime | Add, search, profile, list, forget, and absence-after-delete passed |
 
 CodeGraph MCP is configured separately in `opencode.jsonc`; it is not a local plugin origin.
@@ -168,7 +174,7 @@ Full prerequisites, credential handling, App path, and lifecycle commands: [setu
 ## Verification Entry Points
 
 ```powershell
-rtk bun test
+rtk proxy bun test
 rtk codegraph status .
 rtk opencode models 9router
 rtk opencode run --model 9router/oc/deepseek-v4-flash-free "Use load_tool to load bash, then use bash to run: Write-Output LAZY_LOAD_OK. Return exact command output."
@@ -186,6 +192,7 @@ Plugin sources, our changes, upstream PR notes, and safe update steps: [pr.md](p
 |---|---|
 | [setup.md](setup.md) | Clone, bootstrap, credentials, TUI/App startup, lifecycle tests, remote checks |
 | [pr.md](pr.md) | Where plugins came from, what we changed, upstream PR notes, and safe update steps |
+| [docs/opencode-agents.md](docs/opencode-agents.md) | Main agents, `@` subagents, hidden workers, OMO roles, and research modules |
 | [knownbug.md](knownbug.md) | Current problems, checks, and fixes |
 | [docs/debug-journey/README.md](docs/debug-journey/README.md) | Chronological failure and recovery evidence |
 | [docs/superpowers/specs/2026-07-13-opencode-recovery-design.md](docs/superpowers/specs/2026-07-13-opencode-recovery-design.md) | Recovery design source |

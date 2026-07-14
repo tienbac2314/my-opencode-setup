@@ -91,7 +91,8 @@ for ($index = 0; $index + 2 -lt $tokens.Count; $index++) {
       $depth--
       if ($depth -eq 0) { break }
     }
-    elseif ($depth -eq 1 -and $token.Kind -eq 'String' -and $token.Text -eq $Name) {
+    elseif ($depth -eq 1 -and $token.Kind -eq 'String' -and
+      ($token.Text -eq $Name -or $token.Text.StartsWith("$Name@"))) {
       $target = $token
       break
     }

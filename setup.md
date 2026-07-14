@@ -122,8 +122,21 @@ Bootstrap preserves existing provider and Supermemory credential files. It overw
 
 - `-SkipRtk`: skip `rtk init -g --opencode`.
 - `-SkipCodeGraph`: skip CodeGraph installation and agent wiring.
+- `-UpdateOnly -Component OmoSlim`: update only OMO Slim, then restore tailored OMO/TUI/global configuration and six audited local plugins.
+- `-VersionsFile PATH`: use alternate private version file. Normal path is `$HOME\.config\opencode\versions.env`.
 
 No dry-run or `-WhatIf` contract exists. Use isolated Windows account or disposable config root when testing bootstrap side effects.
+
+## Private Version File
+
+Use this file to change exact package targets without editing `bootstrap.ps1`:
+
+```powershell
+Copy-Item .\config\versions.env.example "$HOME\.config\opencode\versions.env"
+notepad "$HOME\.config\opencode\versions.env"
+```
+
+Bootstrap creates file from tracked example when missing. File accepts `KEY=VERSION`, blank lines, and `#` comments. It contains versions only, no credentials. Keep machine file outside Git.
 
 ## Provider Credentials
 
@@ -192,7 +205,7 @@ Do not replace standalone server with Docker deployment during client setup. Ser
 
 ## Dependency Pins
 
-Fresh bootstrap from tracked example generates `$HOME\.config\opencode\package.json` with:
+Fresh bootstrap reads `$HOME\.config\opencode\versions.env` and generates `$HOME\.config\opencode\package.json`. Tracked example starts with:
 
 | Package | Required version |
 |---|---|
@@ -200,7 +213,7 @@ Fresh bootstrap from tracked example generates `$HOME\.config\opencode\package.j
 | `@ai-sdk/openai-compatible` | `3.0.7` |
 | `opencode-supermemory` | `2.0.8` |
 | `opencode-update-notifier` | `0.3.3` |
-| `oh-my-opencode-slim` | `2.1.1` |
+| `oh-my-opencode-slim` | `2.2.0` |
 
 Verify:
 
@@ -210,11 +223,11 @@ bun pm ls
 Pop-Location
 ```
 
-Bootstrap preserves existing `opencode.jsonc`. If preserved plugin entry is unpinned, dependency generation maps it to `latest` before later config pin repair. Normalize any mismatch:
+Bootstrap preserves existing `opencode.jsonc`, then private version values win for tested npm plugins. Normalize any mismatch:
 
 ```powershell
 Push-Location "$HOME\.config\opencode"
-npm install --save-exact "@opencode-ai/plugin@1.17.18" "@ai-sdk/openai-compatible@3.0.7" "opencode-supermemory@2.0.8" "opencode-update-notifier@0.3.3" "oh-my-opencode-slim@2.1.1"
+npm install --save-exact "@opencode-ai/plugin@1.17.18" "@ai-sdk/openai-compatible@3.0.7" "opencode-supermemory@2.0.8" "opencode-update-notifier@0.3.3" "oh-my-opencode-slim@2.2.0"
 Pop-Location
 ```
 
@@ -234,7 +247,7 @@ Expected count: eight. Expected set:
 
 ```text
 opencode-update-notifier@0.3.3
-oh-my-opencode-slim@2.1.1
+oh-my-opencode-slim@2.2.0
 file:///.../plugins/supermemory.ts
 file:///.../plugins/rtk.ts
 file:///.../plugins/models-discovery.js
@@ -292,6 +305,8 @@ Use load_tool to load bash, then use bash to run: Write-Output DESKTOP_LAZY_OK. 
 
 Expected App trace contains `Called 'load_tool' bash`, shell command, shell output, and final `DESKTOP_LAZY_OK`.
 
+Desktop can keep plugin details from an existing session after an update. Close App, wait for process to exit, reopen it, and create a new session before checking Status. Sidecar startup can briefly show `Could not reach Local Server`; wait about 15 seconds before treating it as a failure.
+
 `Free usage exceeded, subscribe to Go` identifies OpenCode Zen provider quota. Select explicit 9router result and retry in fresh session.
 
 ## First-Run Lifecycle Checks
@@ -303,7 +318,7 @@ Set-Location "$HOME\opencode-dotfiles"
 bun test
 ```
 
-Expected: 14 pass, 0 fail.
+Expected: all tests pass. Exact count grows as regression cases are added.
 
 ### CLI lazy load
 
@@ -351,7 +366,7 @@ rtk rewrite "git status"
 rtk git status --short
 ```
 
-Expected rewrite produces supported RTK form and output remains equivalent. Desktop plugin disables itself safely when Bun shell injection is absent.
+Expected rewrite produces supported RTK form and output remains equivalent. Desktop often omits injected shell `$` and `C:\Windows\System32` from child `PATH`; audited plugin uses child process and checks system directory directly, so RTK remains active.
 
 ### Update notifier
 
@@ -398,26 +413,27 @@ Do not execute standalone server binary with `--help`; current binary may start 
 Use this section for package or plugin upgrades. Update one component at a time; [pr.md#safe-update-steps-for-changed-plugins](pr.md#safe-update-steps-for-changed-plugins) has exact comparison steps and a [copy-paste prompt for a future update agent](pr.md#prompt-for-a-future-update-agent).
 
 1. Read [pr.md](pr.md), especially the plugin section and checks required before removing a local fix.
-2. Use `update-plugins.ps1 -DryRun -Force` only for inventory. Current updater contains unpinned OMO Slim and `npm update` paths; read [knownbug.md#plugin-updater-can-erode-pins](knownbug.md#plugin-updater-can-erode-pins).
-3. Update one dependency or upstream file at a time.
-4. Reapply the local fix if upstream still misses required behavior.
-5. Run 16 tests, plugin bundles, effective-origin check, CLI/TUI/Desktop lazy-load checks, and the changed plugin's full test flow.
-6. Commit only after active files hash-match repository copies where applicable.
+2. Change one target in private `$HOME\.config\opencode\versions.env` after reading release notes.
+3. For OMO Slim, preview with `.\update-plugins.ps1 -Component OmoSlim -DryRun`.
+4. Run `.\bootstrap.ps1 -UpdateOnly -Component OmoSlim`; full bootstrap is for first install or recovery.
+5. For source-derived local files, compare upstream and reapply local fixes manually. Update notifier does not track wrappers or `file:` plugins.
+6. Run full tests, plugin bundles, effective-origin check, CLI/TUI/Desktop lazy-load checks, and changed component's full test flow.
+7. Commit only after active files hash-match repository copies where applicable.
 
 ## Recovery Diagnostics
 
 | Symptom | Check | Required result |
 |---|---|---|
 | `Model tried to call unavailable tool 'load_tool'` | restart process; inspect repeated-init test | second plugin initialization returns tool and hook |
-| TUI works, Desktop fails | inspect module export shape and `input.$` handling | compatible plugin export; adapter default when required; null shell guarded |
-| OMO package resolves newer than `2.1.1` | inspect preserved root plugin entry and `bun pm ls` | run exact normalization command under Dependency Pins |
+| TUI works, Desktop fails | inspect module export shape, missing `input.$`, and repeated initialization | compatible export; child-process fallback; every initialization returns hook |
+| OMO package differs from private target | inspect preserved root plugin entry and `bun pm ls` | run exact normalization command under Dependency Pins |
 | hooks run twice | inspect `plugin_origins` | each local plugin once |
 | `finish: unknown` or stale tool next turn | run lazy-load tests | finish event preserved; turn state cleared |
 | DSML text printed | split-DSML regression | DSML converted; surrounding text preserved |
 | model list contains `9router/opencode/*` | inspect model filter | source `opencode/` IDs skipped |
 | Supermemory tool missing | bundle wrapper from active config | named export resolves and default adapter loads |
 | Supermemory HTTP works but CRUD fails | run full lifecycle | add/search/list/forget all succeed |
-| RTK disabled permanently | inspect load guard order | guard set only after shell and binary validation |
+| RTK disabled or native `git status` appears | run repeated-init RTK test; inspect missing `$` fallback | second initialization returns hook; App trace shows `rtk git status` |
 | CodeGraph blocks grep unexpectedly | inspect `.codegraph/` | block applies only in indexed repository |
 
 ## Security Rules

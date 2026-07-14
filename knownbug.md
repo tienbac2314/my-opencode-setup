@@ -44,7 +44,7 @@ Expected: `Plugins = 8`, `Origins = 8`, with two npm and six local origins liste
 
 **Recovery:** remove only project `plugin` property, preserve `$schema`, then fully reload Desktop with `Ctrl+R` or start a new process. Open status Plugins tab at least three times and confirm count stays eight. Run one `load_tool` shell marker afterward; plugin display and tool execution are independent checks.
 
-**Regression guard:** `tests/bootstrap.test.ts` asserts `.opencode/opencode.json` has no `plugin` property. Run `rtk bun test` before committing or after changing project configuration.
+**Regression guard:** `tests/bootstrap.test.ts` asserts `.opencode/opencode.json` has no `plugin` property. Run `rtk proxy bun test` before committing or after changing project configuration.
 
 **Log attribution:** one Desktop `run=` log can contain events from multiple workspaces. Associate plugin errors with nearest surrounding `directory=` record before treating them as this repository's failure.
 
@@ -56,7 +56,7 @@ Expected: `Plugins = 8`, `Origins = 8`, with two npm and six local origins liste
 
 **Cause:** Electron runtime exercises stricter ESM discovery and can initialize plugins without Bun shell injection.
 
-**Rule:** local module must expose an OpenCode-compatible plugin function, either directly as a named export or through default `{ id, server }` metadata when an adapter is required. Shell-dependent plugin validates `input.$` before setting load guard or invoking tagged template.
+**Rule:** local module must expose an OpenCode-compatible plugin function, either directly as a named export or through default `{ id, server }` metadata when an adapter is required. Shell-dependent plugin must support Desktop input without injected `$` and repeated initialization.
 
 **Detection:** bundle each local plugin; inspect Desktop logs; run null-shell initialization test for RTK.
 
@@ -94,7 +94,7 @@ Expected: `Plugins = 8`, `Origins = 8`, with two npm and six local origins liste
 
 **Rule:** loaded set persists across tool-loop requests within one user turn and clears only on terminal `finish_reason: "stop"`.
 
-**Detection:** `rtk bun test tests/lazy-load.test.ts`; inspect standard finish/reset test.
+**Detection:** `rtk proxy bun test tests/lazy-load.test.ts`; inspect standard finish/reset test.
 
 **Recovery:** restore repository plugin and restart process. Do not add global tool-loaded state or delete empty finish deltas.
 
@@ -167,39 +167,51 @@ Expected: 0.
 
 ## RTK Shell Injection
 
-**Symptom:** Desktop logs `input.$ is not a function`, RTK stays disabled after later valid load, or rewritten command changes semantics.
+**Symptom:** Desktop logs `input.$ is not a function`, logs `rtk binary not found in PATH` even though RTK is installed, RTK stays disabled after later valid load, or rewritten command changes semantics.
 
-**Cause:** generated plugin assumes Bun shell exists, sets guard before validation, or replaces command after failed rewrite.
+**Cause:** generated plugin assumes injected Bun shell `$` exists, trusts Desktop child `PATH`, uses global guard that drops hook on repeated initialization, or replaces command after failed rewrite. Desktop omits `$`, may omit `C:\Windows\System32`, and initializes plugins repeatedly.
 
-**Rule:** validate shell, validate binary, then set guard. Rewrite exceptions preserve original command.
+**Rule:** use injected shell when present and Node child process otherwise; check `PATH`, then Windows system directory; return hook on every initialization. Rewrite exceptions preserve original command.
 
-**Detection:** null-shell and rewrite-equivalence lifecycle; compare repository-active plugin hash.
+**Detection:** Desktop-shaped no-`$` rewrite, injected-shell rewrite, and repeated-init lifecycles; compare repository-active plugin hash.
 
 **Recovery:** rerun bootstrap after `rtk init`; bootstrap restores audited repository file.
 
-## Plugin Updater Can Erode Pins
+## Desktop Shows Old Plugin Version After Update
 
-**Symptom:** package versions or plugin origins change after `update-plugins.ps1`; OMO Slim entry becomes unpinned; active files differ from repository.
+**Symptom:** package files and `opencode debug config` show new exact plugin version, but Status in an already-open Desktop session shows old version.
 
-**Cause:** current updater runs `bunx oh-my-opencode-slim@latest install --yes` and `npm update --save`. Updater predates bootstrap pin-restoration safeguards.
+**Cause:** Desktop session keeps resolved plugin details from process/session startup. Sidecar startup can also briefly show `Could not reach Local Server` before it becomes ready.
 
-**Rule:** use `update-plugins.ps1 -DryRun -Force` for inventory. Real update requires immediate bootstrap and full upgrade matrix.
+**Rule:** close Desktop fully after plugin update, reopen it, wait about 15 seconds for sidecar, then create a new session before checking Status.
+
+**Detection:** compare fresh-session Status with `plugin_origins` and `bun pm ls`. Current verified OMO Slim value is `2.2.0`.
+
+**Recovery:** restart Desktop and open new session. If value still differs, rerun targeted update and inspect newest Desktop server log.
+
+## Old Broad Plugin Updater (Fixed)
+
+**Old symptom:** package versions or plugin origins changed after `update-plugins.ps1`; OMO Slim entry became unpinned; active files differed from repository.
+
+**Old cause:** updater ran unpinned OMO installer and broad npm update. It also trusted pin helper that matched only unpinned OMO entry, not an older exact pin.
+
+**Current rule:** private `$HOME\.config\opencode\versions.env` holds exact target. Use `update-plugins.ps1 -Component OmoSlim -DryRun`, then `bootstrap.ps1 -UpdateOnly -Component OmoSlim`. Current updater delegates only selected exact OMO update and restores tailored config plus both plugin pins.
 
 **Detection:** compare `bun pm ls`, `plugin_origins`, `tui.json`, root plugin array, and six local SHA-256 values.
 
-**Recovery:** rerun `bootstrap.ps1`, verify exact pins, restart OpenCode, run tests and all affected lifecycles.
+**Recovery for old state:** run targeted OMO update, verify exact pins, restart OpenCode, then run OMO and Desktop lifecycle checks.
 
-## Preserved Config Can Generate Latest Dependency
+## Preserved Config Dependency Drift (Fixed)
 
 **Symptom:** fresh repository succeeds, but bootstrap over existing configuration installs newer OMO Slim or another npm plugin despite later pinned `plugin_origins`.
 
-**Cause:** bootstrap preserves existing `opencode.jsonc`. During package generation, any unpinned root plugin entry maps to `latest`; root config pin repair occurs after `npm install` and does not rewrite generated package.
+**Old cause:** bootstrap preserved existing `opencode.jsonc`; unpinned plugin entry could map to `latest` before later pin repair.
 
-**Rule:** inspect `bun pm ls` after bootstrap. Exact package versions and pinned origins are separate checks.
+**Current rule:** private version values override tested npm dependency versions during package generation. Exact package versions and pinned origins remain separate checks.
 
 **Detection:** compare five versions under [setup dependency pins](setup.md#dependency-pins) with active package list.
 
-**Recovery:** run setup guide's exact `npm install --save-exact` normalization command, rerun `bun pm ls`, then restart OpenCode.
+**Recovery:** correct private version file, run selected update path, rerun `bun pm ls`, then restart OpenCode.
 
 ## Historical Mem0 Boundary
 
