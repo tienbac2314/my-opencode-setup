@@ -46,7 +46,7 @@ function Install-OmoSlim {
   Copy-Item "$RepoDir\config\tui.json" "$ConfigDir\tui.json" -Force
   & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path "$ConfigDir\tui.json" -Name "oh-my-opencode-slim" -Version $Version
   if ($versions.OPENCODE_GOAL_PLUGIN_VERSION) {
-    & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path "$ConfigDir\tui.json" -Name "@prevalentware/opencode-goal-plugin" -Version $versions.OPENCODE_GOAL_PLUGIN_VERSION
+    & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path "$ConfigDir\tui.json" -Name "@prevalentware/opencode-goal-plugin/tui" -Version $versions.OPENCODE_GOAL_PLUGIN_VERSION
   }
   Write-Output "  Restored and pinned TUI plugin config"
 
@@ -56,7 +56,7 @@ function Install-OmoSlim {
   }
   & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $activeConfigPath -Name "oh-my-opencode-slim" -Version $Version
   if ($versions.OPENCODE_GOAL_PLUGIN_VERSION) {
-    & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $activeConfigPath -Name "@prevalentware/opencode-goal-plugin" -Version $versions.OPENCODE_GOAL_PLUGIN_VERSION
+    & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $activeConfigPath -Name "@prevalentware/opencode-goal-plugin/server" -Version $versions.OPENCODE_GOAL_PLUGIN_VERSION
   }
   Write-Output "  Restored pinned global plugin config"
 

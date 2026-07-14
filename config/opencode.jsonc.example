@@ -82,7 +82,7 @@
   "plugin": [
     "opencode-update-notifier@0.3.3",
     "oh-my-opencode-slim@2.2.0",
-    "@prevalentware/opencode-goal-plugin@0.1.24"
+    "@prevalentware/opencode-goal-plugin/server@0.1.24"
   ],
   "command": {
     "goal": {

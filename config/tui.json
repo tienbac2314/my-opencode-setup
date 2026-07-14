@@ -1,13 +1,6 @@
 {
   "plugin": [
     "oh-my-opencode-slim@2.2.0",
-    "@prevalentware/opencode-goal-plugin@0.1.24"
-  ],
-  "command": {
-    "goal": {
-      "description": "Set a session-scoped goal and auto-continue until complete.",
-      "template": "$ARGUMENTS",
-      "agent": "build"
-    }
-  }
+    "@prevalentware/opencode-goal-plugin/tui@0.1.24"
+  ]
 }
