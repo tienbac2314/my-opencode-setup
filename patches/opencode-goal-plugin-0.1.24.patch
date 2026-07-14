@@ -28,7 +28,7 @@ diff --git a/src/tui.tsx b/src/tui.tsx
 +    lines.push(objective())
 +    return lines.join("\n")
 +  })
- 
+
    return (
 -    <Show when={goal()}>
 +    <Show
