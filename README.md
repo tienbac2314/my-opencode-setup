@@ -103,7 +103,7 @@ Bootstrap runs two installers that mutate active files:
 | `oh-my-opencode-slim@2.2.0` | npm plugin | Orchestrator, Librarian, Oracle, Designer, Fixer, Observer, and Councillor agents | Installer result must be re-pinned; repository preset restored | Agent/tool/MCP/command registration plus bounded Fixer `PONG` |
 | `opencode-update-notifier@0.3.3` | npm plugin | Read-only npm update notification | Version remains pinned so installed/published comparison is meaningful | Initialization and registry check without file mutation |
 | `0-tokens-source.ts` | auto-discovered file | System, tool, message, and API token accounting; `/tokens` | Loads before lazy load; request body is never modified | Persistent session produced non-empty system/tool/message/usage output |
-| `codegraph-helper.ts` | auto-discovered file | Blocks grep/glob in indexed repositories; updates index after supported writes | `.codegraph/` gate; background runner failure remains nonfatal | Block, index, sync, status, explore, and query paths passed |
+| `codegraph-helper.ts` | auto-discovered file | Requires one CodeGraph attempt before grep/glob fallback; syncs after supported writes | Per-session guard; `.codegraph/` gate; nonfatal background sync | 6 hook tests plus live sync, status, and explore |
 | `lazy-load.ts` | auto-discovered file | `load_tool`, request schema reduction, SSE/DSML rewriting, per-turn state | Standard tool calls, finish events, content, reasoning, and MCP calls must survive | 9 regression tests plus CLI/TUI/Desktop shell markers |
 | `models-discovery.js` | auto-discovered file | Fetches provider models and injects six 9router free models | Skip source IDs starting `opencode/` before provider prefix | 52 models, six `9router/oc/*`, zero `9router/opencode/*` |
 | `rtk.ts` | auto-discovered file | Rewrites eligible bash/shell commands through RTK | Use injected shell in TUI and child-process fallback in Desktop; every repeated initialization returns hook | Rewrite equivalence, Desktop-shaped input, and repeated init passed |
@@ -137,6 +137,7 @@ opencode-dotfiles/
 │   └── supermemory.ts
 ├── tests/
 │   ├── bootstrap.test.ts
+│   ├── codegraph-helper.test.ts
 │   └── lazy-load.test.ts
 ├── docs/
 │   ├── debug-journey/

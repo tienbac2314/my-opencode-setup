@@ -199,8 +199,9 @@ No upstream file exists. Keep changes here. If publishing it as its own project 
 ### What it does
 
 - Acts only when current workspace has `.codegraph/`.
-- Redirects ordinary grep/glob use to CodeGraph in indexed repositories.
-- Starts index refresh after supported write tools.
+- Redirects grep/glob until current session attempts CodeGraph, then allows fallback search.
+- Always allows file reads.
+- Debounces `codegraph sync` after supported write tools, including `apply_patch`.
 - Keeps missing shell runners and background failures from crashing Desktop.
 - Does nothing in repositories without a CodeGraph index.
 
@@ -209,9 +210,10 @@ No upstream file exists. Keep changes here. If publishing it as its own project 
 ```powershell
 rtk codegraph status .
 rtk codegraph explore "CodeGraphHelperPlugin"
+rtk proxy bun test tests/codegraph-helper.test.ts
 ```
 
-Also test indexed and unindexed folders, one blocked search, one file edit, and a failed background runner.
+Also test indexed and unindexed folders, session isolation, grep/glob fallback after one CodeGraph attempt, and a failed background runner.
 
 ### How to update
 

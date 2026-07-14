@@ -2,45 +2,77 @@
  * opencode-codegraph-helper
  *
  * Integrates CodeGraph dynamically:
- * 1. Enforces CodeGraph search: If a repository is indexed by CodeGraph (.codegraph directory exists),
- *    blocks standard grep_search / glob_search tools and instructs the LLM to use codegraph_explore instead.
- * 2. Auto-updates CodeGraph: Automatically updates the CodeGraph index after any file write/edit tool finishes.
+ * 1. Requires one CodeGraph attempt before broad grep/glob search in indexed repositories.
+ * 2. Debounces CodeGraph index updates after file writes/edits.
  */
 
 import type { Plugin } from "@opencode-ai/plugin";
 import * as fs from "fs";
 import * as path from "path";
 
-export const CodeGraphHelperPlugin: Plugin = async ({ client, $, directory }) => {
+const BROAD_SEARCH_TOOLS = new Set(["grep_search", "glob_search"]);
+const EDIT_TOOLS = new Set([
+  "apply_patch",
+  "edit",
+  "multi_replace_file_content",
+  "patch",
+  "replace_file_content",
+  "write",
+  "write_to_file",
+]);
+
+function isCodeGraphExplore(toolName: string): boolean {
+  return toolName === "codegraph_explore" || toolName.endsWith("_codegraph_explore");
+}
+
+export const CodeGraphHelperPlugin: Plugin = async ({ $, directory }) => {
+  const workspaceRoot = path.resolve(directory || process.cwd());
+  const codeGraphAttempts = new Set<string>();
+  let indexTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const hasCodeGraph = () => fs.existsSync(path.join(workspaceRoot, ".codegraph"));
+  const sessionKey = (input: any) => `${workspaceRoot}\0${input?.sessionID ?? "__global__"}`;
+
   return {
     async "tool.execute.before"(input, output) {
-      const toolName = input.tool;
-      const workspaceRoot = directory || process.cwd();
-      const hasCodeGraph = fs.existsSync(path.join(workspaceRoot, ".codegraph"));
+      if (!hasCodeGraph()) return;
 
-      // Intercept and redirect exploration tools in indexed repositories
-      if (hasCodeGraph && ["grep_search", "glob_search"].includes(toolName)) {
+      const toolName = String(input.tool ?? "");
+      const key = sessionKey(input);
+      const command = (output?.args as Record<string, unknown> | undefined)?.command;
+
+      if (isCodeGraphExplore(toolName) || (
+        ["bash", "shell"].includes(toolName) &&
+        typeof command === "string" &&
+        /\bcodegraph\s+explore\b/i.test(command)
+      )) {
+        codeGraphAttempts.add(key);
+        return;
+      }
+
+      if (BROAD_SEARCH_TOOLS.has(toolName) && !codeGraphAttempts.has(key)) {
         throw new Error(
-          `This repository is indexed by CodeGraph. Standard '${toolName}' is blocked. ` +
-          `You MUST use the 'codegraph_explore' tool or run 'codegraph explore' command instead.`
+          `This repository is indexed by CodeGraph. Try CodeGraph first, then retry '${toolName}' ` +
+          "for exact search or fallback."
         );
       }
     },
 
-    async "tool.execute.after"(input, output) {
-      const toolName = input.tool;
-      const workspaceRoot = directory || process.cwd();
-      const hasCodeGraph = fs.existsSync(path.join(workspaceRoot, ".codegraph"));
+    async "tool.execute.after"(input) {
+      if (!hasCodeGraph() || !EDIT_TOOLS.has(String(input.tool ?? ""))) return;
 
-      // Auto-update CodeGraph index after successful file writes/edits
-      if (hasCodeGraph && ["replace_file_content", "write_to_file", "multi_replace_file_content"].includes(toolName)) {
+      if (indexTimer) clearTimeout(indexTimer);
+      indexTimer = setTimeout(() => {
+        indexTimer = undefined;
+
         try {
-          // Trigger index in background asynchronously
-          $`codegraph index`.catch(() => {});
+          $`codegraph sync`.catch(() => {});
         } catch {
-          // Ignore background runner issues
+          // Keep successful edits successful when background indexing fails.
         }
-      }
+      }, 250);
+
+      (indexTimer as any).unref?.();
     }
   };
 };
