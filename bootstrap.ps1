@@ -178,6 +178,11 @@ foreach ($plugin in $config.plugin) {
     $separator = $plugin.LastIndexOf('@')
     if ($separator -gt 0) {
       $packageName = $plugin.Substring(0, $separator)
+      if ($packageName -match '^(@[^/]+/[^/]+)/.+') {
+        $packageName = $Matches[1]
+      } elseif ($packageName -match '^([^/]+)/.+') {
+        $packageName = $Matches[1]
+      }
       $version = $plugin.Substring($separator + 1)
       $dependencies[$packageName] = $version
     } else {

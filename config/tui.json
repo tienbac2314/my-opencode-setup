@@ -1,6 +1,6 @@
 {
   "plugin": [
-    "oh-my-opencode-slim@2.2.0",
+    "oh-my-opencode-slim@2.2.1",
     "@prevalentware/opencode-goal-plugin/tui@0.1.24"
   ]
 }
