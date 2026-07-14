@@ -74,6 +74,20 @@ Expected: `Plugins = 8`, `Origins = 8`, with two npm and six local origins liste
 
 **Recovery:** stop retry, create fresh session, select explicit 9router result, resubmit smoke prompt. Quota error does not indicate plugin failure.
 
+## Intermittent OMO Model Invalid at Startup
+
+**Symptom:** TUI or CLI reports `Agent orchestrator's configured model 9router/ag/gemini-3.5-flash-low is not valid`, often only once. Desktop may still show full 9router model list.
+
+**Cause:** custom `models-discovery.js` timed out while calling 9router `/models`. Old fallback registered only six hardcoded `oc/*` models, so OMO validated its configured model against partial startup catalog. Later process or Desktop request could succeed and hide failure.
+
+**Rule:** discovery fallback must include every 9router model referenced by static agent configuration. Current required entries are `ag/gemini-3.5-flash-low` for OMO and `ag/claude-opus-4-6-thinking` for compaction.
+
+**Safe detection:** run `rtk proxy opencode models 9router`. Catalog containing only hardcoded `9router/oc/*` entries indicates discovery failure. Do not print full resolved config because it contains provider credentials.
+
+**Recovery:** restore repository `models-discovery.js`, copy it to active plugin directory, then restart affected OpenCode process. Full provider catalog remains dynamic; required configured models remain valid during temporary discovery failure.
+
+**Regression guard:** `rtk proxy bun test tests/models-discovery.test.ts` mocks failed `/models` request and verifies both configured fallback models remain registered.
+
 ## DeepSeek DSML After Compaction
 
 **Symptom:** model emits `<｜｜DSML｜｜tool_calls>` markup as text instead of standard `delta.tool_calls`.

@@ -170,6 +170,7 @@ No PR needed for current upstream body-capture logic. A future PR is useful only
 - Reads models from the 9router OpenAI-compatible endpoint.
 - Registers image input support when provider data is incomplete.
 - Adds six selected `oc/*` free models when missing.
+- Keeps OMO `ag/gemini-3.5-flash-low` and compaction `ag/claude-opus-4-6-thinking` valid when startup discovery fails.
 - Ignores source IDs starting with `opencode/` so OpenCode does not create broken `9router/opencode/*` names.
 
 ### Tests to run
@@ -181,6 +182,8 @@ $models = @(rtk opencode models 9router)
 ```
 
 Expected: six selected `9router/oc/*` entries and zero `9router/opencode/*` entries. Total model count can change when provider inventory changes.
+
+Run `rtk proxy bun test tests/models-discovery.test.ts` to verify configured agent models remain available when `/models` is temporarily unavailable.
 
 ### How to update
 

@@ -45,7 +45,9 @@ export const ModelDiscovery = async ({ client }) => {
         }
         
         if (providerId === '9router') {
-          const freeModels = [
+          const fallbackModels = [
+            { id: 'ag/gemini-3.5-flash-low', caps: { vision: true } },
+            { id: 'ag/claude-opus-4-6-thinking', caps: { vision: true, thinking: true } },
             { id: 'oc/big-pickle', caps: { vision: false } },
             { id: 'oc/deepseek-v4-flash-free', caps: { vision: true, thinking: true } },
             { id: 'oc/hy3-free', caps: { vision: true, thinking: true } },
@@ -53,7 +55,7 @@ export const ModelDiscovery = async ({ client }) => {
             { id: 'oc/north-mini-code-free', caps: { vision: false } },
             { id: 'oc/nemotron-3-ultra-free', caps: { vision: false } }
           ]
-          for (const fm of freeModels) {
+          for (const fm of fallbackModels) {
             if (!models.some(m => (m.id || m.name) === fm.id)) {
               models.push({
                 id: fm.id,
