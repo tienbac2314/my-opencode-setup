@@ -46,7 +46,6 @@ export const ModelDiscovery = async ({ client }) => {
         
         if (providerId === '9router') {
           const fallbackModels = [
-            { id: 'ag/gemini-3.5-flash-low', caps: { vision: true } },
             { id: 'ag/claude-opus-4-6-thinking', caps: { vision: true, thinking: true } },
             { id: 'oc/big-pickle', caps: { vision: false } },
             { id: 'oc/deepseek-v4-flash-free', caps: { vision: true, thinking: true } },

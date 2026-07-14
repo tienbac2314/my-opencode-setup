@@ -172,7 +172,8 @@ No PR needed for current upstream body-capture logic. A future PR is useful only
 - Reads models from the 9router OpenAI-compatible endpoint.
 - Registers image input support when provider data is incomplete.
 - Adds six selected `oc/*` free models when missing.
-- Keeps OMO `ag/gemini-3.5-flash-low` and compaction `ag/claude-opus-4-6-thinking` valid when startup discovery fails.
+- Keeps compaction `ag/claude-opus-4-6-thinking` valid when startup discovery fails.
+- Uses native `opencode/deepseek-v4-flash-free` for OMO roles. AG Gemini streams have returned visible scratch narration and closed with `finish: unknown`, so they are not orchestration defaults.
 - Ignores source IDs starting with `opencode/` so OpenCode does not create broken `9router/opencode/*` names.
 
 ### Tests to run
@@ -359,6 +360,7 @@ No upstream PR needed for personal model choice. OpenCode-safe module placement 
 - `setDefaultAgent: false` keeps OpenCode Build as main default agent.
 - `disabled_agents: ["explorer"]` disables OMO Explorer.
 - Active preset is `9router`; every OMO role uses selected 9router model.
+- Every OMO role uses `opencode/deepseek-v4-flash-free`; keep AG models out until their gateway streams end with reliable finish reasons.
 - Orchestrator gets all skills and all MCPs except `context7`.
 - Oracle gets only `simplify` and no MCPs.
 - Librarian gets `websearch`, `context7`, and `gh_grep`, with no skills.
@@ -375,6 +377,10 @@ rtk proxy bun test tests/bootstrap.test.ts
 ```
 
 Then check agent, tool, MCP, and command registration and run one bounded child-agent call.
+
+### Native Windows skill scripts
+
+`skills/subagent-driven-development` keeps upstream shell helpers for macOS/Linux and adds `scripts/task-brief.ps1` for native Windows. Skill instructions select `pwsh -File` on Windows; never launch the WSL `bash.exe` stub. Test the PowerShell helper from a directory outside this repository.
 
 ### How to update
 

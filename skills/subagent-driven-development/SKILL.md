@@ -223,7 +223,9 @@ prints back — stays resident in your context for the rest of the session
 and is re-read on every later turn. Hand artifacts over as files:
 
 - **Task brief:** before dispatching an implementer, run this skill's
-  `scripts/task-brief PLAN_FILE N` — it extracts the task's full text to a
+  `pwsh -File scripts/task-brief.ps1 PLAN_FILE N` on Windows, or
+  `scripts/task-brief PLAN_FILE N` on macOS/Linux. Never invoke `bash` on
+  native Windows. It extracts the task's full text to a
   uniquely named file and prints the path. Compose the dispatch so the
   brief stays the single source of requirements. Your dispatch should
   contain: (1) one line on where this task fits in the project; (2) the

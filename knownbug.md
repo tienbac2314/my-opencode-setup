@@ -84,15 +84,33 @@ Expected: `Plugins = 8`, `Origins = 8`, with two npm and six local origins liste
 
 ## Intermittent OMO Model Invalid at Startup
 
-**Symptom:** TUI or CLI reports `Agent orchestrator's configured model 9router/ag/gemini-3.5-flash-low is not valid`, often only once. Desktop may still show full 9router model list.
+**Symptom:** TUI or CLI reports a configured 9router model is not valid, often only once. Desktop may still show full 9router model list.
 
 **Cause:** custom `models-discovery.js` timed out while calling 9router `/models`. Old fallback registered only six hardcoded `oc/*` models, so OMO validated its configured model against partial startup catalog. Later process or Desktop request could succeed and hide failure.
 
-**Rule:** discovery fallback must include every 9router model referenced by static agent configuration. Current required entries are `ag/gemini-3.5-flash-low` for OMO and `ag/claude-opus-4-6-thinking` for compaction.
+**Rule:** discovery fallback must include every 9router model referenced by static agent configuration. OMO uses injected `oc/deepseek-v4-flash-free`; compaction requires `ag/claude-opus-4-6-thinking`.
 
 **Safe detection:** run `rtk proxy opencode models 9router`. Catalog containing only hardcoded `9router/oc/*` entries indicates discovery failure. Do not print full resolved config because it contains provider credentials.
 
 **Recovery:** restore repository `models-discovery.js`, copy it to active plugin directory, then restart affected OpenCode process. Full provider catalog remains dynamic; required configured models remain valid during temporary discovery failure.
+
+## AG model narrates and stops mid-response
+
+**Symptom:** `ag/gemini-*` prints “Wait”, “let's inspect”, and other scratch narration, then sometimes stops without completing a tool call or answer.
+
+**Cause:** 9router AG responses place scratch narration in normal `content`, not a separate reasoning field. Affected stored turns ended with `finish: unknown`, showing stream closure rather than OpenCode output-token exhaustion.
+
+**Rule:** do not use AG Gemini models for OMO roles. Current OMO model is native `opencode/deepseek-v4-flash-free`. Keep AG Claude only for compaction until gateway behavior is rechecked.
+
+## Bash opens WSL error on native Windows
+
+**Symptom:** a skill runs `bash <skill>\scripts\task-brief ...`, then Windows shows WSL installation text.
+
+**Cause:** upstream helper is a Bash script. Native Windows resolves `bash.exe` to the WSL launcher even when WSL is not installed.
+
+**Fix:** run `pwsh -File scripts/task-brief.ps1 PLAN_FILE N` on Windows. Repository skill instructions now select the PowerShell helper; macOS/Linux keep the shell script.
+
+Installing WSL alone does not fix native OpenCode commands containing `C:\...` paths. Run OpenCode inside WSL so paths are Linux-native, or keep the PowerShell launcher for Windows TUI/Desktop sessions.
 
 **Regression guard:** `rtk proxy bun test tests/models-discovery.test.ts` mocks failed `/models` request and verifies both configured fallback models remain registered.
 
