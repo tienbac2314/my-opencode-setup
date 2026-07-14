@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { CodeGraphHelperPlugin } from "../plugins/codegraph-helper"
@@ -9,7 +9,10 @@ const directories: string[] = []
 function workspace(indexed = true): string {
   const directory = mkdtempSync(join(tmpdir(), "codegraph-helper-"))
   directories.push(directory)
-  if (indexed) mkdirSync(join(directory, ".codegraph"))
+  if (indexed) {
+    mkdirSync(join(directory, ".codegraph"))
+    writeFileSync(join(directory, ".codegraph", "codegraph.db"), "")
+  }
   return directory
 }
 
@@ -24,6 +27,54 @@ afterEach(() => {
 })
 
 describe("CodeGraph search guard", () => {
+  test("disables global CodeGraph MCP outside indexed workspaces", async () => {
+    const hooks = await plugin(workspace(false))
+    const config: any = {
+      mcp: {
+        codegraph: {
+          type: "local",
+          command: ["codegraph", "serve", "--mcp"],
+          enabled: true,
+        },
+      },
+    }
+
+    await hooks.config(config)
+
+    expect(config.mcp.codegraph.enabled).toBe(false)
+  })
+
+  test("ignores a metadata-only CodeGraph directory", async () => {
+    const directory = workspace(false)
+    mkdirSync(join(directory, ".codegraph"))
+    writeFileSync(join(directory, ".codegraph", "telemetry.json"), "{}")
+    const hooks = await plugin(directory)
+    const config: any = {
+      mcp: { codegraph: { enabled: true } },
+    }
+
+    await hooks.config(config)
+
+    expect(config.mcp.codegraph.enabled).toBe(false)
+  })
+
+  test("keeps global CodeGraph MCP enabled in indexed workspaces", async () => {
+    const hooks = await plugin(workspace())
+    const config: any = {
+      mcp: {
+        codegraph: {
+          type: "local",
+          command: ["codegraph", "serve", "--mcp"],
+          enabled: true,
+        },
+      },
+    }
+
+    await hooks.config(config)
+
+    expect(config.mcp.codegraph.enabled).toBe(true)
+  })
+
   test("does nothing when workspace has no CodeGraph index", async () => {
     const hooks = await plugin(workspace(false))
 

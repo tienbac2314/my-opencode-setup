@@ -2,6 +2,14 @@
 
 Use this page when the setup starts but behaves incorrectly. Find the matching symptom, run its safe check, then apply only the listed fix. For installation use [setup.md](setup.md); for plugin source changes use [pr.md](pr.md).
 
+## CodeGraph error outside indexed projects
+
+**Symptom:** OpenCode shows `[ERR] CodeGraph not initialized in <folder>` and TUI freezes or exits when started in a folder without `.codegraph/`.
+
+**Cause:** CodeGraph is installed as a global MCP entry. User home may contain `.codegraph/` daemon and telemetry files without a project database. Directory existence alone does not mean project is initialized.
+
+**Fix:** `codegraph-helper.ts` disables that MCP entry when `.codegraph/codegraph.db` is absent. Do not remove global CodeGraph config: indexed workspaces still use it. If error returns, confirm active helper matches repository copy and restart OpenCode.
+
 ## Local Plugin Duplication
 
 **Symptom:** hook executes twice, `fetch` wrappers nest, Desktop startup differs from TUI, or tool definitions disappear unpredictably.

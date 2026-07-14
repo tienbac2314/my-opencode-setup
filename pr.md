@@ -201,7 +201,8 @@ No upstream file exists. Keep changes here. If publishing it as its own project 
 
 ### What it does
 
-- Acts only when current workspace has `.codegraph/`.
+- Acts only when current workspace has `.codegraph/codegraph.db`; user-home telemetry or daemon files do not count as a project index.
+- Disables the global CodeGraph MCP entry when current workspace has no `.codegraph/`, preventing a failed MCP startup from breaking TUI sessions.
 - Redirects grep/glob until current session attempts CodeGraph, then allows fallback search.
 - Always allows file reads.
 - Leaves index refresh to CodeGraph MCP file watcher. No OpenCode edit hook or duplicate `codegraph sync`.

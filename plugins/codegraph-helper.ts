@@ -19,10 +19,15 @@ export const CodeGraphHelperPlugin: Plugin = async ({ directory }) => {
   const workspaceRoot = path.resolve(directory || process.cwd());
   const codeGraphAttempts = new Set<string>();
 
-  const hasCodeGraph = () => fs.existsSync(path.join(workspaceRoot, ".codegraph"));
+  const hasCodeGraph = () => fs.existsSync(path.join(workspaceRoot, ".codegraph", "codegraph.db"));
   const sessionKey = (input: any) => `${workspaceRoot}\0${input?.sessionID ?? "__global__"}`;
 
   return {
+    async config(config: any) {
+      const codeGraph = config?.mcp?.codegraph;
+      if (codeGraph && !hasCodeGraph()) codeGraph.enabled = false;
+    },
+
     async "tool.execute.before"(input, output) {
       if (!hasCodeGraph()) return;
 
