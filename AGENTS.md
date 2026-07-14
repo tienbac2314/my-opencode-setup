@@ -61,14 +61,17 @@
 
 **Auto-clarity:** Full prose for security warnings, irreversible ops, ambiguous multi-step order. Resume caveman after.
 
-<!-- CODEGRAPH_START -->
-## CodeGraph
+## 6. Runtime Tools and Plugins
 
-In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+**Use installed behavior. Do not guess names, hooks, or ownership.**
 
-- **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
-- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
+* **Lazy loading:** `load_tool` exposes unloaded tools on demand. Load exact runtime name before calling tool. MCP names may be namespaced by client. If tool is listed but deferred, load it instead of claiming it is missing.
+* **CodeGraph:** If `.codegraph/` exists, use CodeGraph before grep/find or broad file reads. OpenCode tool is `codegraph_codegraph_explore`; other clients may show `codegraph_explore`. Shell command is `codegraph explore "<symbol names or question>"`. Different names are client namespacing, not duplicate tools.
+* **RTK:** Write `rtk` explicitly for supported shell commands. Native Windows hook may rewrite commands, but never assume it ran. Treat successful RTK output as command result: obey requested output shape; do not explain rewrite, rerun raw command, or second-guess changed formatting. Use user PATH such as `~/.local/bin`; never install or fall back to `C:\Windows\System32`.
+* **Supermemory:** Active long-term memory path. Mem0 is archive only. Use exposed Supermemory tools and their loaded schemas; do not invent tool names, modes, or fields. Never print full config or credentials while debugging.
+* **Agents:** Main-tab agents are primary agents. `@` agents are callable subagents controlled by caller's `permission.task`. Skills and data files guide agents; they are not extra main-tab agents. Read [docs/opencode-agents.md](docs/opencode-agents.md) before changing agent visibility or delegation.
+* **Skills:** Runtime skill list is authoritative. Read matching `SKILL.md` before use. Do not guess skill paths or assume every repository data module is exposed as skill. Deep Research intentionally hides some web-search modules from agents.
+* **Other plugins:** Token source provides `/tokens`. Models discovery builds 9router model entries. Update notifier checks pinned npm plugins, not custom local wrappers. Local plugins are auto-discovered; do not add them to project `plugin` arrays or set `"plugin": []`.
+* **Source of truth:** [README.md](README.md) explains runtime layout. [setup.md](setup.md) covers install and updates. [pr.md](pr.md) records local plugin changes and upstream comparison. Read these before updating plugins or replacing local files.
 
-If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
-<!-- CODEGRAPH_END -->
-
+**Debug safely:** Inspect filtered `plugin_origins` and exact errors. Do not dump full resolved config; it may contain provider keys and Supermemory credentials.
