@@ -1,5 +1,7 @@
 # OpenCode Repository Recovery Design
 
+This historical design records the recovery approach approved before implementation. Use [setup.md](../../../setup.md) for the working setup today.
+
 ## Goal
 
 Restore `master` from stable commit `d8fa757a`, retain validated Supermemory migration behavior, repair lazy-loaded tool calls in both TUI and Desktop App, and prove every README plugin lifecycle works.

@@ -29,6 +29,6 @@ This directory records repository failure, diagnosis, recovery, and validation. 
 | `2f4d06f3a1475c8e2ca8653889ac17bcbb50eee5` | Normalized plugin loading |
 | `03db0fda4f03580217bb2f5ac5d467af8ac6e83a` | Preserved plugin lifecycle |
 
-Final Desktop incident: project `.opencode/opencode.json` used `"plugin": []`, hiding status entries while eight `plugin_origins` and `load_tool` remained healthy. Current tree omits that property and protects invariant in `tests/bootstrap.test.ts`. No lazy-load or Supermemory rollback was required.
+Final Desktop incident: project `.opencode/opencode.json` used `"plugin": []`, hiding status entries while eight `plugin_origins` and `load_tool` remained healthy. Current tree omits that property, and `tests/bootstrap.test.ts` prevents it from returning. No lazy-load or Supermemory rollback was required.
 
 Current operation belongs in [README](../../README.md), [setup](../../setup.md), [patch requirements](../../pr.md), and [known bugs](../../knownbug.md).

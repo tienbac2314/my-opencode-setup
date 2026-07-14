@@ -1,5 +1,7 @@
 # Lazy-load failure
 
+This historical note explains the broken `load_tool` stream behavior, the fix, and the tests that prevent it from returning. For current plugin changes and tests, use [pr.md](../../pr.md#lazy-loading).
+
 ## Intended protocol
 
 `opencode-lazy-load` intercepts provider responses, detects requested tools, resolves schemas, and rewrites direct tool calls only when required. It must preserve every normal streamed tool-call frame.
@@ -43,4 +45,4 @@ DSML response names resolve against original tool names case-insensitively. Dire
 
 ## Regression coverage
 
-Nine lazy-load tests cover repeated initialization, split standard calls, namespaced gateway calls, direct unloaded-tool rewrite, terminal reset, MCP passthrough, false gateway-name matches, ordinary content/reasoning, and split DSML. Full repository suite reports 14 tests and 42 assertions.
+Nine lazy-load tests cover repeated initialization, split standard calls, namespaced gateway calls, direct unloaded-tool rewrite, terminal reset, MCP passthrough, false gateway-name matches, ordinary content/reasoning, and split DSML. Full repository suite now reports 16 tests and 49 assertions.

@@ -1,5 +1,7 @@
 # OpenCode Documentation System Implementation Plan
 
+This completed plan records how the current documentation was built. Start with [README.md](../../../README.md) for current information.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a zero-context, technically exact documentation suite for restored OpenCode architecture, setup, plugin patches, current defects, legacy evidence, and recovery history.

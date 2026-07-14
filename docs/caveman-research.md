@@ -1,5 +1,7 @@
 # Caveman Mode: Cross-Model Research Findings
 
+This research note explains why the repository uses short, direct writing rules and which wording patterns failed across different models. It is background evidence, not OpenCode setup guidance; start with [README.md](../README.md) for the live project.
+
 Research date: 2026-07-11
 Sources: [caveman repo](https://github.com/JuliusBrussee/caveman) (87.8k stars), [arXiv:2604.00025](https://arxiv.org/abs/2604.00025), caveman issues #629/#665/#677/#679/#680
 

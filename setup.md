@@ -1,5 +1,7 @@
 # OpenCode Setup
 
+Use this guide to install this repository on a Windows PC, add private credentials, start OpenCode, and prove every part works. For plugin source changes and updates, use [pr.md](pr.md).
+
 ## Supported Environment
 
 Verified host:
@@ -216,7 +218,7 @@ npm install --save-exact "@opencode-ai/plugin@1.17.18" "@ai-sdk/openai-compatibl
 Pop-Location
 ```
 
-Do not remove pins because registry latest versions have not passed repository regression and Desktop lifecycle gates.
+Do not remove pins because newer registry versions have not passed this repository's tests and Desktop checks.
 
 ## Effective Plugin Origins
 
@@ -320,7 +322,7 @@ $models = @(opencode models 9router)
 "polluted=$(@($models | Where-Object { $_ -like '9router/opencode/*' }).Count)"
 ```
 
-Verified values: `total=52`, `oc=6`, `polluted=0`. Provider inventory can change; invariant is six injected `9router/oc/*` models and zero `9router/opencode/*` IDs.
+Verified values: `total=52`, `oc=6`, `polluted=0`. Provider inventory can change; required result is six injected `9router/oc/*` models and zero `9router/opencode/*` IDs.
 
 ### CodeGraph
 
@@ -393,11 +395,13 @@ Do not execute standalone server binary with `--help`; current binary may start 
 
 ## Upgrade Procedure
 
-1. Read [pr.md](pr.md) removal gates.
+Use this section for package or plugin upgrades. Update one component at a time; [pr.md#safe-update-steps-for-changed-plugins](pr.md#safe-update-steps-for-changed-plugins) has exact comparison steps and a [copy-paste prompt for a future update agent](pr.md#prompt-for-a-future-update-agent).
+
+1. Read [pr.md](pr.md), especially the plugin section and checks required before removing a local fix.
 2. Use `update-plugins.ps1 -DryRun -Force` only for inventory. Current updater contains unpinned OMO Slim and `npm update` paths; read [knownbug.md#plugin-updater-can-erode-pins](knownbug.md#plugin-updater-can-erode-pins).
 3. Update one dependency or upstream file at a time.
-4. Reapply local patch if upstream still violates invariant.
-5. Run 14 tests, plugin bundles, effective-origin check, CLI/TUI/Desktop lazy-load checks, and affected lifecycle.
+4. Reapply the local fix if upstream still misses required behavior.
+5. Run 16 tests, plugin bundles, effective-origin check, CLI/TUI/Desktop lazy-load checks, and the changed plugin's full test flow.
 6. Commit only after active files hash-match repository copies where applicable.
 
 ## Recovery Diagnostics

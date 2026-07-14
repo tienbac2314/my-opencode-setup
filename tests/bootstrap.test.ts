@@ -1,15 +1,61 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const script = readFileSync(new URL("../bootstrap.ps1", import.meta.url), "utf8")
 const pinPluginScript = fileURLToPath(new URL("../scripts/pin-opencode-plugin.ps1", import.meta.url))
+const setCredentialsScript = fileURLToPath(new URL("../scripts/set-credentials.ps1", import.meta.url))
 const projectConfig = JSON.parse(readFileSync(new URL("../.opencode/opencode.json", import.meta.url), "utf8"))
 
 test("project config does not override global plugins", () => {
   expect(projectConfig).not.toHaveProperty("plugin")
+})
+
+test("credential restore updates only provider.9router.options", () => {
+  const directory = mkdtempSync(join(tmpdir(), "opencode-credentials-"))
+  const configDirectory = join(directory, ".config", "opencode")
+  const configPath = join(configDirectory, "opencode.jsonc")
+  const credentialsPath = join(directory, "credentials.json")
+  const authPath = join(directory, "auth.json")
+  const original = `{
+  // decoy: "apiKey": "comment-key", "baseURL": "https://comment.invalid"
+  "provider": {
+    "other": { "options": { "apiKey": "keep-key", "baseURL": "https://keep.invalid" } },
+    "9router": { "options": { "baseURL": "https://old.invalid", "apiKey": "old-key" } }
+  }
+}`
+
+  try {
+    mkdirSync(configDirectory, { recursive: true })
+    writeFileSync(configPath, original)
+    writeFileSync(credentialsPath, JSON.stringify({
+      router_api_key: "new-key",
+      router_base_url: "https://new.invalid",
+      supermemory_api_key: "memory-key",
+      supermemory_base_url: "https://memory.invalid",
+      openrouter_api_key: "openrouter-key",
+    }))
+
+    const result = Bun.spawnSync([
+      "rtk", "proxy", "pwsh", "-NoProfile", "-File", setCredentialsScript,
+      "-CredentialsFile", credentialsPath,
+      "-ConfigDir", configDirectory,
+      "-AuthFile", authPath,
+      "-SkipUserEnvironment",
+    ])
+
+    expect(result.exitCode).toBe(0)
+    const updated = readFileSync(configPath, "utf8")
+    expect(updated).toContain('// decoy: "apiKey": "comment-key"')
+    expect(updated).toContain('"apiKey": "keep-key"')
+    expect(updated).toContain('"baseURL": "https://keep.invalid"')
+    expect(updated).toContain('"baseURL": "https://new.invalid"')
+    expect(updated).toContain('"apiKey": "new-key"')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 describe("bootstrap plugin pinning", () => {

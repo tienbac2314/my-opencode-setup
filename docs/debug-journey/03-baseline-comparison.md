@@ -1,5 +1,7 @@
 # Reference-baseline comparison
 
+This historical note explains what the clean `workathome\.config` comparison proved and what it could not prove. For current setup steps, use [setup.md](../../setup.md).
+
 ## Reference
 
 `C:\Users\bacnt\Desktop\workathome\.config` was gold-standard bare configuration. It demonstrated provider and base-config health independently from broken repository history.

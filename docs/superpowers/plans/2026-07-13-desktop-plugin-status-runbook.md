@@ -1,5 +1,7 @@
 # Desktop Plugin Status Runbook Implementation Plan
 
+This completed plan records the Desktop plugin-list fix. Use [knownbug.md](../../../knownbug.md#desktop-plugin-list-hidden-by-project-override) for the current check and fix.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Preserve diagnosis and prevention guidance for the Desktop plugin-count regression fixed in commit `443099a`.

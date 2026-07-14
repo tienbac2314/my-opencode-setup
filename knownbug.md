@@ -1,4 +1,6 @@
-# OpenCode Known Bugs and Operational Boundaries
+# OpenCode Known Problems and Fixes
+
+Use this page when the setup starts but behaves incorrectly. Find the matching symptom, run its safe check, then apply only the listed fix. For installation use [setup.md](setup.md); for plugin source changes use [pr.md](pr.md).
 
 ## Local Plugin Duplication
 
@@ -84,7 +86,7 @@ Expected: `Plugins = 8`, `Origins = 8`, with two npm and six local origins liste
 
 **Recovery:** restore repository `lazy-load.ts`, keep `compaction.reserved` at `20000`, use stable compaction model, restart process.
 
-## Lazy-Load Turn-State Invariant
+## Lazy-Load State Between Tool Calls
 
 **Symptom:** newly loaded tool is blocked in same turn, next turn can call tool without loading, or session ends with unknown finish.
 

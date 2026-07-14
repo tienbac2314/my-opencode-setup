@@ -1,84 +1,198 @@
 <#
 .SYNOPSIS
-  Restore all credentials and environment variables for the full OpenCode setup.
+  Restore OpenCode credentials from a private JSON file.
 
 .DESCRIPTION
-  Reads credentials from a credentials.json file (stored separately, NOT in git)
-  and applies them to the local environment.
+  Safe repository helper. It contains field names only, never real keys.
+  Keep the JSON file outside Git. Run bootstrap before this script.
 
-  This script is the SAFE TEMPLATE. It expects a credentials.json file in
-  ~/.config/opencode/credentials.json with this structure:
+  Expected JSON:
 
   {
-    "router_api_key": "sk-...",
-    "router_base_url": "https://...",
-    "supermemory_base_url": "https://supermemory.example.com",
-    "supermemory_api_key": "sm_...",
-    "openrouter_api_key": "sk-or-v1-..."
+    "router_api_key": "",
+    "router_base_url": "",
+    "supermemory_api_key": "",
+    "supermemory_base_url": "",
+    "openrouter_api_key": ""
   }
 
-  To set up credentials for the first time:
-    1. Copy this script to your Desktop as 'my-opencode-credentials.ps1'
-    2. Edit the $Credentials variable below with your actual values
-    3. Run it once: pwsh -File my-opencode-credentials.ps1
-    4. Store the edited file in your password manager
-    5. Never commit credentials.json or the edited script to git
+  Example:
+    pwsh -File scripts/set-credentials.ps1 -CredentialsFile C:\private\opencode-credentials.json
 #>
 
+param(
+  [string]$CredentialsFile = "$env:USERPROFILE\.config\opencode\credentials.json",
+  [string]$ConfigDir = "$env:USERPROFILE\.config\opencode",
+  [string]$AuthFile = "$env:USERPROFILE\.local\share\opencode\auth.json",
+  [switch]$SkipUserEnvironment
+)
+
 $ErrorActionPreference = "Stop"
-$ConfigDir = "$env:USERPROFILE\.config\opencode"
-$ConfigFile = "$ConfigDir\opencode.jsonc"
-$CredsFile = "$ConfigDir\credentials.json"
+$ConfigFile = Join-Path $ConfigDir "opencode.jsonc"
+$SupermemoryFile = Join-Path $ConfigDir "supermemory.jsonc"
 
-# ─── Load credentials from JSON file ───
-if (-not (Test-Path $CredsFile)) {
-  Write-Output "[error] $CredsFile not found" -ForegroundColor Red
-  Write-Output "Create it with your actual credentials. See template above."
-  exit 1
-}
+function Get-JsoncTokens([string]$Content) {
+  $tokens = [Collections.Generic.List[object]]::new()
 
-$Credentials = Get-Content $CredsFile -Raw | ConvertFrom-Json
+  for ($index = 0; $index -lt $Content.Length;) {
+    $char = $Content[$index]
+    if ([char]::IsWhiteSpace($char)) { $index++; continue }
 
-# ─── 1. 9router API key in opencode.jsonc ───
-if (-not (Test-Path $ConfigDir)) {
-  New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
-}
+    if ($char -eq '/' -and $index + 1 -lt $Content.Length) {
+      if ($Content[$index + 1] -eq '/') {
+        $index += 2
+        while ($index -lt $Content.Length -and $Content[$index] -notin "`r", "`n") { $index++ }
+        continue
+      }
+      if ($Content[$index + 1] -eq '*') {
+        $index += 2
+        while ($index + 1 -lt $Content.Length -and
+          -not ($Content[$index] -eq '*' -and $Content[$index + 1] -eq '/')) { $index++ }
+        $index = [Math]::Min($index + 2, $Content.Length)
+        continue
+      }
+    }
 
-if (Test-Path $ConfigFile) {
-  $config = Get-Content $ConfigFile -Raw
-  if ($config -match '9router') {
-    $config = $config -replace '(?<=apiKey":\s*")[^"]+(?=")', $Credentials.router_api_key
-    Set-Content $ConfigFile $config -NoNewline -Encoding UTF8
-    Write-Output "[ok] 9router apiKey patched in $ConfigFile"
-  } else {
-    Write-Output "[skip] $ConfigFile has no 9router block — manual edit required"
+    if ($char -eq '"') {
+      $start = $index
+      $index++
+      while ($index -lt $Content.Length) {
+        if ($Content[$index] -eq '\') { $index += 2; continue }
+        if ($Content[$index] -eq '"') { $index++; break }
+        $index++
+      }
+      $tokens.Add([pscustomobject]@{
+        Kind = "String"
+        Text = $Content.Substring($start + 1, $index - $start - 2)
+        Start = $start
+        End = $index
+      })
+      continue
+    }
+
+    if ('[]{}:,'.Contains([string]$char)) {
+      $tokens.Add([pscustomobject]@{
+        Kind = "Symbol"
+        Text = [string]$char
+        Start = $index
+        End = $index + 1
+      })
+    }
+    $index++
   }
-} else {
-  Write-Output "[warn] $ConfigFile does not exist — run bootstrap.ps1 first"
+
+  return $tokens
 }
 
-# ─── 2. Supermemory client config ───
-if ($Credentials.supermemory_api_key -and $Credentials.supermemory_base_url) {
-  @{
-    apiKey = $Credentials.supermemory_api_key
-    baseUrl = $Credentials.supermemory_base_url
-  } | ConvertTo-Json | Set-Content "$ConfigDir\supermemory.jsonc" -Encoding UTF8
-  Write-Output "[ok] Supermemory config written"
+function Find-ObjectPropertyValueIndex($Tokens, [int]$ObjectIndex, [string]$Name) {
+  if ($Tokens[$ObjectIndex].Text -ne '{') { throw "Expected JSONC object for $Name" }
+  $depth = 0
+
+  for ($index = $ObjectIndex; $index -lt $Tokens.Count; $index++) {
+    $token = $Tokens[$index]
+    if ($token.Kind -eq "Symbol" -and $token.Text -in '{', '[') {
+      $depth++
+      continue
+    }
+    if ($token.Kind -eq "Symbol" -and $token.Text -in '}', ']') {
+      $depth--
+      if ($depth -eq 0) { break }
+      continue
+    }
+    if ($depth -eq 1 -and $token.Kind -eq "String" -and $token.Text -eq $Name -and
+      $index + 2 -lt $Tokens.Count -and $Tokens[$index + 1].Text -eq ':') {
+      return $index + 2
+    }
+  }
+
+  throw "JSONC property not found: $Name"
 }
 
-# ─── 3. OpenCode experimental flag ───
-[System.Environment]::SetEnvironmentVariable('OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS', 'true', 'User')
-Write-Output "[ok] OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true"
-
-# ─── 4. OpenRouter key (optional) ───
-if ($Credentials.openrouter_api_key) {
-  $authFile = "$env:USERPROFILE\.local\share\opencode\auth.json"
-  New-Item -ItemType Directory -Path (Split-Path $authFile) -Force | Out-Null
-  @{ openrouter = @{ type = "api"; key = $Credentials.openrouter_api_key } } |
-    ConvertTo-Json -Depth 10 | Set-Content $authFile -Encoding UTF8
-  Write-Output "[ok] OpenRouter key written to auth.json"
+if (-not (Test-Path -LiteralPath $CredentialsFile)) {
+  throw "Private credential file not found: $CredentialsFile"
 }
 
-Write-Output ""
-Write-Output "=== Credentials restored ===" -ForegroundColor Green
-Write-Output "Restart any open terminals for env vars to take effect."
+$Credentials = Get-Content -Raw -LiteralPath $CredentialsFile | ConvertFrom-Json
+$required = @(
+  "router_api_key",
+  "router_base_url",
+  "supermemory_api_key",
+  "supermemory_base_url"
+)
+
+foreach ($name in $required) {
+  $value = [string]$Credentials.$name
+  if ([string]::IsNullOrWhiteSpace($value)) {
+    throw "Missing required credential field: $name"
+  }
+}
+
+if (-not (Test-Path -LiteralPath $ConfigFile)) {
+  throw "$ConfigFile not found. Run bootstrap.ps1 first."
+}
+
+$configText = Get-Content -Raw -LiteralPath $ConfigFile
+$tokens = @(Get-JsoncTokens $configText)
+$rootIndex = 0
+$providerIndex = Find-ObjectPropertyValueIndex $tokens $rootIndex "provider"
+$routerIndex = Find-ObjectPropertyValueIndex $tokens $providerIndex "9router"
+$optionsIndex = Find-ObjectPropertyValueIndex $tokens $routerIndex "options"
+$apiKeyIndex = Find-ObjectPropertyValueIndex $tokens $optionsIndex "apiKey"
+$baseUrlIndex = Find-ObjectPropertyValueIndex $tokens $optionsIndex "baseURL"
+
+$changes = @(
+  [pscustomobject]@{ Token = $tokens[$apiKeyIndex]; Value = [string]$Credentials.router_api_key },
+  [pscustomobject]@{ Token = $tokens[$baseUrlIndex]; Value = [string]$Credentials.router_base_url }
+)
+foreach ($change in $changes | Sort-Object { $_.Token.Start } -Descending) {
+  if ($change.Token.Kind -ne "String") { throw "Credential target must be a JSON string" }
+  $replacement = $change.Value | ConvertTo-Json -Compress
+  $configText = $configText.Substring(0, $change.Token.Start) +
+    $replacement + $configText.Substring($change.Token.End)
+}
+Set-Content -LiteralPath $ConfigFile -Value $configText -NoNewline -Encoding UTF8
+Write-Output "[ok] Restored 9router config"
+
+[ordered]@{
+  apiKey = [string]$Credentials.supermemory_api_key
+  baseUrl = [string]$Credentials.supermemory_base_url
+} | ConvertTo-Json | Set-Content -LiteralPath $SupermemoryFile -Encoding UTF8
+Write-Output "[ok] Restored Supermemory config"
+
+$openrouterKey = [string]$Credentials.openrouter_api_key
+if (-not [string]::IsNullOrWhiteSpace($openrouterKey)) {
+  New-Item -ItemType Directory -Path (Split-Path $AuthFile) -Force | Out-Null
+  $auth = if (Test-Path -LiteralPath $AuthFile) {
+    Get-Content -Raw -LiteralPath $AuthFile | ConvertFrom-Json
+  } else {
+    [pscustomobject]@{}
+  }
+  $openrouter = [pscustomobject]@{ type = "api"; key = $openrouterKey }
+  if ($auth.PSObject.Properties.Name -contains "openrouter") {
+    $auth.openrouter = $openrouter
+  } else {
+    $auth | Add-Member -NotePropertyName "openrouter" -NotePropertyValue $openrouter
+  }
+  $auth | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $AuthFile -Encoding UTF8
+  Write-Output "[ok] Restored OpenRouter auth"
+}
+
+if (-not $SkipUserEnvironment) {
+  [Environment]::SetEnvironmentVariable(
+    "SUPERMEMORY_API_KEY",
+    [string]$Credentials.supermemory_api_key,
+    "User"
+  )
+  [Environment]::SetEnvironmentVariable(
+    "SUPERMEMORY_BASE_URL",
+    [string]$Credentials.supermemory_base_url,
+    "User"
+  )
+  [Environment]::SetEnvironmentVariable(
+    "OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS",
+    "true",
+    "User"
+  )
+}
+
+Write-Output "[ok] Credential restore complete. Restart OpenCode and terminals."

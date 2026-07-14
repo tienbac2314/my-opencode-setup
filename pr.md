@@ -1,95 +1,260 @@
-# OpenCode Plugin Patch Ledger
+# Plugin Fixes and Update Notes
 
-Local patches remain repository-controlled until upstream behavior passes OpenCode `1.17.18` CLI, TUI, Desktop App, combined-plugin, and lifecycle gates.
+Use this document when you need to understand where a plugin came from, what this repository changed, how to update it, or what to include in an upstream pull request. For normal installation, use [setup.md](setup.md). For current problems, use [knownbug.md](knownbug.md).
 
-## Patch Removal Policy
+## Quick Source Map
 
-Remove a patch only when all conditions hold:
+| Component | Where it came from | What we own |
+|---|---|---|
+| `plugins/lazy-load.ts` | [opencode-lazy-loading](https://github.com/omarwaly-ai/opencode-lazy-loading) | Upstream file plus our streaming, DSML, tool-name, and Desktop fixes |
+| `plugins/0-tokens-source.ts` | [OpenCode-tokens-source](https://github.com/omarwaly-ai/OpenCode-tokens-source) | Upstream file; local filename and five-line load guard |
+| `plugins/models-discovery.js` | Made in this repository | Whole file |
+| `plugins/codegraph-helper.ts` | Made in this repository | Whole file |
+| `plugins/rtk.ts` | Generated from [RTK OpenCode hook](https://github.com/rtk-ai/rtk/tree/master/hooks/opencode) | Windows/Desktop checks and OpenCode file-plugin wrapper |
+| `plugins/supermemory.ts` | Small wrapper around [opencode-supermemory](https://github.com/supermemoryai/opencode-supermemory) | Wrapper only; package owns memory behavior |
+| `oh-my-opencode-slim` | [Upstream npm package](https://github.com/alvinunreal/oh-my-opencode-slim) | Version pins, installer cleanup, and 9router preset |
+| `opencode-update-notifier` | [Upstream npm package](https://github.com/tim-hilde/opencode-update-notifier) | Version pin and setup only |
 
-1. Upstream release contains equivalent invariant.
-2. Pinned dependency or copied source is upgraded in one isolated change.
-3. Existing regression suite fails before local patch removal only because behavior is now duplicated, or new upstream-focused regression proves equivalence.
-4. `bun test` passes.
-5. Local plugin bundles pass under active `$HOME\.config\opencode` dependency context.
-6. Effective `plugin_origins` contains each origin once.
-7. CLI, TUI, and Desktop complete exact lazy-loaded shell command.
-8. Affected plugin completes full lifecycle.
+Comparison date: 2026-07-14. Compared upstream commits:
 
-Version publication, clean import, or successful startup alone does not satisfy removal gate.
+| Project | Commit |
+|---|---|
+| opencode-lazy-loading | `11ee1745e34235c90ce3fbe3167a344096afbb83` |
+| OpenCode-tokens-source | `004e35f371a8bf23b22d02c63819fc91e44bc0ef` |
+| opencode-supermemory | `dd7cf6273b1440a55a2e448a166de04db9e334d3` |
+| RTK | `5d32d0736f686b69d1e8b9dc45c007d4eb77a0a2` |
 
-## lazy-load
+## Before Removing Any Local Fix
 
-**Component:** repository `plugins/lazy-load.ts`; upstream origin `omarwaly-ai/opencode-lazy-loading`.
+Do not remove a fix only because upstream published a new version. First prove all of these:
 
-**Failure:** broken tip `c286bb8` routed every event containing `choices[0].delta` through DSML branch, returned before standard `delta.tool_calls` handling, and dropped empty finish deltas. Standard streamed tool calls disappeared, finish became unknown, and per-turn loaded state survived. Desktop exposed separate repeated-initialization failure: global plugin guard returned `{}` on later initialization, removing `load_tool` and `tool.definition` while process remained alive.
+1. Upstream now handles the same case.
+2. Only one plugin is updated in the test change.
+3. Local and upstream files are compared before copying.
+4. `rtk bun test` passes.
+5. Changed local plugins bundle under `$HOME\.config\opencode`.
+6. Resolved `plugin` and `plugin_origins` both contain the expected eight entries once each.
+7. CLI, TUI, and Desktop complete a real `load_tool` shell call.
+8. The changed plugin completes its own tests below.
 
-**Required invariants:**
+Successful import or startup is not enough.
 
-- Standard JSON tool calls survive split name/argument chunks.
-- DSML conversion touches text deltas only.
-- Ordinary `content` and `reasoning_content` survive semantically outside DSML markup.
-- Direct unloaded built-in call rewrites to `load_tool`.
-- Tool loaded earlier in same turn executes directly.
-- MCP definitions enter same gateway; unloaded direct MCP calls rewrite to `load_tool`, then loaded same-turn calls pass.
-- Finish event and `[DONE]` survive.
-- `finish_reason: "stop"` clears session turn state.
-- Every plugin initialization returns tool and hook; only `fetch` wrapping is idempotent.
+## Lazy Loading
 
-**Structural patch:** classify text, tool-call, and finish data independently. Do not return from DSML processing before standard tool-call handling. Buffer tool calls by index until arguments form valid JSON. Remove global plugin-return guard.
+### Where it came from
 
-```diff
-- if (globalThis.__lazy_load_loaded__) return {}
-- globalThis.__lazy_load_loaded__ = true
-  wrapFetch()
-  return {
-    tool: { load_tool: ... },
-    "tool.definition": ...
-  }
-```
+Current file started from `plugins/opencode-lazy-load.ts` in [omarwaly-ai/opencode-lazy-loading](https://github.com/omarwaly-ai/opencode-lazy-loading).
 
-```ts
-if (delta) {
-  for (const field of ["content", "reasoning_content"] as const) {
-    if (typeof delta[field] === "string" && delta[field].length > 0) {
-      processText(controller, parsed, field, delta[field])
-      delete delta[field]
-      hadText = true
-    }
-  }
-}
+### Already present upstream
 
-const toolCalls = parsed?.choices?.[0]?.delta?.tool_calls
-// Buffer and rewrite standard tool calls here.
+Fresh comparison shows upstream already handles these parts:
 
-const finish = parsed?.choices?.[0]?.finish_reason
-if (finish === "stop") turnLoaded.delete(sessionID)
-```
+- Captures normal built-in schemas from the final request body.
+- Buffers standard streamed tool-call names and JSON arguments across chunks.
+- Keeps finish events and clears loaded tools after `finish_reason: "stop"`.
+- Returns plugin hooks on repeated initialization instead of using a global return guard.
+- Detects MCP entries separately and passes their direct calls through.
 
-`wrapFetch()` retains module-level `_fetchWrapped` guard. This prevents recursive wrappers without suppressing later hook registration.
+Do not open upstream PRs for those items. They remain in our tests because old repository changes once broke them.
 
-**Regression gate:**
+### Our local changes beyond upstream
+
+- Supports OpenCode names such as `opencode_load_tool`, not only exact `load_tool`.
+- Keeps the actual load-tool name used by OpenCode.
+- Moves captured MCP descriptions and schemas into the same on-demand tool map and pointer list as built-in tools.
+- Routes unloaded MCP calls through the loader instead of always passing them through.
+- Converts DeepSeek DSML text blocks into normal tool calls.
+- Handles DSML markers split across stream chunks.
+- Keeps ordinary `content` and `reasoning_content` around DSML blocks.
+- Matches tool names without case mistakes.
+- Exports `createSSETransform` so focused tests can run without a live provider.
+
+Repository history also contains two fixes that current upstream already has: standard stream/finish preservation and repeated Desktop initialization. Keep their tests, but do not present them as missing upstream work.
+
+### Must keep working
+
+- Split standard JSON calls survive.
+- Split DSML calls become normal tool calls.
+- Text and reasoning are not lost.
+- A tool must be loaded before direct use in each new user turn.
+- A loaded tool works through the rest of the same turn.
+- MCP tools follow the same rule.
+- Stop and `[DONE]` events survive.
+- Later Desktop sessions still register `load_tool`.
+
+### How to update
+
+1. Clone or fetch `omarwaly-ai/opencode-lazy-loading` into a temp folder.
+2. Compare its `plugins/opencode-lazy-load.ts` with `plugins/lazy-load.ts`.
+3. Keep every item under **Our local changes beyond upstream** unless new upstream code and tests cover it.
+4. Copy reviewed hunks only. Do not replace the whole file.
+5. Run the focused and live tests below, then `rtk bun test`.
+
+### Tests to run
 
 ```powershell
 rtk bun test tests/lazy-load.test.ts
-```
-
-Expected: 9 pass, 0 fail covering repeated init, standard split call, namespaced call, direct rewrite, finish reset, response-transform passthrough for an uncaptured MCP call, false gateway names, content/reasoning, and split DSML. Live request capture still routes MCP definitions through `load_tool`.
-
-**Live gate:**
-
-```powershell
 rtk opencode run --model 9router/oc/deepseek-v4-flash-free "Use load_tool to load bash, then use bash to run: Write-Output PATCH_LAZY_OK. Return exact command output."
 ```
 
-CLI, TUI, and Desktop must show `load_tool`, shell command, and `PATCH_LAZY_OK`.
+Expected focused result: 9 tests pass. Run the shell marker in CLI, TUI, and Desktop.
 
-## Supermemory Export Adapter
+### Upstream PR plan
 
-**Component:** `opencode-supermemory@2.0.8`; repository `plugins/supermemory.ts`.
+This is the main upstream PR candidate. Check open issues first, then keep each PR reviewable:
 
-**Failure:** package exports `SupermemoryPlugin` by name. OpenCode file discovery expects default plugin object with `id` and `server`. Direct package exposure can initialize differently between TUI and Electron Desktop.
+1. First PR: add OpenCode-prefixed load-tool names, active-name preservation, and case-insensitive tool resolution.
+2. Second PR: move MCP tools into the same on-demand loading path and add request-body tests.
+3. Third PR: add DSML conversion, surrounding text/reasoning preservation, exported transform helper, and split-boundary tests.
 
-**Required invariant:** local file has default `{ id: "opencode-supermemory", server: SupermemoryPlugin }`; credentials remain in ignored `supermemory.jsonc`.
+Do not send the full repository file as one unexplained replacement. Link each change to a failing stream example and its test.
+
+## Token Source
+
+### Where it came from
+
+`plugins/0-tokens-source.ts` comes from `plugins/tokens-source.ts` in [omarwaly-ai/OpenCode-tokens-source](https://github.com/omarwaly-ai/OpenCode-tokens-source).
+
+### Exact current difference
+
+Fresh comparison found only two local differences:
+
+1. Filename has `0-` prefix so it loads before lazy loading.
+2. Plugin function has this five-line guard:
+
+```ts
+if ((globalThis as any).__tokens_source_loaded__) {
+  return {}
+}
+(globalThis as any).__tokens_source_loaded__ = true
+```
+
+Everything else, including final request-body capture and `/tokens` reporting, is already in current upstream.
+
+### Important warning
+
+The filename prefix is local deployment setup and does not belong in an upstream PR. The five-line guard prevents duplicate hook registration, but it may also remove `/tokens` hooks when Desktop initializes the plugin again. Do not propose or remove it until a repeated-initialization test proves which behavior is correct.
+
+### How to update
+
+1. Fetch `omarwaly-ai/OpenCode-tokens-source`.
+2. Compare upstream `plugins/tokens-source.ts` with local `plugins/0-tokens-source.ts`.
+3. Keep local filename `0-tokens-source.ts`; load order depends on it.
+4. Review the five-line guard separately. Never assume it belongs in a new upstream file.
+5. Copy reviewed upstream changes, then run the flow below and `rtk bun test`.
+
+### Tests to run
+
+1. Start one persistent OpenCode process.
+2. Complete one model call.
+3. Run `/tokens` in the same process.
+4. Check non-empty System Prompt, Tools, Messages, and API Actual sections.
+5. Open a second Desktop session in the same process and prove `/tokens` still exists.
+
+### Upstream PR plan
+
+No PR needed for current upstream body-capture logic. A future PR is useful only if a repeated-init test shows upstream needs a safe registration guard. The test must come with the change.
+
+## 9router Model Discovery
+
+### Where it came from
+
+`plugins/models-discovery.js` was made in this repository. Old README history already labels it `custom` and says only this repository maintains it.
+
+### What it does
+
+- Reads models from the 9router OpenAI-compatible endpoint.
+- Registers image input support when provider data is incomplete.
+- Adds six selected `oc/*` free models when missing.
+- Ignores source IDs starting with `opencode/` so OpenCode does not create broken `9router/opencode/*` names.
+
+### Tests to run
+
+```powershell
+$models = @(rtk opencode models 9router)
+@($models | Where-Object { $_ -like '9router/oc/*' }).Count
+@($models | Where-Object { $_ -like '9router/opencode/*' }).Count
+```
+
+Expected: six selected `9router/oc/*` entries and zero `9router/opencode/*` entries. Total model count can change when provider inventory changes.
+
+### How to update
+
+No upstream file exists. Edit `plugins/models-discovery.js` directly, add a focused provider-response test or probe, run the model counts above, and check Desktop model selection. Do not replace it through `update-plugins.ps1`.
+
+### PR plan
+
+No upstream file exists. Keep changes here. If publishing it as its own project later, include endpoint configuration, modality fallback, namespace filtering, and mocked provider tests.
+
+## CodeGraph Helper
+
+### Where it came from
+
+`plugins/codegraph-helper.ts` was made in this repository to connect OpenCode editing hooks with the separately installed [CodeGraph](https://github.com/colbymchenry/codegraph).
+
+### What it does
+
+- Acts only when current workspace has `.codegraph/`.
+- Redirects ordinary grep/glob use to CodeGraph in indexed repositories.
+- Starts index refresh after supported write tools.
+- Keeps missing shell runners and background failures from crashing Desktop.
+- Does nothing in repositories without a CodeGraph index.
+
+### Tests to run
+
+```powershell
+rtk codegraph status .
+rtk codegraph explore "CodeGraphHelperPlugin"
+```
+
+Also test indexed and unindexed folders, one blocked search, one file edit, and a failed background runner.
+
+### How to update
+
+No upstream plugin file exists. Update `plugins/codegraph-helper.ts` only when OpenCode hook names or CodeGraph commands change. Check current OpenCode and CodeGraph docs first, then run indexed and unindexed tests above. `codegraph upgrade` updates the CLI, not this custom helper.
+
+### PR plan
+
+No matching upstream plugin file exists. This could become a new CodeGraph OpenCode integration proposal, not a patch against existing CodeGraph source. Keep OpenCode version assumptions and supported hook names in the proposal.
+
+## RTK OpenCode Plugin
+
+### Where it came from
+
+`plugins/rtk.ts` is based on `hooks/opencode/rtk.ts` generated by [RTK](https://github.com/rtk-ai/rtk). Bootstrap runs RTK setup, then restores this repository copy because the generator can overwrite it.
+
+### What we changed
+
+- Accepts whole plugin input so missing `input.$` can be handled.
+- Returns safely when Desktop does not provide Bun shell `$`.
+- Uses Windows `where rtk` instead of Unix `which rtk`.
+- Sets load guard only after shell and RTK checks pass.
+- Leaves original command unchanged when rewrite fails.
+- Adds default `{ id, server }` export for local file discovery.
+
+### Tests to run
+
+- Initialize once without `$`; result must be `{}` without throwing.
+- Initialize later with valid `$`; hook must register.
+- Rewrite an eligible shell command and compare its result with original command.
+- Compare SHA-256 of repository and active RTK plugin after bootstrap.
+
+### How to update
+
+1. Fetch `rtk-ai/rtk` and compare `hooks/opencode/rtk.ts` with `plugins/rtk.ts`.
+2. Copy useful generator changes without losing Windows `where`, null-shell handling, guard order, or default export.
+3. Run RTK's local checks plus this repository's null-shell and rewrite tests.
+4. Run bootstrap and confirm it restores repository `plugins/rtk.ts` after `rtk init -g --opencode`.
+
+### Upstream PR plan
+
+Useful upstream PR: make generated OpenCode hook work on Windows and Desktop. Include null-shell test, later-valid-init test, cross-platform binary lookup, default export compatibility, and rewrite-failure test.
+
+## Supermemory Wrapper
+
+### Where it came from
+
+`plugins/supermemory.ts` is a small local wrapper around `opencode-supermemory@2.0.8`. Upstream exports `SupermemoryPlugin` as a named function. Our file exports OpenCode file-plugin metadata:
 
 ```ts
 import type { Plugin } from "@opencode-ai/plugin"
@@ -101,7 +266,7 @@ export default {
 }
 ```
 
-**Bundle gate:**
+### Tests to run
 
 ```powershell
 Push-Location "$HOME\.config\opencode"
@@ -109,150 +274,177 @@ rtk bun build plugins/supermemory.ts --outfile "$env:TEMP\opencode-supermemory-v
 Pop-Location
 ```
 
-**Lifecycle gate:** add unique marker, search, profile, list, forget by ID, then prove exact marker absent.
+Then add a unique marker, search it, read profile/list results, forget its exact ID, and prove it is gone.
 
-**Removal gate:** package publishes OpenCode-compatible default object and passes fresh TUI/Desktop discovery plus full self-hosted lifecycle without wrapper.
+### How to update
 
-## Models Discovery Namespace Filter
-
-**Component:** `plugins/models-discovery.js`; provider `9router`.
-
-**Failure:** provider `/models` can return source IDs such as `opencode/deepseek-v4-flash-free`. OpenCode prefixes provider ID, producing invalid `9router/opencode/*` entries and confusing Desktop model selector.
-
-**Required invariant:** exclude source IDs beginning `opencode/` before include/exclude filters and provider namespace construction. Inject exactly six curated `oc/*` free models when absent.
-
-```diff
-  const id = m.id || m.name
-  if (!id) continue
-+ if (id.startsWith('opencode/')) continue
-  if (include && !include.test(id)) continue
-```
-
-**Regression gate:**
+1. Read the target `opencode-supermemory` release and compare its exports with current `src/index.ts`.
+2. Update exact version in `bootstrap.ps1`, `README.md`, `setup.md`, and every current-stack/package-pin/prompt entry in `pr.md` only after review.
+3. Keep `plugins/supermemory.ts` unchanged unless upstream export shape changed.
+4. Install exact target under active config:
 
 ```powershell
-$models = @(rtk opencode models 9router)
-@($models | Where-Object { $_ -like '9router/oc/*' }).Count
-@($models | Where-Object { $_ -like '9router/opencode/*' }).Count
+Push-Location "$HOME\.config\opencode"
+npm install --save-exact "opencode-supermemory@TARGET_VERSION"
+Pop-Location
 ```
 
-Expected: first count 6; second count 0. Total inventory may change with provider.
+5. Bundle wrapper and run full add/search/profile/list/forget/delete proof.
 
-**Removal gate:** upstream/provider guarantees no built-in namespace IDs and Desktop selector proves no double-prefixed entries.
+### Upstream PR plan
 
-## RTK Desktop Shell Guard
+Ask upstream whether it wants an OpenCode local-file default export. Do not change memory API behavior in this wrapper. Remove wrapper only after direct package loading works in both TUI and Desktop and full self-hosted add/search/profile/list/forget flow passes.
 
-**Component:** repository `plugins/rtk.ts`; external RTK binary.
+## OMO Slim Setup
 
-**Failure:** Electron plugin input may omit Bun shell `$`. Calling template shell immediately throws `input.$ is not a function`. Setting global load guard before validation permanently disables later valid initialization.
+### Where it came from
 
-**Required invariant:** validate `input.$`, prove `rtk` exists, then set global guard. Rewrite failures leave original command unchanged.
+`oh-my-opencode-slim` is an upstream npm plugin. Repository does not patch package source.
 
-```ts
-if ((globalThis as any).__rtk_opencode_loaded__) return {}
+### What we changed around it
 
-const $ = input?.$
-if (typeof $ !== "function") return {}
+- Pins exact tested version in global and TUI plugin lists.
+- Runs exact installer version in bootstrap.
+- Restores repository 9router preset after installer runs.
+- Restores tracked TUI config.
+- Uses `scripts/pin-opencode-plugin.ps1` to update only root `plugin` array without touching comments, credentials, nested properties, or other arrays.
 
-try {
-  await $`where rtk`.quiet()
-} catch {
-  return {}
-}
-
-;(globalThis as any).__rtk_opencode_loaded__ = true
-```
-
-**Lifecycle gate:** null-shell initialization returns `{}` without poisoning later load; eligible bash/shell command rewrites; output matches original command semantics.
-
-**Removal gate:** upstream RTK OpenCode generator emits equivalent guard order and preserves original command on rewrite errors in Windows Desktop.
-
-## Bootstrap OMO Slim Pin Preservation
-
-**Component:** `oh-my-opencode-slim@2.1.1`; `bootstrap.ps1`; `scripts/pin-opencode-plugin.ps1`; `tests/bootstrap.test.ts`.
-
-**Failure:** installer rewrites TUI/global plugin entries to unpinned name. Broad string replacement can alter comments, credentials, nested plugin properties, or unrelated arrays. Compact JSONC and quoted comments invalidate line regex approaches.
-
-**Required invariant:** run pinned installer, restore tracked TUI file, then pin only string item in root-object `plugin` array while preserving byte layout elsewhere.
-
-```powershell
-bunx oh-my-opencode-slim@2.1.1 install
-Copy-Item "$RepoDir\config\tui.json" "$ConfigDir\tui.json" -Force
-& "$RepoDir\scripts\pin-opencode-plugin.ps1" `
-  -Path "$ConfigDir\opencode.jsonc" `
-  -Name "oh-my-opencode-slim" `
-  -Version "2.1.1"
-```
-
-Helper tokenizes JSONC strings and structural symbols while skipping line/block comments. Candidate property is accepted only at root container depth 1. Target string is accepted only at plugin array depth 1.
-
-**Regression gate:**
+### Tests to run
 
 ```powershell
 rtk bun test tests/bootstrap.test.ts
 ```
 
-Expected: 5 pass, 0 fail covering installer order, credential/comment preservation, RTK restore order, compact arrays, and nested property isolation.
+Current expected result: 7 bootstrap tests pass. Then check agent, tool, MCP, and command registration and run one bounded child-agent call.
 
-**Removal gate:** installer accepts explicit version without rewriting either active plugin array or repository preset; adversarial JSONC tests remain green after helper removal.
+### How to update
 
-## Bootstrap RTK Restoration
+Example target below is `2.2.0`. Change it only after reading that release:
 
-**Component:** `bootstrap.ps1`; repository `plugins/rtk.ts`.
-
-**Failure:** `rtk init -g --opencode` overwrites audited RTK plugin with generated variant, discarding Desktop guard and fallback semantics.
-
-**Required invariant:** restore repository plugin immediately after initializer.
-
-```powershell
-rtk init -g --opencode
-Copy-Item "$RepoDir\plugins\rtk.ts" "$ConfigDir\plugins\rtk.ts" -Force
-```
-
-**Regression gate:** bootstrap test asserts restore statement appears after initializer; SHA-256 of repository and active `rtk.ts` must match.
-
-**Removal gate:** generated upstream file is byte-equivalent in behavior and passes null-shell/rewrite lifecycle.
-
-## tokens-source Wrapper Ordering
-
-**Component:** repository `plugins/0-tokens-source.ts`.
-
-**Failure:** token source loaded after lazy load becomes outer wrapper and can observe pre-reduction request, reporting tool schemas model never receives. Duplicate global registration recursively wraps fetch.
-
-**Required invariant:** `0-` filename sorts before `lazy-load.ts`; token wrapper is idempotent; request body remains unchanged; tool map refreshes on each LLM request.
-
-```ts
-if (_tsFetchWrapped) return
-_tsFetchWrapped = true
-_tsOriginalFetch = globalThis.fetch
-```
-
-**Lifecycle gate:** complete model call, run `/tokens`, verify system/tool/message sections and actual usage. Tool section after lazy reduction must describe API body rather than all registered tools.
-
-**Removal gate:** upstream exposes deterministic plugin ordering or shared request-observation hook that reports post-transform body in TUI and Desktop.
-
-## CodeGraph Helper Desktop Safety
-
-**Component:** repository `plugins/codegraph-helper.ts`; CodeGraph MCP/CLI.
-
-**Failure history:** older broken commits used unsupported tool names, threw from after-hook, or evaluated unavailable shell runner outside protected path.
-
-**Required invariant:** standard search block applies only when workspace contains `.codegraph/`; background index invocation occurs only after supported write tools and remains inside `try/catch`; no index means inert hooks.
-
-**Lifecycle gate:**
+1. Replace `2.1.1` with target version in runtime pin locations:
+   - `bootstrap.ps1` installer and pin-helper arguments
+   - `config/opencode.jsonc.example`
+   - `config/tui.json`
+   - `tests/bootstrap.test.ts`
+2. Update version statements and commands in `README.md`, `setup.md`, `pr.md`, and `knownbug.md` where present.
+3. Run exact installer, never `@latest`:
 
 ```powershell
-rtk codegraph status .
-rtk codegraph explore "CodeGraphHelperPlugin"
+$Version = "2.2.0"
+bunx "oh-my-opencode-slim@$Version" install --yes
 ```
 
-Test hook with indexed and unindexed directories. Indexed grep/glob is redirected; index/status/explore/query complete; runner failure does not crash Desktop.
+4. Run updated bootstrap so repository preset, TUI config, root plugin pin, and audited RTK file are restored:
 
-**Removal gate:** upstream OpenCode integration supplies equivalent indexed-repository policy and post-write sync behavior.
+```powershell
+.\bootstrap.ps1
+```
 
-## npm Plugin Pinning
+5. Normalize active package exactly:
 
-**Components:**
+```powershell
+Push-Location "$HOME\.config\opencode"
+npm install --save-exact "oh-my-opencode-slim@$Version"
+bun pm ls
+Pop-Location
+```
+
+6. Run bootstrap tests, confirm both resolved plugin counts are eight, open Desktop Plugins three times, and run `ping all agents` plus one bounded child-agent call.
+
+### Upstream issue or PR plan
+
+Useful upstream request: installer should preserve exact version when invoked through an exact package spec and should not rewrite unrelated config. Include before/after JSONC examples. Repository pin helper remains needed until installer behavior is safe for comments, compact arrays, and nested `plugin` fields.
+
+## Update Notifier
+
+Package source is unchanged. Repository pins `opencode-update-notifier@0.3.3` so notification compares installed and published versions correctly.
+
+Tests: initialize read-only, confirm pinned entry is detected, confirm registry check does not modify packages, and confirm malformed/unpinned entries are skipped. No upstream PR is currently needed.
+
+### How to update
+
+1. Read target release in `tim-hilde/opencode-update-notifier`.
+2. Change exact pin in `bootstrap.ps1`, `config/opencode.jsonc.example`, `README.md`, `setup.md`, and every current-stack/package-pin/prompt entry in `pr.md`.
+3. Install exact version with `npm install --save-exact "opencode-update-notifier@TARGET_VERSION"` under `$HOME\.config\opencode`.
+4. Run read-only initialization and prove update check does not modify packages.
+
+## Safe Update Steps for Changed Plugins
+
+Update one component at a time. Never run broad updater first.
+
+1. Start with clean worktree and new branch.
+2. Read this component's source and tests.
+3. Fetch upstream into a temp folder.
+4. Compare old upstream, new upstream, and repository file.
+5. List which local fixes upstream now includes.
+6. Copy only reviewed changes or cherry-pick a small upstream commit.
+7. Keep local fixes still needed.
+8. Run focused test, then full `rtk bun test`.
+9. Deploy through bootstrap only after repository tests pass.
+10. Verify exact package pins, eight plugins, CLI/TUI/Desktop `load_tool`, and affected plugin flow.
+11. Commit only this one update.
+
+Do not use `update-plugins.ps1` for a real update. Its `@latest` and broad `npm update` paths can change several tested pieces at once. `-DryRun -Force` is inventory only.
+
+## Prompt for a Future Update Agent
+
+Copy this prompt into a new coding-agent task and replace only the target plugin and target version/commit:
+
+```text
+Work in C:\Users\bacnt\opencode-dotfiles.
+
+Goal: update TARGET_PLUGIN from its current pinned/source version to TARGET_VERSION_OR_COMMIT without breaking lazy loading, Desktop plugin display, or Supermemory.
+
+Read first:
+- AGENTS.md
+- README.md
+- setup.md
+- pr.md, especially TARGET_PLUGIN
+- knownbug.md
+- docs/debug-journey/README.md
+
+Rules:
+- Use RTK wrapper for shell commands when supported.
+- If .codegraph exists, use codegraph explore before text search.
+- Stop if worktree has unrelated changes that overlap target files.
+- Never print or commit API keys, tokens, passwords, auth.json, supermemory.jsonc, credentials.json, or my-opencode-credentials.ps1.
+- Do not run update-plugins.ps1 as a real update.
+- Update one plugin only. Use exact version or commit, never @latest.
+- Compare current repository file against both old and new upstream source before editing.
+- Keep local fixes that new upstream does not contain.
+- Do not restore Mem0 code. Active memory is opencode-supermemory through plugins/supermemory.ts.
+- Project .opencode/opencode.json must not contain a plugin property.
+- Installers may overwrite config/tui.json, active opencode.jsonc plugin pins, config/oh-my-opencode-slim.json, and active plugins/rtk.ts. Restore repository-controlled copies and exact pins.
+
+Current tested stack:
+- OpenCode 1.17.18
+- @opencode-ai/plugin 1.17.18
+- @ai-sdk/openai-compatible 3.0.7
+- opencode-supermemory 2.0.8
+- opencode-update-notifier 0.3.3
+- oh-my-opencode-slim 2.1.1
+- eight effective plugins: two npm plus six local files
+
+Required work:
+1. State source URL, current version/commit, target version/commit, and exact local differences.
+2. Read upstream changelog and changed source using primary upstream sources.
+3. Add or update a focused regression before changing behavior when possible.
+4. Make smallest required update.
+5. Update exact pins and related docs only when target is a pinned package.
+6. Run focused tests and rtk bun test.
+7. Bundle changed local plugin under C:\Users\bacnt\.config\opencode dependency context.
+8. Verify resolved plugin and plugin_origins counts are both 8 without printing full resolved config.
+9. Verify CLI, TUI, and Desktop load_tool shell markers.
+10. Verify affected plugin lifecycle from pr.md.
+11. If Supermemory is touched, run add/search/profile/list/forget and prove test marker is deleted.
+12. Get an independent diff review, fix important findings, and report exact commands/results.
+
+Do not push. Leave one focused commit ready for review.
+```
+
+## Package Pins
+
+These versions move only through the one-at-a-time process above:
 
 ```text
 @opencode-ai/plugin@1.17.18
@@ -262,47 +454,8 @@ opencode-update-notifier@0.3.3
 oh-my-opencode-slim@2.1.1
 ```
 
-**Failure:** unpinned package resolution changes module shape, plugin hooks, config schema, and installer output without repository review. Update notifier also needs installed version identity.
+After any package update, `bun pm ls` and resolved plugin specs must show exact intended versions.
 
-**Required invariant:** tracked config pins npm plugins. Fresh bootstrap writes exact base dependencies and derives exact versions from pinned root plugin array. Preserved unpinned config can produce `latest` in generated package before later config repair and requires explicit package normalization.
+## Old Mem0 Work
 
-**Gate:** `bun pm ls` under active config must show exact versions; `plugin_origins` must show pinned npm specs. If package list differs, run setup guide's exact `npm install --save-exact` command.
-
-**Removal gate:** none. Pins may move only through reviewed upgrade and full matrix.
-
-## Plugin Updater Pin Erosion
-
-**Component:** `update-plugins.ps1`.
-
-Current updater intentionally skips overwriting patched file plugins but still runs:
-
-```powershell
-bunx oh-my-opencode-slim@latest install --yes
-npm update --save
-```
-
-These operations can erode tested pins or rewrite active config. Treat `-DryRun -Force` as inventory only. After any real updater run, rerun bootstrap, verify package pins and origins, restore repository plugin hashes, and execute full regression/lifecycle matrix.
-
-Patch proposal for future runtime task: make updater consume exact versions from tracked config, restore TUI/root pins through existing JSONC helper, and restore audited RTK file. This documentation task does not change updater behavior.
-
-## Upgrade Verification Matrix
-
-| Change | Minimum required verification |
-|---|---|
-| OpenCode or `@opencode-ai/plugin` | 14 tests, all bundles, effective origins, CLI/TUI/Desktop lazy load, every plugin lifecycle |
-| `opencode-supermemory` | wrapper bundle, TUI/Desktop discovery, add/search/profile/list/forget/delete proof |
-| OMO Slim | bootstrap 5 tests, pinned origins, agent/tool/MCP/command registration, bounded child-agent call |
-| update notifier | pinned origin, read-only initialization, no package mutation |
-| lazy-load upstream sync | 9 focused tests, CLI/TUI/Desktop shell marker, two-turn reset, MCP call |
-| tokens-source upstream sync | combined wrapper order and `/tokens` body proof |
-| models discovery | six curated models, zero double-prefix IDs, Desktop selector |
-| RTK | null-shell initialization, rewrite equivalence, repository-active hash |
-| CodeGraph | indexed/unindexed hook paths, sync, status, explore, query, Desktop non-crash |
-
-## Historical Mem0 Patches
-
-Mem0 fetch interceptor, fallback tools, missing `tool` hook, route translation, Pydantic compatibility, event emulation, and duplicate-guard proposals are archived under `mem0-archive/` and branch `archive/broken-docs-reference`. They are not requirements for current Supermemory runtime.
-
-Do not reapply historical recommendation to add global guard returning `{}` in `lazy-load.ts`; Desktop repeated initialization proved that guard removes `load_tool`. Current idempotency belongs inside `wrapFetch()`, not plugin return path.
-
-Legacy patch evidence and exact SHAs: [knownbug.md#broken-documentation-archive](knownbug.md#broken-documentation-archive).
+Mem0 patches are history only. They are kept under `mem0-archive/` and `archive/broken-docs-reference`. Do not copy them into current runtime. Current memory uses `opencode-supermemory@2.0.8` through `plugins/supermemory.ts`.

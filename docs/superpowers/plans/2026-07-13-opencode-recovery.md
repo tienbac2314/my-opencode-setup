@@ -1,5 +1,7 @@
 # OpenCode Repository Recovery Implementation Plan
 
+This completed plan records recovery work and old checkpoints. Use [setup.md](../../../setup.md) and [pr.md](../../../pr.md) for current commands.
+
 > Execute in order. Each task has independent verification evidence.
 
 **Goal:** Rebuild clean post-`d8fa757a` history with working lazy-loaded tools, preserved Supermemory migration, functioning README plugins, and verified TUI/Desktop/VPS operation.

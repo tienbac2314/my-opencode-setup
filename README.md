@@ -1,6 +1,6 @@
 # OpenCode Dotfiles
 
-Windows OpenCode configuration for 9router models, lazy-loaded tools, multi-agent orchestration, CodeGraph indexing, self-hosted Supermemory, token accounting, model discovery, update notifications, and RTK shell rewriting.
+Use this repository to install, understand, test, and safely update a Windows OpenCode setup with 9router, lazy-loaded tools, multi-agent orchestration, CodeGraph, self-hosted Supermemory, token reporting, model discovery, update notifications, and RTK shell rewriting.
 
 ## Verified Runtime
 
@@ -19,7 +19,7 @@ Windows OpenCode configuration for 9router models, lazy-loaded tools, multi-agen
 | Recovery baseline | `d8fa757af2f97a640610fb00e32d4d811a255fab` |
 | Broken reference tip | `c286bb890666528fbdfed486f1851b1226a075b6` |
 
-Recovery verification completed with 14 Bun tests, local and Supermemory plugin bundles, CLI/TUI/Desktop `load_tool` execution, eight effective plugin origins, six repository-to-runtime plugin hash matches, 52 discovered 9router models, a complete Supermemory add/search/profile/list/forget lifecycle, and Oracle VPS local/public HTTP 200 checks.
+Recovery verification completed with 16 Bun tests, local and Supermemory plugin bundles, CLI/TUI/Desktop `load_tool` execution, eight effective plugin origins, six repository-to-runtime plugin hash matches, 52 discovered 9router models, a complete Supermemory add/search/profile/list/forget lifecycle, and Oracle VPS local/public HTTP 200 checks.
 
 ## Architecture
 
@@ -90,9 +90,9 @@ Bootstrap runs two installers that mutate active files:
 - `bunx oh-my-opencode-slim@2.1.1 install` may rewrite plugin arrays. Bootstrap restores `config/tui.json` and pins only root `plugin` array entry in active `opencode.jsonc` through `scripts/pin-opencode-plugin.ps1`.
 - `rtk init -g --opencode` generates RTK plugin. Bootstrap restores audited `plugins/rtk.ts` afterward.
 
-## Active Plugin Matrix
+## Plugins in This Setup
 
-| Component | Load source | Function | Required local invariant | Lifecycle proof |
+| Component | Load source | What it does | What must keep working | How we tested it |
 |---|---|---|---|---|
 | `oh-my-opencode-slim@2.1.1` | npm plugin | Orchestrator, Librarian, Oracle, Designer, Fixer, Observer, and Councillor agents | Installer result must be re-pinned; repository preset restored | Agent/tool/MCP/command registration plus bounded Fixer `PONG` |
 | `opencode-update-notifier@0.3.3` | npm plugin | Read-only npm update notification | Version remains pinned so installed/published comparison is meaningful | Initialization and registry check without file mutation |
@@ -110,8 +110,8 @@ CodeGraph MCP is configured separately in `opencode.jsonc`; it is not a local pl
 ```text
 opencode-dotfiles/
 ├── README.md                         architecture and documentation index
-├── setup.md                          canonical installation and operations
-├── pr.md                             plugin patch ledger
+├── setup.md                          installation and daily commands
+├── pr.md                             plugin sources, fixes, PR notes, updates
 ├── knownbug.md                       current boundaries and legacy index
 ├── bootstrap.ps1                     idempotent deployment
 ├── update-plugins.ps1                manual updater; read knownbug.md first
@@ -178,15 +178,15 @@ Expected lazy-load trace contains `load_tool`, shell command, and `LAZY_LOAD_OK`
 
 Desktop plugin-status verification is separate from tool execution: resolved `plugin` and `plugin_origins` must both contain eight entries, and the Plugins tab must remain at eight across repeated opens after a full App reload.
 
-Plugin-specific upgrade gates and patch excerpts: [pr.md](pr.md). Current runtime edge cases: [knownbug.md](knownbug.md).
+Plugin sources, our changes, upstream PR notes, and safe update steps: [pr.md](pr.md). Current problems and fixes: [knownbug.md](knownbug.md).
 
-## Documentation Map
+## Which Document to Read
 
 | Document | Use |
 |---|---|
 | [setup.md](setup.md) | Clone, bootstrap, credentials, TUI/App startup, lifecycle tests, remote checks |
-| [pr.md](pr.md) | Local patches required for current plugin stack |
-| [knownbug.md](knownbug.md) | Current operational boundaries and archived commit index |
+| [pr.md](pr.md) | Where plugins came from, what we changed, upstream PR notes, and safe update steps |
+| [knownbug.md](knownbug.md) | Current problems, checks, and fixes |
 | [docs/debug-journey/README.md](docs/debug-journey/README.md) | Chronological failure and recovery evidence |
 | [docs/superpowers/specs/2026-07-13-opencode-recovery-design.md](docs/superpowers/specs/2026-07-13-opencode-recovery-design.md) | Recovery design source |
 | [docs/superpowers/plans/2026-07-13-opencode-recovery.md](docs/superpowers/plans/2026-07-13-opencode-recovery.md) | Recovery execution plan |

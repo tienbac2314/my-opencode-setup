@@ -1,5 +1,7 @@
 # OpenCode Documentation System Design
 
+This historical design explains how the current documentation set was organized. Read [README.md](../../../README.md) to enter the live documentation.
+
 ## Goal
 
 Replace fragmented recovery notes with one zero-context documentation system covering architecture, plugin patch invariants, installation, current defects, legacy evidence, and chronological recovery evidence.

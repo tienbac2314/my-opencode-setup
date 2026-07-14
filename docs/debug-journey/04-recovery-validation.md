@@ -1,5 +1,7 @@
 # Recovery validation
 
+This historical note records the checks that proved the recovered repository worked. For commands that should be run today, use [setup.md](../../setup.md) and [pr.md](../../pr.md).
+
 ## Repository state
 
 Active runtime is rebuilt from stable commit `d8fa757af2f97a640610fb00e32d4d811a255fab`. Broken tip remains reachable through `archive/broken-docs-reference`; it is not an ancestor of active runtime.
@@ -46,7 +48,7 @@ Oracle VPS checks verified `supermemory.service` and `cloudflared.service` activ
 
 Review probes covered split stream boundaries, empty terminal deltas, mixed-case tool names, malformed DSML, unknown tools, duplicate initialization, stale model aliases, updater pin erosion, and absent credentials.
 
-## Final invariants
+## What Must Keep Working
 
 - Standard provider streams are preserved.
 - DSML rewrite occurs only after complete classification.
