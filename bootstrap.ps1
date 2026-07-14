@@ -45,6 +45,9 @@ function Install-OmoSlim {
 
   Copy-Item "$RepoDir\config\tui.json" "$ConfigDir\tui.json" -Force
   & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path "$ConfigDir\tui.json" -Name "oh-my-opencode-slim" -Version $Version
+  if ($versions.OPENCODE_GOAL_PLUGIN_VERSION) {
+    & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path "$ConfigDir\tui.json" -Name "@prevalentware/opencode-goal-plugin" -Version $versions.OPENCODE_GOAL_PLUGIN_VERSION
+  }
   Write-Output "  Restored and pinned TUI plugin config"
 
   $activeConfigPath = "$ConfigDir\opencode.jsonc"
@@ -52,6 +55,9 @@ function Install-OmoSlim {
     throw "Active OpenCode config not found: $activeConfigPath"
   }
   & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $activeConfigPath -Name "oh-my-opencode-slim" -Version $Version
+  if ($versions.OPENCODE_GOAL_PLUGIN_VERSION) {
+    & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $activeConfigPath -Name "@prevalentware/opencode-goal-plugin" -Version $versions.OPENCODE_GOAL_PLUGIN_VERSION
+  }
   Write-Output "  Restored pinned global plugin config"
 
   New-Item -ItemType Directory -Path "$ConfigDir\plugins" -Force | Out-Null
@@ -165,7 +171,7 @@ $dependencies = [ordered]@{
   "@opencode-ai/plugin"       = $versions.OPENCODE_PLUGIN_VERSION
   "@ai-sdk/openai-compatible" = $versions.AI_SDK_OPENAI_COMPATIBLE_VERSION
   "opencode-supermemory"      = $versions.OPENCODE_SUPERMEMORY_VERSION
-  "opencode-goal-plugin"      = $versions.OPENCODE_GOAL_PLUGIN_VERSION
+  "@prevalentware/opencode-goal-plugin" = $versions.OPENCODE_GOAL_PLUGIN_VERSION
 }
 foreach ($plugin in $config.plugin) {
   if ($plugin -is [string] -and $plugin -notmatch '^\./') {
