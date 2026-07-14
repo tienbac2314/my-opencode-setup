@@ -232,7 +232,7 @@ No matching upstream plugin file exists. This could become a new CodeGraph OpenC
 - Accepts whole plugin input so missing `input.$` can be handled.
 - Uses Node child process when Desktop does not provide injected Bun shell `$`, so rewriting still works.
 - Uses Windows `where rtk` instead of Unix `which rtk`.
-- Falls back to `C:\Windows\System32\rtk.exe` because Desktop can omit that directory from child `PATH`.
+- Requires normal user `PATH`; does not probe or depend on `C:\Windows\System32`.
 - Returns rewrite hook on every initialization because Desktop initializes plugins repeatedly.
 - Leaves original command unchanged when rewrite fails.
 - Adds default `{ id, server }` export for local file discovery.
@@ -248,7 +248,7 @@ No matching upstream plugin file exists. This could become a new CodeGraph OpenC
 ### How to update
 
 1. Fetch `rtk-ai/rtk` and compare `hooks/opencode/rtk.ts` with `plugins/rtk.ts`.
-2. Copy useful generator changes without losing Windows lookup/fallback, no-`$` child process, repeated-init hook return, or default export.
+2. Copy useful generator changes without losing Windows PATH lookup, no-`$` child process, repeated-init hook return, or default export.
 3. Run RTK's local checks plus this repository's null-shell and rewrite tests.
 4. Run bootstrap and confirm it restores repository `plugins/rtk.ts` after `rtk init -g --opencode`.
 

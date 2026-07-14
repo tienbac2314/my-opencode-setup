@@ -70,14 +70,31 @@ Official alternative:
 npm install -g @colbymchenry/codegraph
 ```
 
-Install RTK from Windows x64 release at `https://github.com/rtk-ai/rtk/releases`. Extract `rtk.exe` into a directory present in user `PATH`, then verify:
+Install RTK from Windows x64 release at `https://github.com/rtk-ai/rtk/releases`. Extract `rtk.exe` to `$HOME\.local\bin`, add that directory to user `PATH`, install native hook, then verify:
 
 ```powershell
+$bin = "$HOME\.local\bin"
+New-Item -ItemType Directory -Path $bin -Force | Out-Null
+# Copy downloaded rtk.exe into $bin before continuing.
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($userPath -split ";") -notcontains $bin) {
+  [Environment]::SetEnvironmentVariable("Path", "$bin;$userPath", "User")
+}
+$env:Path = "$bin;$env:Path"
 rtk --version
+rg --version
+rtk init -g --auto-patch
+rtk init -g --show
 rtk gain
 ```
 
-Wrong crates.io package may share `rtk` name. Correct binary supports `rtk gain`, `rtk rewrite`, and `rtk init -g --opencode`.
+Restart terminals and Desktop after changing user `PATH`. Do not install `rtk.exe` under `C:\Windows\System32`; plugin uses `PATH` only. Wrong crates.io package may share `rtk` name. Correct binary supports `rtk gain`, `rtk rewrite`, and `rtk init -g --opencode`.
+
+If an older setup left `C:\Windows\System32\rtk.exe`, first confirm `where.exe rtk` lists `$HOME\.local\bin\rtk.exe` first. Then remove old copy from an elevated PowerShell window:
+
+```powershell
+Remove-Item -LiteralPath "C:\Windows\System32\rtk.exe" -Force
+```
 
 VibeShell is optional and required only for Oracle VPS checks. Verify configured server after VibeShell installation and login:
 
@@ -366,7 +383,7 @@ rtk rewrite "git status"
 rtk git status --short
 ```
 
-Expected rewrite produces supported RTK form and output remains equivalent. Desktop often omits injected shell `$` and `C:\Windows\System32` from child `PATH`; audited plugin uses child process and checks system directory directly, so RTK remains active.
+Expected rewrite produces supported RTK form and output remains equivalent. Desktop often omits injected shell `$`; audited plugin uses child process but still resolves `rtk.exe` through user `PATH` only.
 
 ### Update notifier
 

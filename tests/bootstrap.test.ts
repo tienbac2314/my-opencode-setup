@@ -123,15 +123,12 @@ test("OMO update mode changes only OMO files and restores tailored config", () =
   }
 }, 15000)
 
-test("RTK uses Windows system fallback when Desktop PATH omits rtk", async () => {
+test("RTK requires PATH and never probes Windows system directory", async () => {
   delete (globalThis as any).__rtk_opencode_loaded__
   const calls: Array<{ parts: readonly string[]; values: unknown[] }> = []
   const shell = (parts: TemplateStringsArray, ...values: unknown[]) => {
     calls.push({ parts: [...parts], values })
-    const command = parts.join("{}")
-    const promise = command === "where rtk"
-      ? Promise.reject(new Error("not in PATH"))
-      : Promise.resolve({ stdout: command.includes("rewrite") ? "rtk rg pattern" : "rtk 0.23.0" })
+    const promise = Promise.reject(new Error("not in PATH"))
     return Object.assign(promise, {
       quiet() { return this },
       nothrow() { return this },
@@ -139,13 +136,10 @@ test("RTK uses Windows system fallback when Desktop PATH omits rtk", async () =>
   }
 
   const hooks = await RtkOpenCodePlugin({ $: shell } as any) as any
-  const output = { args: { command: "rg pattern" } }
-  await hooks["tool.execute.before"]({ tool: "shell" }, output)
 
-  const fallback = `${process.env.SystemRoot ?? "C:\\Windows"}\\System32\\rtk.exe`
-  expect(calls[1]?.values[0]).toBe(fallback)
-  expect(calls[2]?.values[0]).toBe(fallback)
-  expect(output.args.command).toBe("rtk rg pattern")
+  expect(calls).toHaveLength(1)
+  expect(calls[0]?.parts.join("{}")).toBe("where rtk")
+  expect(hooks).toEqual({})
 })
 
 test("RTK registers in Desktop without an injected Bun shell", async () => {

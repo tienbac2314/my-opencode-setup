@@ -169,13 +169,13 @@ Expected: 0.
 
 **Symptom:** Desktop logs `input.$ is not a function`, logs `rtk binary not found in PATH` even though RTK is installed, RTK stays disabled after later valid load, or rewritten command changes semantics.
 
-**Cause:** generated plugin assumes injected Bun shell `$` exists, trusts Desktop child `PATH`, uses global guard that drops hook on repeated initialization, or replaces command after failed rewrite. Desktop omits `$`, may omit `C:\Windows\System32`, and initializes plugins repeatedly.
+**Cause:** generated plugin assumes injected Bun shell `$` exists, RTK is outside user `PATH`, uses global guard that drops hook on repeated initialization, or replaces command after failed rewrite. Desktop omits `$` and initializes plugins repeatedly.
 
-**Rule:** use injected shell when present and Node child process otherwise; check `PATH`, then Windows system directory; return hook on every initialization. Rewrite exceptions preserve original command.
+**Rule:** install `rtk.exe` under `$HOME\.local\bin`, add directory to user `PATH`, use injected shell when present and Node child process otherwise, and return hook on every initialization. Never probe System32. Rewrite exceptions preserve original command.
 
 **Detection:** Desktop-shaped no-`$` rewrite, injected-shell rewrite, and repeated-init lifecycles; compare repository-active plugin hash.
 
-**Recovery:** rerun bootstrap after `rtk init`; bootstrap restores audited repository file.
+**Recovery:** fix user `PATH`, run `rtk init -g --auto-patch`, rerun bootstrap, then restart Desktop. Bootstrap restores audited repository file after RTK generator runs.
 
 ## Desktop Shows Old Plugin Version After Update
 
