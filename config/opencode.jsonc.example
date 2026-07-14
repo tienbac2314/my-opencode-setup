@@ -19,6 +19,17 @@
         }
       },
       "models": {}
+    },
+    "headroom": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:8787/v1",
+        "apiKey": "YOUR_API_KEY_HERE",
+        "modelsDiscovery": {
+          "enabled": true
+        }
+      },
+      "models": {}
     }
   },
   "model": "opencode/deepseek-v4-flash-free",
