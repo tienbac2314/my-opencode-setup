@@ -42,9 +42,12 @@ Problems:
 
 1. Active sidebar nests conditional fragments inside `<text>`, causing OpenTUI `Orphan text error` and hiding Goal UI.
 2. Sidebar memo does not consume timer signal, so new goal tool parts may not trigger rescan.
-3. Empty state returns no sidebar content, making plugin look unloaded.
+3. TUI only scans loaded chat tool parts, while server-owned Goal state is stored separately.
+4. Persisted server records omit display-only fields expected by the TUI snapshot validator, so strict validation discards valid goals.
 
 Config note: server and TUI configs must use root package spec (`@prevalentware/opencode-goal-plugin@VERSION`). OpenCode resolves `./server` or `./tui` for each host. `/server@VERSION` silently loads no server tools.
+
+Documentation PR: add a short troubleshooting note that OpenCode persists sidebar visibility. Tell users to press `Ctrl+X`, then `B`, use a top-level session in a terminal wider than 120 columns for automatic display, and open the built-in `Plugins` command to confirm `local.goal-mode.tui` is active. A fresh plugin install can still inherit hidden sidebar state, so reinstalling is not a reliable UI test.
 
 Minimal PR:
 
@@ -55,7 +58,7 @@ Minimal PR:
  })
 ```
 
-Render optional active details as one valid text value, then add visible `Goal / No active goal` fallback. Test empty and active frames plus delayed tool-part rescan. Local exact patch demonstrates change.
+Render optional active details as one valid text value. Poll or subscribe to the server-owned state, normalize persisted records before validation, request a host rerender, and show the Goal block only while a non-closed Goal exists. Test tool-backed active, persisted active, empty, and cleared states. Local exact patch demonstrates the change.
 
 ## `Weizhena/Deep-Research-skills`
 

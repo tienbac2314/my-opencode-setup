@@ -79,4 +79,4 @@ pwsh ./maintain.ps1 verify
 - full Bun test suite.
 - production dependency audit at high severity or above when online.
 
-Live checks still matter for provider traffic, Goal sidebar, App rendering, agent orchestration, and Supermemory CRUD.
+Live checks still matter for provider traffic, Goal sidebar, App rendering, agent orchestration, and Supermemory CRUD. OpenCode remembers sidebar visibility globally; press `Ctrl+X`, then `B` before treating a missing Goal block as a plugin failure.

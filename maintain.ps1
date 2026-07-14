@@ -276,7 +276,9 @@ function Apply-Components($ManifestValue) {
   $omo = $pending | Where-Object id -eq "omo-slim"
   if ($omo -and $PSCmdlet.ShouldProcess($omo.package, "run exact OMO installer and restore tailored files")) {
     $originalPath = $env:PATH
+    $originalConfigDir = $env:OPENCODE_CONFIG_DIR
     try {
+      $env:OPENCODE_CONFIG_DIR = $ConfigDir
       if ($IsWindows) {
         $bunShim = Get-Command bun -ErrorAction SilentlyContinue
         if ($bunShim) {
@@ -290,6 +292,7 @@ function Apply-Components($ManifestValue) {
       if ($LASTEXITCODE -ne 0) { throw "OMO installer failed" }
     } finally {
       $env:PATH = $originalPath
+      $env:OPENCODE_CONFIG_DIR = $originalConfigDir
     }
     Copy-Item "$RepoDir\config\oh-my-opencode-slim.json" "$ConfigDir\oh-my-opencode-slim.json" -Force
     Copy-Item "$RepoDir\config\tui.json" "$ConfigDir\tui.json" -Force
@@ -316,6 +319,12 @@ function Verify-State($ManifestValue) {
   $failures = [Collections.Generic.List[string]]::new()
   $packageFile = Join-Path $ConfigDir "package.json"
   $package = if (Test-Path -LiteralPath $packageFile) { Get-Content -LiteralPath $packageFile -Raw | ConvertFrom-Json } else { $null }
+  $expectedTui = @(
+    $omo = $ManifestValue.components | Where-Object id -eq "omo-slim"
+    if ($omo) { "oh-my-opencode-slim@$($omo.target)" }
+    $goal = $ManifestValue.components | Where-Object id -eq "goal"
+    if ($goal) { "@prevalentware/opencode-goal-plugin@$($goal.target)" }
+  )
 
   foreach ($retired in @($ManifestValue.retired.npmLocal)) {
     if ($package.dependencies.PSObject.Properties.Name -contains $retired) { $failures.Add("retired package still installed: $retired") }
@@ -324,6 +333,21 @@ function Verify-State($ManifestValue) {
   foreach ($item in $ManifestValue.components | Where-Object kind -in "npm-local", "omo") {
     $actual = $package.dependencies.($item.package)
     if ($actual -ne $item.target) { $failures.Add("$($item.id): package.json has '$actual', expected '$($item.target)'") }
+  }
+  $tuiPath = Join-Path $ConfigDir "tui.json"
+  if ($expectedTui.Count -and -not (Test-Path -LiteralPath $tuiPath)) {
+    $failures.Add("active tui.json is missing")
+  } elseif ($expectedTui.Count) {
+    try {
+      $tui = Get-Content -LiteralPath $tuiPath -Raw | ConvertFrom-Json
+      $actualTui = @($tui.plugin)
+      foreach ($spec in $expectedTui) {
+        if ($spec -notin $actualTui) { $failures.Add("active tui.json is missing exact plugin pin: $spec") }
+      }
+      if ($actualTui.Count -ne $expectedTui.Count) {
+        $failures.Add("active tui.json has $($actualTui.Count) plugins, expected $($expectedTui.Count)")
+      }
+    } catch { $failures.Add("active tui.json is invalid: $($_.Exception.Message)") }
   }
   foreach ($item in $ManifestValue.components | Where-Object localFile) {
     $source = Join-Path $RepoDir $item.localFile
@@ -341,6 +365,9 @@ function Verify-State($ManifestValue) {
     $cfg = $resolved | ConvertFrom-Json
     if ($cfg.plugin.Count -ne $ManifestValue.expectedServerPlugins) { $failures.Add("resolved plugin count is $($cfg.plugin.Count), expected $($ManifestValue.expectedServerPlugins)") }
     if ($cfg.plugin_origins.Count -ne $ManifestValue.expectedServerPlugins) { $failures.Add("plugin origin count is $($cfg.plugin_origins.Count), expected $($ManifestValue.expectedServerPlugins)") }
+    foreach ($spec in $expectedTui) {
+      if ($spec -notin @($cfg.plugin)) { $failures.Add("resolved server config is missing exact plugin pin: $spec") }
+    }
   } else { $failures.Add("opencode debug config failed") }
 
   if (-not $SkipTests) {

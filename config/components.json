@@ -12,7 +12,7 @@
       "name": "OpenCode",
       "kind": "npm-global",
       "package": "opencode-ai",
-      "target": "1.17.20",
+      "target": "1.18.0",
       "command": "opencode",
       "repository": "https://github.com/anomalyco/opencode",
       "verify": "opencode --version"
@@ -22,7 +22,7 @@
       "name": "OpenCode plugin SDK",
       "kind": "npm-local",
       "package": "@opencode-ai/plugin",
-      "target": "1.17.20",
+      "target": "1.18.0",
       "repository": "https://github.com/anomalyco/opencode",
       "verify": "npm ls @opencode-ai/plugin --depth=0"
     },

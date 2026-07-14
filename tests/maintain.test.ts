@@ -81,6 +81,8 @@ test("setup and maintainer use cross-platform config and temp paths", () => {
   expect(setup.lastIndexOf("Copy-UniqueSkills")).toBeGreaterThan(setup.indexOf("& pwsh @apply"))
   expect(maintain).toContain('node_modules\\bun\\bin\\bun.exe')
   expect(maintain).toContain('$env:PATH = $originalPath')
+  expect(maintain).toContain('$env:OPENCODE_CONFIG_DIR = $ConfigDir')
+  expect(maintain).toContain('$env:OPENCODE_CONFIG_DIR = $originalConfigDir')
 })
 
 test("offline check is read-only and reports approved target", () => {
@@ -201,6 +203,46 @@ test("apply skips an already-current npm target", () => {
   }
 })
 
+test("OMO installer honors custom OpenCode config directory", () => {
+  const root = mkdtempSync(join(tmpdir(), "opencode-omo-config-"))
+  const configDir = join(root, "config")
+  const cacheDir = join(root, "cache")
+  const bin = join(root, "bin")
+  const log = join(root, "commands.log")
+  const manifest = join(root, "components.json")
+  try {
+    mkdirSync(configDir)
+    mkdirSync(cacheDir)
+    mkdirSync(bin)
+    writeFileSync(join(configDir, "package.json"), JSON.stringify({ dependencies: {
+      "oh-my-opencode-slim": "2.2.0",
+      "@prevalentware/opencode-goal-plugin": "0.1.24",
+    } }))
+    writeFileSync(join(configDir, "opencode.jsonc"), '{ "plugin": [] }')
+    writeFileSync(join(configDir, "tui.json"), '{ "plugin": [] }')
+    writeFileSync(manifest, JSON.stringify({
+      schemaVersion: 1,
+      expectedServerPlugins: 2,
+      retired: { npmLocal: [], pluginSpecs: [] },
+      components: [
+        { id: "omo-slim", kind: "omo", package: "oh-my-opencode-slim", target: "2.2.1" },
+        { id: "goal", kind: "npm-local", package: "@prevalentware/opencode-goal-plugin", target: "0.1.24" },
+      ],
+    }))
+    writeFileSync(join(bin, "npm.cmd"), `@echo npm %*>>"${log}"\r\n@exit /b 0\r\n`)
+    writeFileSync(join(bin, "bun.cmd"), "@exit /b 0\r\n")
+    writeFileSync(join(bin, "bunx.cmd"), `@echo bunx config=%OPENCODE_CONFIG_DIR% %*>>"${log}"\r\n@exit /b 0\r\n`)
+    const result = Bun.spawnSync([
+      "pwsh", "-NoProfile", "-File", maintainer, "apply", "-Component", "omo-slim",
+      "-Manifest", manifest, "-ConfigDir", configDir, "-CacheDir", cacheDir,
+    ], { env: { ...process.env, Path: `${bin};${process.env.Path}`, OPENCODE_CONFIG_DIR: "sentinel" } })
+    expect(result.exitCode).toBe(0)
+    expect(readFileSync(log, "utf8")).toContain(`bunx config=${configDir} oh-my-opencode-slim@2.2.1 install --yes`)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test("Headroom installer reads commit from component manifest", () => {
   const source = readFileSync(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url), "utf8")
   expect(source).toContain("components.json")
@@ -208,24 +250,66 @@ test("Headroom installer reads commit from component manifest", () => {
   expect(source).not.toContain("versions.env")
 })
 
-test("Goal package patch keeps sidebar reactive and visible when empty", () => {
+test("Goal package patch keeps active sidebar reactive and hides inactive state", () => {
   const patch = readFileSync(new URL("../patches/opencode-goal-plugin-0.1.24.patch", import.meta.url), "utf8")
   const manifest = repositoryManifest.components.find((item: any) => item.id === "goal")
   expect(manifest.patch).toBe("patches/opencode-goal-plugin-0.1.24.patch")
   expect(manifest.tuiCache).toBe(true)
   expect(patch).toContain("+    nowSeconds()")
-  expect(patch).toContain("No active goal")
+  expect(patch).toContain("persistedGoals")
+  expect(patch).toContain("● Goal active")
+  expect(patch).not.toContain("No active goal")
   expect(patch).toContain("const details = createMemo")
   expect(patch).toContain("-                <Show when={value().tokenBudget}")
   expect(patch).toContain("+              <text fg={theme().textMuted}>{details()}</text>")
 })
 
-test("Goal TUI verifier covers cached empty and active sidebar states", () => {
+test("Goal TUI verifier covers tool, file, and inactive sidebar states", () => {
   const source = readFileSync(new URL("../scripts/verify-goal-tui.ts", import.meta.url), "utf8")
-  expect(source).toContain("No active goal")
-  expect(source).toContain("Status: active")
+  expect(source).toContain("file-active")
+  expect(source).toContain("file-cleared")
+  expect(source).toContain("inactive Goal state should be absent")
   expect(source).toContain("testRender")
   expect(source).toContain("opencode-goal-plugin@0.1.24")
+})
+
+test("verification checks exact active TUI plugin pins", () => {
+  const root = mkdtempSync(join(tmpdir(), "opencode-tui-drift-"))
+  const configDir = join(root, "config")
+  const cacheDir = join(root, "cache")
+  const bin = join(root, "bin")
+  const manifest = join(root, "components.json")
+  try {
+    mkdirSync(configDir)
+    mkdirSync(cacheDir)
+    mkdirSync(bin)
+    writeFileSync(join(configDir, "package.json"), JSON.stringify({ dependencies: {
+      "oh-my-opencode-slim": "2.2.1",
+      "@prevalentware/opencode-goal-plugin": "0.1.24",
+    } }))
+    writeFileSync(join(configDir, "tui.json"), JSON.stringify({ plugin: [
+      "@prevalentware/opencode-goal-plugin@0.1.24",
+      "oh-my-opencode-slim",
+    ] }))
+    writeFileSync(manifest, JSON.stringify({
+      schemaVersion: 1,
+      expectedServerPlugins: 2,
+      retired: { npmLocal: [] },
+      components: [
+        { id: "omo-slim", kind: "omo", package: "oh-my-opencode-slim", target: "2.2.1" },
+        { id: "goal", kind: "npm-local", package: "@prevalentware/opencode-goal-plugin", target: "0.1.24" },
+      ],
+    }))
+    writeFileSync(join(bin, "opencode.cmd"), '@echo {"plugin":["oh-my-opencode-slim@2.2.1","@prevalentware/opencode-goal-plugin@0.1.24"],"plugin_origins":[{},{}]}\r\n')
+    const result = Bun.spawnSync([
+      "pwsh", "-NoProfile", "-File", maintainer, "verify", "-Offline", "-SkipTests",
+      "-Manifest", manifest, "-ConfigDir", configDir, "-CacheDir", cacheDir,
+    ], { env: { ...process.env, Path: `${bin};${process.env.Path}` } })
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stderr.toString()).toContain("active tui.json is missing exact plugin pin: oh-my-opencode-slim@2.2.1")
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test("Supermemory self-host patch skips cloud settings endpoint", () => {
@@ -257,8 +341,8 @@ test("setup converges isolated config without machine integration", () => {
     expect(existsSync(join(configDir, "plugins", "lazy-load.ts"))).toBe(true)
     expect(existsSync(join(configDir, "commands", "goal.md"))).toBe(true)
     const commands = readFileSync(log, "utf8")
-    expect(commands).toContain("opencode-ai@1.17.20")
-    expect(commands).toContain("@opencode-ai/plugin@1.17.20")
+    expect(commands).toContain("opencode-ai@1.18.0")
+    expect(commands).toContain("@opencode-ai/plugin@1.18.0")
     expect(commands).not.toContain("headroom-ai")
   } finally {
     rmSync(root, { recursive: true, force: true })

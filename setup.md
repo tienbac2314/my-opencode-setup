@@ -69,7 +69,7 @@ Expected: manifest-approved packages, configured plugin count equal to manifest,
 Live smoke tests:
 
 1. Start TUI and App. Open status/plugin panels.
-2. Run `/goal <disposable objective>`, confirm Goal sidebar appears, then clear goal.
+2. Open a top-level session in a terminal wider than 120 columns. If the sidebar is hidden, press `Ctrl+X`, then `B`. Open `Plugins` from the command palette and confirm `local.goal-mode.tui` is active. Run `/goal <disposable objective>`, confirm the Goal block updates, then clear the goal.
    Deterministic renderer check: `bun ./scripts/verify-goal-tui.ts "$HOME/.cache/opencode"`.
 3. Run `/tokens` after model request.
 4. Run `ping all agents` and one bounded child-agent task.

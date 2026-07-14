@@ -44,13 +44,18 @@ Do not restore the deleted local Goal wrapper. Root package loading now exposes 
 
 ### Goal sidebar
 
-Three upstream TUI problems existed:
+Four upstream TUI problems existed:
 
 - active details nested conditional fragments inside `<text>`, causing OpenTUI `Orphan text error`;
 - state memo did not consume the timer signal, so delayed goal parts were not rescanned;
-- empty state rendered nothing, making the plugin look unloaded.
+- TUI only scanned loaded chat tool parts, while server-owned Goal state lives in its persisted state file;
+- persisted server records omit two display-only fields required by the TUI snapshot validator.
 
-`patches/opencode-goal-plugin-0.1.24.patch` fixes all three in both config and cached TUI package copies. `scripts/verify-goal-tui.ts` renders real empty and active frames. A narrow PTY can hide all sidebars by responsive design; that is not a plugin failure.
+`patches/opencode-goal-plugin-0.1.24.patch` fixes these in both config and cached TUI package copies. It polls and normalizes server-owned state, requests a host rerender, and shows a clear active block. Inactive Goal state renders nothing. `scripts/verify-goal-tui.ts` covers tool-backed active, file-backed active, empty, and cleared states.
+
+OpenCode also persists sidebar visibility. A bare config still reuses that host state, so reinstalling the plugin does not make a hidden sidebar reappear. In a wide terminal, press `Ctrl+X`, then `B`. The built-in `Plugins` command distinguishes host state from plugin failure: `local.goal-mode.tui` must be active. A narrow terminal can hide all sidebars by responsive design.
+
+Live OpenCode proof showed `local.goal-mode.tui` and `oh-my-opencode-slim:tui` active together. OMO does not overwrite Goal; OpenCode appends both sidebar slots. `willytop8/OpenCode-goal-plugin` 0.6.5 has server exports only and no TUI export, so replacing Prevalent Goal with Willy would remove sidebar support rather than fix it.
 
 ### Supermemory self-hosting
 
@@ -61,6 +66,8 @@ The package made an unawaited cloud `settings.update()` call even with a custom 
 ### OMO Slim and skills
 
 On Windows, OMO's Node installer could resolve `bun.cmd` but could not spawn `bun`, so cache warm-up was skipped. Maintainer now prepends the real Bun executable directory only while the installer runs.
+
+The OMO installer defaults to the normal global OpenCode directory. Maintainer now points it at the requested `-ConfigDir` only while the installer runs, then restores the previous environment. This matters during first install, version changes, recovery, or custom-config checks. Normal maintenance skips the installer when the approved OMO version is already installed.
 
 OMO also copied skills already visible under `~/.agents` or `~/.claude`. Setup now removes active-config duplicates after OMO runs. It deliberately does not delete user-owned duplicates between `~/.agents` and `~/.claude`.
 
@@ -87,7 +94,7 @@ RTK uses `~/.local/bin`, supports Desktop-shaped hook input without an injected 
 
 ## Final evidence gathered
 
-- `pwsh ./maintain.ps1 verify`: 63 tests, 0 failures; exact targets, local hashes, package patches, and 8 plugin origins verified.
+- `pwsh ./maintain.ps1 verify`: 65 tests, 0 failures; exact targets, local hashes, package patches, and 8 plugin origins verified.
 - `opencode debug config`: 8 plugins, 8 origins, root Goal package, `/goal`, and `/tokens`.
 - Goal: create/get/update/clear lifecycle passed; empty and active sidebar frames passed.
 - Lazy loading: live `load_tool` then Bash execution passed.
@@ -98,7 +105,7 @@ RTK uses `~/.local/bin`, supports Desktop-shaped hook input without an injected 
 - CodeGraph: indexed exploration and unindexed startup passed.
 - Deep Research skill loaded; strategy modules remain hidden from agent autocomplete.
 - App: local web UI returned HTTP 200 and rendered through headless Chrome without plugin/server errors.
-- TUI: live startup/exit passed; Goal renderer is authoritative for sidebar content.
+- TUI: live plugin manager showed Goal and OMO active together. Deterministic rendering covers active state from both tool output and the persisted server state; empty and cleared states stay hidden.
 - Oracle VPS: both service hosts were reachable; unauthenticated 9router returned expected 401. Authenticated Supermemory CRUD was proven locally.
 - Production npm audit: 0 high, 0 critical. Remaining findings were transitive low/moderate packages with no safe forced fix.
 - Repository secret scan found placeholders/constants only. Private credential values stay outside Git.
