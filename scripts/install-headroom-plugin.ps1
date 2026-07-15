@@ -1,6 +1,21 @@
+<#
+.SYNOPSIS
+  Build the pinned native Headroom OpenCode transport plugin.
+
+.DESCRIPTION
+  Fetches the approved Headroom source commit, installs its Bun dependencies, and
+  builds the OpenCode entry under the user cache. On Windows, install Visual Studio
+  Build Tools with the C++ workload and Windows SDK before installing headroom-ai[all].
+
+.EXAMPLE
+  pwsh ./scripts/install-headroom-plugin.ps1
+
+.EXAMPLE
+  pwsh ./scripts/install-headroom-plugin.ps1 -Commit a0699794660132313446e8c52c588d6ead05af21
+#>
 param(
-  [string]$VersionsFile = "$HOME\.config\opencode\versions.env",
-  [string]$CacheDir = "$HOME\.cache\opencode-headroom",
+  [string]$Commit,
+  [string]$CacheDir = [IO.Path]::Combine($HOME, ".cache", "opencode-headroom"),
   [string]$Repository = "https://github.com/headroomlabs-ai/headroom.git"
 )
 
@@ -12,9 +27,13 @@ foreach ($command in @("git", "bun")) {
   }
 }
 
-$versions = & "$PSScriptRoot\read-versions.ps1" -Path $VersionsFile | ConvertFrom-Json
+if (-not $Commit) {
+  $manifest = Get-Content ([IO.Path]::Combine($PSScriptRoot, "..", "config", "components.json")) -Raw | ConvertFrom-Json
+  $Commit = ($manifest.components | Where-Object id -eq "headroom-source").target
+}
+if ($Commit -notmatch '^[0-9a-fA-F]{40}$') { throw "Commit must be a full 40-character Git SHA" }
 $source = Join-Path $CacheDir "source"
-$entry = Join-Path $source "plugins\opencode\dist\entry.opencode.js"
+$entry = [IO.Path]::Combine($source, "plugins", "opencode", "dist", "entry.opencode.js")
 
 New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null
 if (-not (Test-Path -LiteralPath (Join-Path $source ".git"))) {
@@ -22,12 +41,12 @@ if (-not (Test-Path -LiteralPath (Join-Path $source ".git"))) {
   if ($LASTEXITCODE -ne 0) { throw "Failed to clone Headroom source" }
 }
 
-& git -C $source fetch origin $versions.HEADROOM_GIT_COMMIT --depth 1
+& git -C $source fetch origin $Commit --depth 1
 if ($LASTEXITCODE -ne 0) { throw "Failed to fetch pinned Headroom commit" }
-& git -C $source checkout --detach $versions.HEADROOM_GIT_COMMIT
+& git -C $source checkout --detach $Commit
 if ($LASTEXITCODE -ne 0) { throw "Failed to check out pinned Headroom commit" }
 
-Push-Location (Join-Path $source "plugins\opencode")
+Push-Location ([IO.Path]::Combine($source, "plugins", "opencode"))
 try {
   & bun install --frozen-lockfile
   if ($LASTEXITCODE -ne 0) {

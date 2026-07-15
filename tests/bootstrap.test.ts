@@ -5,27 +5,14 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { RtkOpenCodePlugin } from "../plugins/rtk"
 
-const script = readFileSync(new URL("../bootstrap.ps1", import.meta.url), "utf8")
+const setupScript = readFileSync(new URL("../setup.ps1", import.meta.url), "utf8")
+const maintainerScript = readFileSync(new URL("../maintain.ps1", import.meta.url), "utf8")
 const pinPluginScript = fileURLToPath(new URL("../scripts/pin-opencode-plugin.ps1", import.meta.url))
 const setCredentialsScript = fileURLToPath(new URL("../scripts/set-credentials.ps1", import.meta.url))
-const readVersionsScript = fileURLToPath(new URL("../scripts/read-versions.ps1", import.meta.url))
+const removeLegacyGoalScript = fileURLToPath(new URL("../scripts/remove-legacy-goal-command.ps1", import.meta.url))
 const installHeadroomScript = fileURLToPath(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))
-const bootstrapScript = fileURLToPath(new URL("../bootstrap.ps1", import.meta.url))
-const updaterScript = readFileSync(new URL("../update-plugins.ps1", import.meta.url), "utf8")
 const projectConfig = JSON.parse(readFileSync(new URL("../.opencode/opencode.json", import.meta.url), "utf8"))
-const globalConfig = JSON.parse(readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8"))
-const goalAdapter = readFileSync(new URL("../plugins/goal.ts", import.meta.url), "utf8")
-
-const versionFileBody = `
-# machine-local tested versions
-OPENCODE_VERSION=1.17.18
-OPENCODE_PLUGIN_VERSION=1.17.18
-AI_SDK_OPENAI_COMPATIBLE_VERSION=3.0.7
-OPENCODE_SUPERMEMORY_VERSION=2.0.8
-OPENCODE_UPDATE_NOTIFIER_VERSION=0.3.3
-OH_MY_OPENCODE_SLIM_VERSION=9.8.7
-HEADROOM_GIT_COMMIT=4e30dde2aca801c6dbdcdc78412132805c496bb4
-`
+const globalConfig = JSON.parse(readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""))
 
 test("project config does not override global plugins", () => {
   expect(projectConfig).not.toHaveProperty("plugin")
@@ -37,133 +24,72 @@ test("Headroom stays launcher-only", () => {
   expect(globalConfig.mcp?.headroom).toBeUndefined()
 })
 
-test("goal plugin uses local server adapter and owns its command", () => {
-  expect(goalAdapter).toContain('config.command?.goal?.template === "$ARGUMENTS"')
-  expect(globalConfig.plugin ?? []).not.toContain("@prevalentware/opencode-goal-plugin/server@0.1.24")
+test("goal plugin is commented out while its OpenCode integration is broken", () => {
+  expect(globalConfig.plugin ?? []).not.toContain("@prevalentware/opencode-goal-plugin@0.1.24")
+  expect(setupScript).toContain("-not $_.disabled")
+  expect(globalConfig.plugin.some((item: string) => item.includes("/server@"))).toBe(false)
   expect(globalConfig.command?.goal).toBeUndefined()
 })
 
-describe("private version file", () => {
-  test("parses comments, blank lines, and every required version", () => {
-    const directory = mkdtempSync(join(tmpdir(), "opencode-versions-"))
-    const versionsPath = join(directory, "versions.env")
+test("setup delegates approved installs to the manifest maintainer", () => {
+  expect(setupScript).toContain('config\\components.json')
+  expect(setupScript).toContain('maintain.ps1", "apply"')
+  expect(setupScript).toContain('maintain.ps1" verify')
+  expect(setupScript).not.toContain("raw.githubusercontent.com")
+  expect(setupScript).not.toContain("@latest")
+  expect(setupScript).toContain('Copy-Tree "$RepoDir\\commands"')
+})
 
-    try {
-      writeFileSync(versionsPath, versionFileBody)
-      const result = Bun.spawnSync([
-        "rtk", "proxy", "pwsh", "-NoProfile", "-File", readVersionsScript,
-        "-Path", versionsPath,
-      ])
+test("goal and token commands are tracked locally", () => {
+  const goal = readFileSync(new URL("../commands/goal.md", import.meta.url), "utf8")
+  const tokens = readFileSync(new URL("../commands/tokens.md", import.meta.url), "utf8")
+  expect(goal).toContain("$ARGUMENTS")
+  expect(goal).toContain("create_goal")
+  expect(tokens).toContain("/tokens")
+})
 
-      expect(result.exitCode).toBe(0)
-      const versions = JSON.parse(result.stdout.toString())
-      expect(versions.OPENCODE_VERSION).toBe("1.17.18")
-      expect(versions.OPENCODE_PLUGIN_VERSION).toBe("1.17.18")
-      expect(versions.AI_SDK_OPENAI_COMPATIBLE_VERSION).toBe("3.0.7")
-      expect(versions.OPENCODE_SUPERMEMORY_VERSION).toBe("2.0.8")
-      expect(versions.OPENCODE_UPDATE_NOTIFIER_VERSION).toBe("0.3.3")
-      expect(versions.OH_MY_OPENCODE_SLIM_VERSION).toBe("9.8.7")
-      expect(versions.HEADROOM_GIT_COMMIT).toBe("4e30dde2aca801c6dbdcdc78412132805c496bb4")
-    } finally {
-      rmSync(directory, { recursive: true, force: true })
-    }
-  }, 15000)
+test("maintainer removes retired local adapters during deployment", () => {
+  expect(maintainerScript).toContain('"goal.ts"')
+  expect(maintainerScript).toContain("Remove-Item")
+})
 
-  test("rejects a file with a missing required version", () => {
-    const directory = mkdtempSync(join(tmpdir(), "opencode-versions-"))
-    const versionsPath = join(directory, "versions.env")
-
-    try {
-      writeFileSync(versionsPath, "OPENCODE_VERSION=1.17.18\n")
-      const result = Bun.spawnSync([
-        "rtk", "proxy", "pwsh", "-NoProfile", "-File", readVersionsScript,
-        "-Path", versionsPath,
-      ])
-
-      expect(result.exitCode).not.toBe(0)
-      expect(result.stderr.toString()).toContain("Missing required version key")
-    } finally {
-      rmSync(directory, { recursive: true, force: true })
-    }
-  }, 15000)
-
-  test("rejects a mutable or abbreviated Headroom ref", () => {
-    const directory = mkdtempSync(join(tmpdir(), "opencode-versions-"))
-    const versionsPath = join(directory, "versions.env")
-
-    try {
-      writeFileSync(versionsPath, versionFileBody.replace(
-        "4e30dde2aca801c6dbdcdc78412132805c496bb4",
-        "main",
-      ))
-      const result = Bun.spawnSync([
-        "rtk", "proxy", "pwsh", "-NoProfile", "-File", readVersionsScript,
-        "-Path", versionsPath,
-      ])
-
-      expect(result.exitCode).not.toBe(0)
-      expect(result.stderr.toString()).toContain("full 40-character Git SHA")
-    } finally {
-      rmSync(directory, { recursive: true, force: true })
-    }
-  }, 15000)
+test("legacy raw goal command migration preserves other config", () => {
+  const directory = mkdtempSync(join(tmpdir(), "opencode-goal-command-"))
+  const configPath = join(directory, "opencode.jsonc")
+  const original = `{
+  // keep
+  "provider": { "demo": { "options": { "apiKey": "keep-secret" } } },
+  "command": {
+    "goal": { "description": "legacy", "template": "$ARGUMENTS", "agent": "build" },
+    "other": { "template": "keep-other" }
+  }
+}`
+  try {
+    writeFileSync(configPath, original)
+    const result = Bun.spawnSync([
+      "pwsh", "-NoProfile", "-File", removeLegacyGoalScript, "-Path", configPath,
+    ])
+    expect(result.exitCode).toBe(0)
+    const updated = readFileSync(configPath, "utf8")
+    expect(updated).toContain("// keep")
+    expect(updated).toContain("keep-secret")
+    expect(updated).toContain("keep-other")
+    expect(updated).not.toContain('"goal"')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 test("Headroom native plugin installer is tracked", () => {
   expect(existsSync(installHeadroomScript)).toBe(true)
 })
 
-test("OMO update mode changes only OMO files and restores tailored config", () => {
-  const directory = mkdtempSync(join(tmpdir(), "opencode-update-only-"))
-  const configDirectory = join(directory, ".config", "opencode")
-  const versionsPath = join(configDirectory, "versions.env")
-  const fakeBin = join(directory, "bin")
-  const commandLog = join(directory, "commands.log")
-
-  try {
-    mkdirSync(configDirectory, { recursive: true })
-    mkdirSync(fakeBin, { recursive: true })
-    writeFileSync(versionsPath, versionFileBody)
-    writeFileSync(join(configDirectory, "opencode.jsonc"), '{"plugin":["oh-my-opencode-slim@1.0.0","other@1.0.0"]}')
-    writeFileSync(join(fakeBin, "bunx.cmd"), `@echo bunx %*>>"${commandLog}"\r\n@exit /b 0\r\n`)
-    writeFileSync(join(fakeBin, "npm.cmd"), `@echo npm %*>>"${commandLog}"\r\n@exit /b 0\r\n`)
-
-    const result = Bun.spawnSync([
-      "rtk", "proxy", "pwsh", "-NoProfile", "-File", bootstrapScript,
-      "-UpdateOnly", "-Component", "OmoSlim", "-VersionsFile", versionsPath,
-    ], {
-      env: {
-        ...process.env,
-        USERPROFILE: directory,
-        Path: `${fakeBin};${process.env.Path}`,
-      },
-    })
-
-    expect(result.exitCode).toBe(0)
-    const commands = readFileSync(commandLog, "utf8")
-    expect(commands).toContain("bunx oh-my-opencode-slim@9.8.7 install --yes")
-    expect(commands).toContain("npm install --save-exact oh-my-opencode-slim@9.8.7")
-    expect(readFileSync(join(configDirectory, "opencode.jsonc"), "utf8")).toContain(
-      '"oh-my-opencode-slim@9.8.7"',
-    )
-    expect(readFileSync(join(configDirectory, "oh-my-opencode-slim.json"), "utf8")).toBe(
-      readFileSync(new URL("../config/oh-my-opencode-slim.json", import.meta.url), "utf8"),
-    )
-    expect(readFileSync(join(configDirectory, "tui.json"), "utf8")).toContain(
-      '"oh-my-opencode-slim@9.8.7"',
-    )
-    expect(result.stdout.toString()).not.toContain("[1/8]")
-    expect(result.stdout.toString()).not.toContain("CodeGraph")
-    expect(readFileSync(join(configDirectory, "plugins", "rtk.ts"), "utf8")).toBe(
-      readFileSync(new URL("../plugins/rtk.ts", import.meta.url), "utf8"),
-    )
-    expect(readFileSync(join(configDirectory, "plugins", "lazy-load.ts"), "utf8")).toBe(
-      readFileSync(new URL("../plugins/lazy-load.ts", import.meta.url), "utf8"),
-    )
-  } finally {
-    rmSync(directory, { recursive: true, force: true })
-  }
-}, 15000)
+test("retired notifier is removed from manifest and config", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../config/components.json", import.meta.url), "utf8"))
+  expect(manifest.components.some((item: any) => item.id === "update-notifier")).toBe(false)
+  expect(manifest.retired.npmLocal).toContain("opencode-update-notifier")
+  expect(globalConfig.plugin ?? []).not.toContain("opencode-update-notifier@0.3.3")
+})
 
 test("RTK requires PATH and never probes Windows system directory", async () => {
   delete (globalThis as any).__rtk_opencode_loaded__
@@ -205,6 +131,16 @@ test("RTK repeated Desktop initialization keeps rewrite hook", async () => {
 
   expect(typeof hooks["tool.execute.before"]).toBe("function")
   expect(output.args.command).toStartWith("rtk ")
+})
+
+test("RTK uses PATH without executable-specific resolution", () => {
+  const source = readFileSync(new URL("../plugins/rtk.ts", import.meta.url), "utf8")
+  expect(source).not.toContain("rtkCommand")
+  expect(source).not.toContain("rtk.exe")
+  expect(source).not.toContain("System32")
+  expect(source).toContain('runFile("rtk", ["--version"])')
+  expect(setupScript).toContain("& rtk init -g")
+  expect(maintainerScript).not.toContain("$userBinary")
 })
 
 test("credential restore updates only provider.9router.options", () => {
@@ -252,24 +188,18 @@ test("credential restore updates only provider.9router.options", () => {
   }
 })
 
-describe("bootstrap plugin pinning", () => {
-  test("keeps oh-my-opencode-slim pinned after its installer runs", () => {
-    const install = script.indexOf('bunx "oh-my-opencode-slim@$Version" install --yes')
-    const restore = script.indexOf('Copy-Item "$RepoDir\\config\\tui.json"', install)
-    const repin = script.indexOf('pin-opencode-plugin.ps1', install)
-
-    expect(install).toBeGreaterThan(-1)
-    expect(restore).toBeGreaterThan(install)
-    expect(repin).toBeGreaterThan(install)
-    expect(script).not.toContain("oh-my-opencode-slim@latest")
+describe("JSONC plugin pinning", () => {
+  test("manifest maintainer owns exact config pin synchronization", () => {
+    expect(maintainerScript).toContain("Sync-ConfigPins")
+    expect(maintainerScript).toContain("@prevalentware/opencode-goal-plugin/tui")
+    expect(maintainerScript).toContain('-Name "@prevalentware/opencode-goal-plugin/server" -Remove')
+    expect(maintainerScript).toContain('name = "@prevalentware/opencode-goal-plugin"; add = $true')
   })
 
-  test("legacy updater delegates one exact component to bootstrap", () => {
-    expect(updaterScript).toContain('bootstrap.ps1" -UpdateOnly')
-    expect(updaterScript).toContain('[ValidateSet("OmoSlim")]')
-    expect(updaterScript).not.toContain("oh-my-opencode-slim@latest")
-    expect(updaterScript).not.toContain("npm update")
-    expect(updaterScript).not.toContain("codegraph upgrade")
+  test("TUI does not load disabled Goal package", () => {
+    const tui = JSON.parse(readFileSync(new URL("../config/tui.json", import.meta.url), "utf8"))
+    expect(tui.plugin).not.toContain("@prevalentware/opencode-goal-plugin@0.1.24")
+    expect(tui.plugin.some((item: string) => item.includes("/tui@"))).toBe(false)
   })
 
   test("pins only the plugin array and preserves credentials", () => {
@@ -330,12 +260,22 @@ describe("bootstrap plugin pinning", () => {
     }
   })
 
-  test("restores the audited RTK plugin after rtk init", () => {
-    const install = script.indexOf("rtk init -g --opencode")
-    const restore = script.indexOf('Copy-Item "$RepoDir\\plugins\\rtk.ts"', install)
-
-    expect(install).toBeGreaterThan(-1)
-    expect(restore).toBeGreaterThan(install)
+  test("adds a missing pinned plugin without rewriting JSONC", () => {
+    const directory = mkdtempSync(join(tmpdir(), "opencode-add-plugin-"))
+    const configPath = join(directory, "opencode.jsonc")
+    writeFileSync(configPath, '{\n  // keep\n  "plugin": [\n    "first@1"\n  ]\n}')
+    try {
+      const result = Bun.spawnSync([
+        "rtk", "proxy", "pwsh", "-NoProfile", "-File", pinPluginScript,
+        "-Path", configPath, "-Name", "goal/server", "-Version", "2.0.0", "-Add",
+      ])
+      expect(result.exitCode).toBe(0)
+      const updated = readFileSync(configPath, "utf8")
+      expect(updated).toContain("// keep")
+      expect(JSON.parse(updated.replace("// keep", "")).plugin).toEqual(["first@1", "goal/server@2.0.0"])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 
   test("pins compact plugin arrays without touching later arrays", () => {

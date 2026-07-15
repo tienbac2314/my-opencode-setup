@@ -69,8 +69,9 @@
   "formatter": false,
   "lsp": true,
   "plugin": [
-    "opencode-update-notifier@0.3.3",
     "oh-my-opencode-slim@2.2.1"
+    // Goal plugin disabled: OpenCode Goal tool and TUI integration remains broken.
+    // "@prevalentware/opencode-goal-plugin@0.1.24"
   ],
   "experimental": {
     "mcp_timeout": 60000

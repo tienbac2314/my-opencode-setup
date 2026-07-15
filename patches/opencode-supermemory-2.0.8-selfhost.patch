@@ -1,0 +1,30 @@
+diff --git a/dist/index.js b/dist/index.js
+index 9c647b0..20db627 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -13897,15 +13897,20 @@ var SupermemoryClient = class {
+       if (!isConfigured()) {
+         throw new Error("SUPERMEMORY_API_KEY not set");
+       }
++      const baseURL = getApiBaseUrl();
+       this.client = new Supermemory({
+         apiKey: SUPERMEMORY_API_KEY,
+-        baseURL: getApiBaseUrl(),
++        baseURL,
+         defaultHeaders: { "x-sm-source": OPENCODE_SOURCE }
+       });
+-      this.client.settings.update({
+-        shouldLLMFilter: true,
+-        filterPrompt: CONFIG.filterPrompt
+-      });
++      if (baseURL === DEFAULT_BASE_URL) {
++        void this.client.settings.update({
++          shouldLLMFilter: true,
++          filterPrompt: CONFIG.filterPrompt
++        }).catch((error) => {
++          log("settings.update: error", { error: String(error) });
++        });
++      }
+     }
+     return this.client;
+   }

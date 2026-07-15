@@ -24,6 +24,11 @@ test("Headroom launcher is isolated and provider-neutral", () => {
   expect(source).not.toContain("tienbac.dpdns.org")
   expect(source).not.toContain('provider.headroom')
   expect(source).not.toContain('mcp.headroom')
+  expect(source).not.toContain("Get-NetTCPConnection")
+  expect(source).toContain("Test-TcpPort")
+  expect(source).toContain('if ($IsWindows) { $start.WindowStyle = "Hidden" }')
+  expect(source).toContain("[IO.Path]::GetTempPath()")
+  expect(source).toContain("$proxy.WaitForExit(5000) | Out-Null")
 })
 
 test("Headroom launcher rejects non-array OpenCode arguments", () => {
