@@ -41,5 +41,5 @@
   "recommendation": "Use in a staged pilot pinned to 0.2.2. Start with repoContext, autoCapture, and autoRecall disabled; validate explicit MCP tools first, then enable actor-scoped recall, then capture. Do not run alongside active Supermemory automatic injection in normal sessions.",
   "confidence": "High for package identity and source behavior; medium for OpenCode host compatibility at current versions; low for production reliability until live lifecycle tests pass.",
   "source_quality_notes": "Behavior claims were read directly from official package source and official docs. npm package identity was cross-checked against the in-repository package manifest.",
-  "uncertain": ["OpenCode 1.18.0 compatibility under all lifecycle events", "lazy-load MCP interaction", "duplicate capture behavior across harnesses"]
+  "uncertain": ["OpenCode 1.18.1 compatibility under all lifecycle events", "lazy-load MCP interaction", "duplicate capture behavior across harnesses"]
 }

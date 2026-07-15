@@ -574,7 +574,7 @@ Behavior claims were read directly from official package source and official doc
 
 ### Uncertain fields
 
-- OpenCode 1.18.0 compatibility under all lifecycle events
+- OpenCode 1.18.1 compatibility under all lifecycle events
 - duplicate capture behavior across harnesses
 - lazy-load MCP interaction
 

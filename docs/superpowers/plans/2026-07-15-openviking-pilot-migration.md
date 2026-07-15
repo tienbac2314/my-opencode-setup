@@ -6,7 +6,7 @@
 
 **Architecture:** Keep normal OpenCode configuration and Supermemory unchanged during server and tool-only phases. Install exact OpenViking versions as optional manifest components, launch the official OpenCode package only through an isolated process-scoped config overlay, and use distinct actor peers for OpenCode and Hermes. Enable automatic recall and capture in separate phases; perform migration as export-transform-import with immutable source artifacts and an OVPack restore test before cutover.
 
-**Tech Stack:** PowerShell 7, Bun/TypeScript, npm, Python `uv`, OpenViking `0.4.9`, `@openviking/opencode-plugin` `0.2.2`, OpenCode `1.18.0`, Hermes Agent native OpenViking provider, OpenViking HTTP API/MCP, Bun tests.
+**Tech Stack:** PowerShell 7, Bun/TypeScript, npm, Python `uv`, OpenViking `0.4.9`, `@openviking/opencode-plugin` `0.2.2`, OpenCode `1.18.1`, Hermes Agent native OpenViking provider, OpenViking HTTP API/MCP, Bun tests.
 
 ## Global Constraints
 
@@ -258,13 +258,13 @@ try {
 }
 ```
 
-Also validate `OpenCodeArgsJson` is an array using same pattern as Headroom launcher.
+Also validate `OpenCodeArgsJson` is an array with a dedicated malformed-input test.
 
 - [ ] **Step 4: Run launcher tests and verify GREEN**
 
-Run: `rtk bun test tests/openviking-pilot.test.ts tests/headroom-launcher.test.ts`
+Run: `rtk bun test tests/openviking-pilot.test.ts`
 
-Expected: PASS; Headroom isolation remains unchanged.
+Expected: PASS; normal OpenCode config remains unchanged.
 
 - [ ] **Step 5: Commit**
 
