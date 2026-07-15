@@ -1,7 +1,7 @@
 {
   "$schema": "./components.schema.json",
   "schemaVersion": 1,
-  "expectedServerPlugins": 8,
+  "expectedServerPlugins": 7,
   "retired": {
     "npmLocal": ["opencode-update-notifier"],
     "pluginSpecs": ["opencode-update-notifier"]
@@ -59,6 +59,8 @@
     {
       "id": "goal",
       "name": "Goal plugin",
+      "disabled": true,
+      "disabledReason": "Disabled while OpenCode Goal tool and TUI integration remains broken.",
       "kind": "npm-local",
       "package": "@prevalentware/opencode-goal-plugin",
       "target": "0.1.24",

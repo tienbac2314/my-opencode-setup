@@ -71,9 +71,7 @@ function Get-InstalledVersion($Item) {
       return (Get-Content -LiteralPath $packageFile -Raw | ConvertFrom-Json).dependencies.($Item.package)
     }
     "github-release" {
-      $userBinary = Join-Path $HOME ".local\bin\$(if ($IsWindows) { 'rtk.exe' } else { 'rtk' })"
-      $command = if (Test-Path -LiteralPath $userBinary) { $userBinary } else { $Item.command }
-      return Normalize-Version (Invoke-Text $command @("--version"))
+      return Normalize-Version (Invoke-Text $Item.command @("--version"))
     }
     "pypi" {
       return Normalize-Version (Invoke-Text $Item.command @("--version"))
@@ -115,6 +113,21 @@ function Get-LatestVersion($Item) {
 
 function Get-Report($ManifestValue) {
   foreach ($item in $ManifestValue.components) {
+    if ($item.disabled) {
+      [pscustomobject]@{
+        id = $item.id
+        name = $item.name
+        kind = $item.kind
+        installed = $null
+        target = [string]$item.target
+        latest = $null
+        state = "disabled"
+        reviewRequired = $false
+        repository = $item.repository
+        verify = $item.disabledReason
+      }
+      continue
+    }
     $installed = Get-InstalledVersion $item
     try { $latest = Get-LatestVersion $item } catch { $latest = $null }
     $target = [string]$item.target
@@ -148,10 +161,12 @@ function Get-Report($ManifestValue) {
 }
 
 function Select-Components($ManifestValue) {
-  if ($All) { return @($ManifestValue.components) }
+  if ($All) { return @($ManifestValue.components | Where-Object { -not $_.disabled }) }
   if (-not $Component) { throw "apply requires -Component ID or -All" }
   $requested = @($Component | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-  $selected = @($ManifestValue.components | Where-Object { $_.id -in $requested })
+  $disabled = @($ManifestValue.components | Where-Object { $_.id -in $requested -and $_.disabled })
+  if ($disabled) { throw "Disabled component IDs: $($disabled.id -join ', ')" }
+  $selected = @($ManifestValue.components | Where-Object { $_.id -in $requested -and -not $_.disabled })
   $missing = @($requested | Where-Object { $_ -notin $selected.id })
   if ($missing) { throw "Unknown component IDs: $($missing -join ', ')" }
   return $selected
@@ -192,8 +207,10 @@ function Sync-ConfigPins($ManifestValue) {
   foreach ($pin in $pins) {
     if (-not (Test-Path -LiteralPath $pin.path)) { continue }
     $item = $ManifestValue.components | Where-Object id -eq $pin.id
-    if ($item) {
+    if ($item -and -not $item.disabled) {
       & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Version $item.target -Add:([bool]$pin.add)
+    } elseif ($item.disabled) {
+      & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Remove
     }
   }
 }
@@ -310,6 +327,9 @@ function Apply-Components($ManifestValue) {
     $activeCommands = Join-Path $ConfigDir "commands"
     New-Item -ItemType Directory -Path $activeCommands -Force | Out-Null
     Copy-Item "$RepoDir\commands\*" $activeCommands -Force
+    if ($ManifestValue.components | Where-Object { $_.id -eq "goal" -and $_.disabled }) {
+      Remove-Item (Join-Path $activeCommands "goal.md") -Force -ErrorAction SilentlyContinue
+    }
   }
   & "$RepoDir\scripts\apply-package-patches.ps1" -ConfigDir $ConfigDir -CacheDir $CacheDir -Manifest $Manifest
   Sync-ConfigPins $ManifestValue
@@ -322,7 +342,7 @@ function Verify-State($ManifestValue) {
   $expectedTui = @(
     $omo = $ManifestValue.components | Where-Object id -eq "omo-slim"
     if ($omo) { "oh-my-opencode-slim@$($omo.target)" }
-    $goal = $ManifestValue.components | Where-Object id -eq "goal"
+    $goal = $ManifestValue.components | Where-Object { $_.id -eq "goal" -and -not $_.disabled }
     if ($goal) { "@prevalentware/opencode-goal-plugin@$($goal.target)" }
   )
 
@@ -330,7 +350,7 @@ function Verify-State($ManifestValue) {
     if ($package.dependencies.PSObject.Properties.Name -contains $retired) { $failures.Add("retired package still installed: $retired") }
   }
 
-  foreach ($item in $ManifestValue.components | Where-Object kind -in "npm-local", "omo") {
+  foreach ($item in $ManifestValue.components | Where-Object { -not $_.disabled -and $_.kind -in "npm-local", "omo" }) {
     $actual = $package.dependencies.($item.package)
     if ($actual -ne $item.target) { $failures.Add("$($item.id): package.json has '$actual', expected '$($item.target)'") }
   }

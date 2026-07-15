@@ -69,14 +69,13 @@ Expected: manifest-approved packages, configured plugin count equal to manifest,
 Live smoke tests:
 
 1. Start TUI and App. Open status/plugin panels.
-2. Open a top-level session in a terminal wider than 120 columns. If the sidebar is hidden, press `Ctrl+X`, then `B`. Open `Plugins` from the command palette and confirm `local.goal-mode.tui` is active. Run `/goal <disposable objective>`, confirm the Goal block updates, then clear the goal.
-   Deterministic renderer check: `bun ./scripts/verify-goal-tui.ts "$HOME/.cache/opencode"`.
+2. Confirm Goal plugin and `/goal` command are absent. They remain disabled while OpenCode integration is broken.
 3. Run `/tokens` after model request.
 4. Run `ping all agents` and one bounded child-agent task.
 5. In indexed project, use CodeGraph; outside indexed project, confirm no startup error.
 6. Add/search/list/forget disposable Supermemory marker.
    Automated verifier: `bun ./scripts/verify-supermemory.ts "$HOME/.config/opencode"`.
-7. Run RTK rewrite: `& "$HOME\.local\bin\rtk.exe" rewrite "git status"`.
+7. Run RTK rewrite: `rtk rewrite "git status"`.
 
 ## 5. Updates
 
@@ -86,6 +85,14 @@ pwsh ./maintain.ps1 plan
 ```
 
 Review `.state/update-plan.md`. To approve target, edit only matching `target` in `config/components.json`, review upstream diff and [PATCHES.md](PATCHES.md), then:
+
+On Windows, OpenCode cannot replace its running `opencode.exe`; built-in npm upgrade fails with `EBUSY` (shown as exit code 14). Queue update, then close all OpenCode windows:
+
+```powershell
+pwsh ./scripts/update-opencode.ps1 -Version 1.18.0
+```
+
+Detached helper waits for OpenCode processes to exit, then runs exact global npm install.
 
 ```powershell
 pwsh ./maintain.ps1 apply -Component COMPONENT_ID
@@ -136,4 +143,4 @@ Differences:
 - Apply `chmod 600` to private credential files.
 - App availability depends on OpenCode Linux desktop support; TUI and web are baseline.
 
-Supported first target: current Ubuntu LTS. Verify same package targets, plugin origins, Goal/sidebar, lazy loading, RTK, CodeGraph, Supermemory, OMO, and Headroom before claiming another distro supported.
+Supported first target: current Ubuntu LTS. Verify same package targets, plugin origins, lazy loading, RTK, CodeGraph, Supermemory, OMO, and Headroom before claiming another distro supported.

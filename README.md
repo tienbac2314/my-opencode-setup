@@ -34,7 +34,7 @@ Purpose: show what this setup loads and where each part comes from.
 | OpenCode | `anomalyco/opencode` | App, TUI, server, LSP, and built-in tools |
 | 9router model discovery | Local `models-discovery.js` | Adds available 9router models with correct input types |
 | Oh My OpenCode Slim | `alvinunreal/oh-my-opencode-slim` | Orchestrator plus Oracle, Librarian, Designer, and Fixer agents |
-| Goal | `prevalentWare/opencode-goal-plugin` | Long-running goal tools, `/goal`, and TUI sidebar status |
+| Goal (disabled) | `prevalentWare/opencode-goal-plugin` | Retained for investigation; setup does not install or load it while OpenCode integration remains broken |
 | Supermemory | `supermemoryai/opencode-supermemory` | Self-hosted memory across sessions |
 | Lazy loading | `omarwaly-ai/opencode-lazy-loading` | Loads tool schemas only when the model asks for them |
 | Token source | `omarwaly-ai/OpenCode-tokens-source` | `/tokens` breakdown by prompt, tool, and message source |
@@ -62,7 +62,7 @@ pwsh ./maintain.ps1 verify
 - Project `.opencode/opencode.json` does not define `plugin`; global plugin origins remain authoritative.
 - Headroom is launcher-only. Normal App/TUI sessions are not proxied.
 - CodeGraph runs only when project has `.codegraph/codegraph.db`.
-- Goal server and TUI use the pinned root package spec. One exact TUI patch remains until upstream ships equivalent behavior.
+- Goal package, patch, and command remain tracked but are not installed or loaded. `components.json` records the temporary disable reason.
 - Update checks come from `maintain.ps1`; no runtime notifier plugin is needed.
 - Supermemory wrapper adapts package export only; memory behavior remains upstream.
 - `npm ls --depth=0` and `opencode debug config` are authoritative. `bun pm ls` can show stale lock metadata after npm installs.
@@ -79,4 +79,4 @@ pwsh ./maintain.ps1 verify
 - full Bun test suite.
 - production dependency audit at high severity or above when online.
 
-Live checks still matter for provider traffic, Goal sidebar, App rendering, agent orchestration, and Supermemory CRUD. OpenCode remembers sidebar visibility globally; press `Ctrl+X`, then `B` before treating a missing Goal block as a plugin failure.
+Live checks still matter for provider traffic, App rendering, agent orchestration, and Supermemory CRUD.

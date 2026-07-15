@@ -80,10 +80,10 @@ $excluded = @()
 if ($SkipRtk) { $excluded += "rtk" }
 if ($SkipCodeGraph) { $excluded += "codegraph" }
 if ($excluded.Count) {
-  $selected = @($manifest.components | Where-Object { -not $_.optional -and $_.id -notin $excluded } | ForEach-Object id)
+  $selected = @($manifest.components | Where-Object { -not $_.optional -and -not $_.disabled -and $_.id -notin $excluded } | ForEach-Object id)
   $apply = @("-NoProfile", "-File", "$RepoDir\maintain.ps1", "apply", "-Component", ($selected -join ','), "-ConfigDir", $ConfigDir, "-CacheDir", $CacheDir)
 } else {
-  $selected = @($manifest.components | Where-Object { -not $_.optional } | ForEach-Object id)
+  $selected = @($manifest.components | Where-Object { -not $_.optional -and -not $_.disabled } | ForEach-Object id)
   $apply = @("-NoProfile", "-File", "$RepoDir\maintain.ps1", "apply", "-Component", ($selected -join ','), "-ConfigDir", $ConfigDir, "-CacheDir", $CacheDir)
 }
 & pwsh @apply
@@ -95,9 +95,8 @@ if (-not $SkipCodeGraph) {
   & codegraph telemetry off
 }
 if (-not $SkipRtk) {
-  $rtk = Join-Path $HOME ".local\bin\$(if ($IsWindows) { 'rtk.exe' } else { 'rtk' })"
-  if (Test-Path -LiteralPath $rtk) {
-    & $rtk init -g
+  if (Get-Command rtk -ErrorAction SilentlyContinue) {
+    & rtk init -g
     Copy-Item "$RepoDir\plugins\rtk.ts" (Join-Path $ConfigDir "plugins\rtk.ts") -Force
   }
 }

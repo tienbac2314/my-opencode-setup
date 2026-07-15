@@ -23,9 +23,9 @@ Minimal PR: add idempotent wrapper registration while returning command/tool hoo
 
 ## `rtk-ai/rtk`
 
-Problem: generated OpenCode hook assumes `input.$` exists and resolves first PATH `rtk`; Desktop-shaped input can omit shell and Windows may select stale system binary.
+Problem: generated OpenCode hook assumes `input.$` exists; Desktop-shaped input can omit shell.
 
-Minimal PR: fallback to `execFile`, prefer user-managed binary, support `bash` and `shell`, and add Windows/Desktop tests. Do not copy repository-specific config.
+Minimal PR: fallback to `execFile`, support `bash` and `shell`, and add Windows/Desktop tests. Do not copy repository-specific config.
 
 ## `supermemoryai/opencode-supermemory`
 

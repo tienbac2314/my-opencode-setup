@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 $repo = (Resolve-Path "$PSScriptRoot\..").Path
 $components = (Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json).components
 
-foreach ($item in $components | Where-Object patch) {
+foreach ($item in $components | Where-Object { $_.patch -and -not $_.disabled }) {
   if (-not $item.package) { throw "$($item.id): patched component requires package" }
   $patchFile = Join-Path $repo $item.patch
   if (-not (Test-Path -LiteralPath $patchFile -PathType Leaf)) { throw "$($item.id): patch missing: $patchFile" }

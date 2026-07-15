@@ -81,7 +81,7 @@ Normal App/TUI sessions are never proxied. Both native OpenCode and 9router rout
 
 CodeGraph already watches indexed files, so the redundant post-edit reindex hook was removed. The local guard acts only when `.codegraph/codegraph.db` exists and does nothing in unindexed workspaces.
 
-RTK uses `~/.local/bin`, supports Desktop-shaped hook input without an injected shell, and never probes `System32`. A stale system copy may exist but is intentionally untouched.
+RTK installs under `~/.local/bin` and resolves through `PATH`. Local wrapper only supports Desktop-shaped hook input without an injected shell.
 
 ## Approaches tried and rejected
 

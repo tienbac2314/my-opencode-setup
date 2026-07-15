@@ -12,7 +12,7 @@ const setCredentialsScript = fileURLToPath(new URL("../scripts/set-credentials.p
 const removeLegacyGoalScript = fileURLToPath(new URL("../scripts/remove-legacy-goal-command.ps1", import.meta.url))
 const installHeadroomScript = fileURLToPath(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))
 const projectConfig = JSON.parse(readFileSync(new URL("../.opencode/opencode.json", import.meta.url), "utf8"))
-const globalConfig = JSON.parse(readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8"))
+const globalConfig = JSON.parse(readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""))
 
 test("project config does not override global plugins", () => {
   expect(projectConfig).not.toHaveProperty("plugin")
@@ -24,8 +24,9 @@ test("Headroom stays launcher-only", () => {
   expect(globalConfig.mcp?.headroom).toBeUndefined()
 })
 
-test("goal plugin uses root package so OpenCode resolves its server export", () => {
-  expect(globalConfig.plugin ?? []).toContain("@prevalentware/opencode-goal-plugin@0.1.24")
+test("goal plugin is commented out while its OpenCode integration is broken", () => {
+  expect(globalConfig.plugin ?? []).not.toContain("@prevalentware/opencode-goal-plugin@0.1.24")
+  expect(setupScript).toContain("-not $_.disabled")
   expect(globalConfig.plugin.some((item: string) => item.includes("/server@"))).toBe(false)
   expect(globalConfig.command?.goal).toBeUndefined()
 })
@@ -132,10 +133,14 @@ test("RTK repeated Desktop initialization keeps rewrite hook", async () => {
   expect(output.args.command).toStartWith("rtk ")
 })
 
-test("RTK prefers user-managed binary over System32 PATH entry", () => {
+test("RTK uses PATH without executable-specific resolution", () => {
   const source = readFileSync(new URL("../plugins/rtk.ts", import.meta.url), "utf8")
-  expect(source).toContain('join(homedir(), ".local", "bin"')
+  expect(source).not.toContain("rtkCommand")
+  expect(source).not.toContain("rtk.exe")
   expect(source).not.toContain("System32")
+  expect(source).toContain('runFile("rtk", ["--version"])')
+  expect(setupScript).toContain("& rtk init -g")
+  expect(maintainerScript).not.toContain("$userBinary")
 })
 
 test("credential restore updates only provider.9router.options", () => {
@@ -191,9 +196,9 @@ describe("JSONC plugin pinning", () => {
     expect(maintainerScript).toContain('name = "@prevalentware/opencode-goal-plugin"; add = $true')
   })
 
-  test("TUI uses root Goal package spec so OpenCode resolves its tui export", () => {
+  test("TUI does not load disabled Goal package", () => {
     const tui = JSON.parse(readFileSync(new URL("../config/tui.json", import.meta.url), "utf8"))
-    expect(tui.plugin).toContain("@prevalentware/opencode-goal-plugin@0.1.24")
+    expect(tui.plugin).not.toContain("@prevalentware/opencode-goal-plugin@0.1.24")
     expect(tui.plugin.some((item: string) => item.includes("/tui@"))).toBe(false)
   })
 

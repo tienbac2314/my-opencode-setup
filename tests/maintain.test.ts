@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 
 const maintainer = fileURLToPath(new URL("../maintain.ps1", import.meta.url))
 const setup = fileURLToPath(new URL("../setup.ps1", import.meta.url))
+const updateOpenCode = fileURLToPath(new URL("../scripts/update-opencode.ps1", import.meta.url))
 const repositoryManifest = JSON.parse(readFileSync(new URL("../config/components.json", import.meta.url), "utf8"))
 
 function fixture() {
@@ -38,7 +39,7 @@ function fixture() {
 test("component manifest is unique and complete", () => {
   const components = repositoryManifest.components as Array<Record<string, unknown>>
   expect(new Set(components.map((item) => item.id)).size).toBe(components.length)
-  expect(repositoryManifest.expectedServerPlugins).toBe(8)
+  expect(repositoryManifest.expectedServerPlugins).toBe(7)
   expect(repositoryManifest.retired.npmLocal).toContain("opencode-update-notifier")
   for (const item of components) {
     expect(item.id).toBeTruthy()
@@ -46,6 +47,18 @@ test("component manifest is unique and complete", () => {
     expect(item.target).toBeTruthy()
     expect(item.verify).toBeTruthy()
   }
+})
+
+test("Goal plugin stays disabled until its OpenCode integration bug is fixed", () => {
+  const goal = repositoryManifest.components.find((item: any) => item.id === "goal")
+  const globalConfig = readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8")
+  const tuiConfig = JSON.parse(readFileSync(new URL("../config/tui.json", import.meta.url), "utf8"))
+
+  expect(goal.disabled).toBe(true)
+  expect(goal.disabledReason).toContain("OpenCode")
+  expect(globalConfig).toContain("Goal plugin disabled")
+  expect(JSON.parse(globalConfig.replace(/^\s*\/\/.*$/gm, "")).plugin).not.toContain("@prevalentware/opencode-goal-plugin@0.1.24")
+  expect(tuiConfig.plugin).not.toContain("@prevalentware/opencode-goal-plugin@0.1.24")
 })
 
 test("active docs use manifest and unified scripts only", () => {
@@ -203,6 +216,29 @@ test("apply skips an already-current npm target", () => {
   }
 })
 
+test("Windows OpenCode updater waits for running process before npm install", () => {
+  if (process.platform !== "win32") return
+  const root = mkdtempSync(join(tmpdir(), "opencode-update-"))
+  const bin = join(root, "bin")
+  const log = join(root, "npm.log")
+  try {
+    mkdirSync(bin)
+    writeFileSync(join(bin, "npm.cmd"), `@echo %*>>"${log}"\r\n@exit /b 0\r\n`)
+    const blocker = Bun.spawn(["pwsh", "-NoProfile", "-Command", "Start-Sleep -Milliseconds 800"])
+    const started = Date.now()
+    const result = Bun.spawnSync([
+      "pwsh", "-NoProfile", "-File", updateOpenCode,
+      "-Version", "1.18.1", "-WaitForProcessId", String(blocker.pid),
+    ], { env: { ...process.env, Path: `${bin};${process.env.Path}` } })
+
+    expect(result.exitCode).toBe(0)
+    expect(Date.now() - started).toBeGreaterThanOrEqual(600)
+    expect(readFileSync(log, "utf8")).toContain("install --global opencode-ai@1.18.1")
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test("OMO installer honors custom OpenCode config directory", () => {
   const root = mkdtempSync(join(tmpdir(), "opencode-omo-config-"))
   const configDir = join(root, "config")
@@ -339,10 +375,11 @@ test("setup converges isolated config without machine integration", () => {
     expect(existsSync(join(configDir, "opencode.jsonc"))).toBe(true)
     expect(existsSync(join(configDir, "tui.json"))).toBe(true)
     expect(existsSync(join(configDir, "plugins", "lazy-load.ts"))).toBe(true)
-    expect(existsSync(join(configDir, "commands", "goal.md"))).toBe(true)
+    expect(existsSync(join(configDir, "commands", "goal.md"))).toBe(false)
     const commands = readFileSync(log, "utf8")
     expect(commands).toContain("opencode-ai@1.18.0")
     expect(commands).toContain("@opencode-ai/plugin@1.18.0")
+    expect(commands).not.toContain("@prevalentware/opencode-goal-plugin")
     expect(commands).not.toContain("headroom-ai")
   } finally {
     rmSync(root, { recursive: true, force: true })
