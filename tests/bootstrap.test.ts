@@ -18,7 +18,7 @@ test("project config does not override global plugins", () => {
   expect(projectConfig).not.toHaveProperty("plugin")
 })
 
-test("Headroom stays launcher-only", () => {
+test("Headroom stays out of tracked global config", () => {
   expect(globalConfig.provider?.headroom).toBeUndefined()
   expect(globalConfig.plugin ?? []).not.toContain("headroom-opencode")
   expect(globalConfig.mcp?.headroom).toBeUndefined()

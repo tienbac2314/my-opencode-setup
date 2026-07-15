@@ -45,7 +45,7 @@ Purpose: show what this setup loads and where each part comes from.
 | CodeGraph | `colbymchenry/codegraph` plus local guard | Code search for indexed projects; no action elsewhere |
 | RTK | `rtk-ai/rtk` plus local OpenCode hook | Shorter shell output and Windows-safe command rewriting |
 | Deep Research | `Weizhena/Deep-Research-skills` | Research workflow without exposing strategy files as agents |
-| Headroom | `headroomlabs-ai/headroom` | Optional one-session proxy; normal App/TUI traffic is unchanged |
+| Headroom | `headroomlabs-ai/headroom` | Official `headroom wrap opencode` lifecycle plus pinned source transport for custom providers |
 
 Exact versions and source commits live only in `config/components.json`.
 
@@ -64,7 +64,7 @@ pwsh ./maintain.ps1 verify
 ## Runtime boundaries
 
 - Project `.opencode/opencode.json` does not define `plugin`; global plugin origins remain authoritative.
-- Headroom is launcher-only. Normal App/TUI sessions are not proxied.
+- Headroom is opt-in in repository setup. This machine's PowerShell profile routes interactive `opencode` through official wrapper. Wrapper may manage machine-local `opencode.json` provider/MCP entries with a backup; `headroom unwrap opencode` restores them.
 - CodeGraph runs only when project has `.codegraph/codegraph.db`.
 - Goal package, patch, and command remain tracked but are not installed or loaded. `components.json` records the temporary disable reason.
 - Update checks come from `maintain.ps1`; no runtime notifier plugin is needed.

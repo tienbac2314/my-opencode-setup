@@ -126,10 +126,12 @@ pwsh ./maintain.ps1 plan
 
 Review `.state/update-plan.md`. To approve target, edit only matching `target` in `config/components.json`, review upstream diff and [PATCHES.md](PATCHES.md), then:
 
+Latest versions are reported, never auto-approved. Targets remain exact because package patches, copied forks, and runtime contracts require review before each version change; automatic `latest` resolution would bypass that safety boundary.
+
 On Windows, OpenCode cannot replace its running `opencode.exe`; built-in npm upgrade fails with `EBUSY` (shown as exit code 14). Queue update, then close all OpenCode windows:
 
 ```powershell
-pwsh ./scripts/update-opencode.ps1 -Version 1.18.0
+pwsh ./scripts/update-opencode.ps1 -Version 1.18.1
 ```
 
 Detached helper waits for OpenCode processes to exit, then runs exact global npm install.
@@ -141,7 +143,7 @@ pwsh ./maintain.ps1 verify
 
 Use `-All` only after every target in manifest has been reviewed. Maintainer stops rather than overwriting copied upstream forks.
 
-## 6. Headroom optional launcher
+## 6. Headroom official wrapper (optional)
 
 Windows Python dependencies require Visual Studio 2022 Build Tools with C++ workload. Run from Administrator PowerShell, then restart terminal:
 
@@ -149,15 +151,48 @@ Windows Python dependencies require Visual Studio 2022 Build Tools with C++ work
 winget install Microsoft.VisualStudio.2022.BuildTools --silent --accept-package-agreements --accept-source-agreements --override "--add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.Windows11SDK.22000 --includeRecommended --quiet --wait"
 ```
 
-Install pinned Python proxy and build pinned OpenCode transport:
+Install pinned Python proxy and build pinned OpenCode transport. The `headroom-ai` 0.31.0 wheel does not ship `entry.opencode.js`, so custom providers such as 9router still need the pinned source build:
 
 ```powershell
 uv tool install --force "headroom-ai[all]==0.31.0"
 pwsh ./scripts/install-headroom-plugin.ps1
-pwsh ./scripts/start-opencode-headroom.ps1 -OpenCodeArgsJson '["run","--model","opencode/deepseek-v4-flash-free","Return exact text: HEADROOM_OK"]'
+$env:HEADROOM_OPENCODE_PLUGIN_PATH = "$HOME\.cache\opencode-headroom\source\plugins\opencode\dist\entry.opencode.js"
+headroom wrap opencode --no-context-tool -- run --model opencode/deepseek-v4-flash-free "Return exact text: HEADROOM_OK"
 ```
 
-Metadata log: `$env:TEMP\opencode-headroom\requests.jsonl`. Prompts are not logged. Launcher does not edit OpenCode config and stops only proxy it started.
+`headroom wrap opencode` is the maintained proxy/provider/process lifecycle. By default it configures its context tool, Headroom MCP, and Serena MCP; use its `--no-context-tool`, `--no-mcp`, or `--no-serena` flags when those integrations are unwanted. Wrapper manages a Headroom provider block and saves a pre-wrap backup; `headroom unwrap opencode` restores it.
+
+To route every interactive PowerShell `opencode` call through Headroom, add this machine-local function to `$PROFILE.CurrentUserCurrentHost`:
+
+```powershell
+function opencode {
+  $plugin = "$HOME\.cache\opencode-headroom\source\plugins\opencode\dist\entry.opencode.js"
+  $previous = $env:HEADROOM_OPENCODE_PLUGIN_PATH
+  if (-not (Test-Path -LiteralPath $plugin)) {
+    throw "Headroom OpenCode transport missing: $plugin. Run scripts/install-headroom-plugin.ps1."
+  }
+  $binary = Get-Command opencode -CommandType Application,ExternalScript | Select-Object -First 1
+  if (-not $binary) { throw "OpenCode executable not found on PATH" }
+  $binaryBefore = $binary.Source
+  $versionBefore = ((& $binary.Source --version) -join " ").Trim()
+  $exitCode = 1
+  try {
+    $env:HEADROOM_OPENCODE_PLUGIN_PATH = $plugin
+    & headroom wrap opencode --no-context-tool -- @args
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $env:HEADROOM_OPENCODE_PLUGIN_PATH = $previous
+    $binaryAfter = Get-Command opencode -CommandType Application,ExternalScript | Select-Object -First 1
+    $versionAfter = ((& $binaryAfter.Source --version) -join " ").Trim()
+    if ($binaryAfter.Source -ne $binaryBefore -or $versionAfter -ne $versionBefore) {
+      throw "Headroom changed OpenCode version or executable from $versionBefore ($binaryBefore) to $versionAfter ($($binaryAfter.Source))"
+    }
+  }
+  $global:LASTEXITCODE = $exitCode
+}
+```
+
+Headroom resolves the child `opencode` executable directly from PATH, so this PowerShell function does not recurse.
 
 ## 7. Recovery
 
@@ -190,7 +225,7 @@ Differences:
 - Background-agent environment is written to `~/.config/environment.d/opencode.conf`; export it in current shell or log in again.
 - RTK uses Linux release archive and executable bit.
 - Native Bash skill scripts work directly; PowerShell launchers remain available.
-- Headroom launcher uses cross-platform TCP probing and process cleanup. Run same PowerShell commands on Linux.
+- Headroom uses its official `headroom wrap opencode` lifecycle. Export `HEADROOM_OPENCODE_PLUGIN_PATH` to the pinned source transport when wheel does not include it.
 - Apply `chmod 600` to private credential files.
 - App availability depends on OpenCode Linux desktop support; TUI and web are baseline.
 

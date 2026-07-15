@@ -8,7 +8,7 @@
   installs the exact requested opencode-ai version with npm.
 
 .EXAMPLE
-  pwsh ./scripts/update-opencode.ps1 -Version 1.18.0
+  pwsh ./scripts/update-opencode.ps1 -Version 1.18.1
 #>
 [CmdletBinding()]
 param(
