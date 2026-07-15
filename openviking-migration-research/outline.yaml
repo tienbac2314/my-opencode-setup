@@ -1,0 +1,21 @@
+topic: OpenViking migration from Supermemory for OpenCode and Hermes
+items:
+  - name: OpenViking Core
+    category: memory_platform
+    description: Official volcengine/OpenViking server, context database, self-hosting model, data architecture, operations, and licensing.
+  - name: OpenViking OpenCode Plugin
+    category: integration
+    description: Official @openviking/opencode-plugin from volcengine/OpenViking examples/opencode-plugin, including hooks, MCP proxy, configuration, and lifecycle.
+  - name: Hermes Agent OpenViking Integration
+    category: integration
+    description: Official Hermes Agent support for OpenViking, including whether support is native, installation path, configuration, tool behavior, and maturity.
+  - name: Supermemory
+    category: comparison
+    description: Current opencode-supermemory deployment, official self-hosting posture, OpenCode integration, hosted-product coupling, and migration implications.
+  - name: Mem0
+    category: comparison
+    description: Mem0 open-source and hosted architecture, self-hosting posture, integrations, data model, licensing, and migration implications.
+execution:
+  batch_size: 2
+  items_per_agent: 1
+  output_dir: openviking-migration-research/results

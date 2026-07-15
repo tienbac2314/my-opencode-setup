@@ -9,6 +9,7 @@ Personal OpenCode setup for Windows and Linux. One component manifest controls v
 - Understand local differences: [PATCHES.md](PATCHES.md)
 - Diagnose runtime problems: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - Understand agents and OMO roles: [docs/agents.md](docs/agents.md)
+- Evaluate OpenViking migration: [docs/research/openviking-memory-platform-comparison.md](docs/research/openviking-memory-platform-comparison.md)
 - Prepare upstream reports: [pr.md](pr.md)
 - Understand this refactor and past failures: [docs/maintenance-refactor.md](docs/maintenance-refactor.md)
 

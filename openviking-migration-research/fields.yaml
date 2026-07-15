@@ -1,0 +1,129 @@
+field_categories:
+  - category: Identity and provenance
+    fields:
+      - name: name
+        description: Official product, project, or integration name.
+        detail_level: brief
+        required: true
+      - name: official_ownership
+        description: Official organization, repository, package publisher, and evidence tying artifacts together.
+        detail_level: detailed
+        required: true
+      - name: official_sources
+        description: Primary official URLs used, with source type and access date.
+        detail_level: detailed
+        required: true
+      - name: current_version_or_commit
+        description: Current relevant released version or source revision as of research date.
+        detail_level: moderate
+        required: true
+      - name: license
+        description: Licenses for core server, clients, and integration artifacts, including mismatches.
+        detail_level: detailed
+        required: true
+      - name: maturity_signals
+        description: Release cadence, project age, repository activity, tests, adoption, and stability indicators.
+        detail_level: detailed
+        required: true
+  - category: Architecture and data
+    fields:
+      - name: product_focus
+        description: Primary product positioning and whether hosted subscription or self-host operation is central.
+        detail_level: detailed
+        required: true
+      - name: deployment_model
+        description: Supported local, VPS, Docker, cloud, and managed deployment patterns.
+        detail_level: detailed
+        required: true
+      - name: memory_and_retrieval_model
+        description: Memory extraction, recall, search, RAG, session, knowledge, and skill representation.
+        detail_level: detailed
+        required: true
+      - name: storage_and_model_dependencies
+        description: Databases, files, vector stores, embedding models, VLM/LLM providers, and external services.
+        detail_level: detailed
+        required: true
+      - name: api_and_tool_surface
+        description: HTTP, SDK, CLI, MCP, native hooks, and user-facing memory tools.
+        detail_level: detailed
+        required: true
+      - name: identity_and_isolation
+        description: User, account, actor, peer, workspace, tenant, and cross-project isolation semantics.
+        detail_level: detailed
+        required: true
+      - name: security_and_privacy
+        description: Credential flow, network boundaries, telemetry, local/cloud data paths, and documented security limits.
+        detail_level: detailed
+        required: true
+  - category: Integrations
+    fields:
+      - name: opencode_integration
+        description: Official OpenCode support, package identity, hooks, MCP tools, configuration, and current limitations.
+        detail_level: detailed
+        required: true
+      - name: hermes_integration
+        description: Official Hermes Agent support and whether it is native, optional, third-party, or absent.
+        detail_level: detailed
+        required: true
+      - name: automatic_capture_and_recall
+        description: Automatic message capture, memory extraction, recall injection, lifecycle commits, and controls.
+        detail_level: detailed
+        required: true
+      - name: repository_and_knowledge_support
+        description: Code repository indexing, document/resource ingestion, URI model, and overlap with CodeGraph.
+        detail_level: detailed
+        required: true
+  - category: Operations
+    fields:
+      - name: installation_and_configuration
+        description: Exact official install/config requirements relevant to Windows client and self-hosted server.
+        detail_level: detailed
+        required: true
+      - name: backup_restore_and_portability
+        description: Documented backup, restore, export, import, and migration facilities.
+        detail_level: detailed
+        required: true
+      - name: observability_and_recovery
+        description: Health checks, logs, diagnostics, repair, failure modes, and operational recovery.
+        detail_level: detailed
+        required: true
+      - name: resource_and_cost_profile
+        description: Compute, storage, model API, operational labor, and managed-service cost considerations.
+        detail_level: moderate
+        required: true
+  - category: Migration assessment
+    fields:
+      - name: strengths_for_this_repository
+        description: Benefits for this OpenCode, Hermes, CodeGraph, lazy-load, Windows, and self-hosted environment.
+        detail_level: detailed
+        required: true
+      - name: risks_and_unknowns
+        description: Early maturity, compatibility, data loss, isolation, licensing, operational, and integration risks.
+        detail_level: detailed
+        required: true
+      - name: data_migration_path
+        description: Proven or absent path from Supermemory or Mem0, including fallback retention strategy.
+        detail_level: detailed
+        required: true
+      - name: acceptance_tests
+        description: Concrete tests required before adoption or cutover.
+        detail_level: detailed
+        required: true
+      - name: recommendation
+        description: Adopt, pilot, defer, or reject recommendation with evidence and prerequisites.
+        detail_level: detailed
+        required: true
+      - name: confidence
+        description: Confidence level and which conclusions remain uncertain.
+        detail_level: moderate
+        required: true
+  - category: Evidence quality
+    fields:
+      - name: source_quality_notes
+        description: Distinguish official docs/code/package metadata from community or inferred claims.
+        detail_level: detailed
+        required: true
+      - name: uncertain
+        description: Field names with unresolved or weakly supported values.
+        detail_level: brief
+        required: false

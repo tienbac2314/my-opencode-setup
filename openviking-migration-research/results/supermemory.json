@@ -1,0 +1,43 @@
+{
+  "name": "Supermemory",
+  "official_ownership": "Official core repository supermemoryai/supermemory and OpenCode integration repository supermemoryai/opencode-supermemory; npm package opencode-supermemory 2.0.8 points to the latter.",
+  "official_sources": [
+    {"type": "core repository", "url": "https://github.com/supermemoryai/supermemory", "accessed": "2026-07-15"},
+    {"type": "OpenCode repository", "url": "https://github.com/supermemoryai/opencode-supermemory", "accessed": "2026-07-15"},
+    {"type": "self-host docs", "url": "https://supermemory.ai/docs/self-hosting/overview", "accessed": "2026-07-15"},
+    {"type": "npm", "url": "https://www.npmjs.com/package/opencode-supermemory", "accessed": "2026-07-15"},
+    {"type": "installed package", "url": "file:~/.config/opencode/node_modules/opencode-supermemory", "accessed": "2026-07-15"}
+  ],
+  "current_version_or_commit": "OpenCode plugin 2.0.8. Core repository active in July 2026; current local self-host binary documentation is newer than the legacy 0.0.5 server previously used by this setup.",
+  "license": "Core and OpenCode plugin repositories report MIT.",
+  "maturity_signals": "Core repository created 2024-02 with about 28.4k stars; OpenCode plugin about 1.4k stars; active updates. Current self-host docs advertise a single binary and full API, but the repository's installed OpenCode plugin still needed a local export wrapper and custom-base settings patch in this setup.",
+  "product_focus": "Memory API and graph engine with hosted platform and a newly prominent local single-binary self-host product. Hosted platform adds connectors, managed proprietary extraction models, organization controls, scaling, and MCP.",
+  "deployment_model": "Self-hosted local binary on documented macOS/Linux platforms, single process, embedded graph engine, local embeddings, optional local/remote LLM. Hosted and enterprise platforms use same API with additional services. Existing user setup runs a remote self-hosted server.",
+  "memory_and_retrieval_model": "Graph-oriented memory extraction, profiles, document/memory ingestion, hybrid semantic search, project/user containers, and OpenCode session/compaction context injection.",
+  "storage_and_model_dependencies": "Current local product embeds its graph engine and local default embeddings in one data directory. User supplies extraction model or local OpenAI-compatible endpoint. Hosted platform uses proprietary models and managed infrastructure.",
+  "api_and_tool_surface": "HTTP Memory API, TypeScript/Python SDKs, OpenCode tools for add/search/profile/list/forget, conversation ingest, context injection, privacy tags, and compaction support. Hosted platform also offers MCP/connectors.",
+  "identity_and_isolation": "Local server is documented as one machine, one org, one API key. OpenCode plugin scopes user and project data by container tags. Hosted/enterprise provides richer organization and key controls.",
+  "security_and_privacy": "Can run fully offline with local embeddings and local LLM. Local data lives in .supermemory or configured data directory; installer saves env secrets separately. Current repository patch prevents a cloud account settings call against custom self-host base URLs.",
+  "opencode_integration": "Official opencode-supermemory package, but version 2.0.8 exports named SupermemoryPlugin and required a local default module wrapper. This setup also applies a self-host custom-base patch.",
+  "hermes_integration": "Official Hermes Agent bundles a native Supermemory provider, but its documented requirements focus on a Supermemory API key and platform-style integration. It supports automatic recall/capture and explicit tools.",
+  "automatic_capture_and_recall": "OpenCode plugin injects user profile and relevant project/user memories and ingests sessions. Hermes provider supports auto_recall, auto_capture, full-session ingest, and profile context.",
+  "repository_and_knowledge_support": "OpenCode plugin uses project container tags for codebase knowledge, but it is primarily memory/document API rather than a hierarchical repository filesystem. Hosted connectors are platform-only; self-host supports file ingestion but not managed connectors.",
+  "installation_and_configuration": "Current local docs offer curl/npx/bunx and a single server binary, but officially list macOS/Linux binary support. Existing Windows client can continue to use remote server. OpenCode package and self-host server need API URL/key config.",
+  "backup_restore_and_portability": "Local docs state all durable state lives in one data directory, making filesystem backup possible. API can list memories/documents for logical export. No official OpenViking import path exists; profiles and container metadata require explicit mapping.",
+  "observability_and_recovery": "Local gives server logs and a single data directory; hosted platform offers dashboard/analytics. OpenCode plugin has explicit lifecycle verifier in this repository. Existing patch addresses delayed unhandled HTTP 405 in self-host mode.",
+  "resource_and_cost_profile": "Simpler single-process operation than OpenViking. Local embeddings reduce cost; extraction still needs a model. Hosted platform offers better model tuning/connectors at subscription cost. Current remote legacy service may need upgrade to benefit from new local product.",
+  "strengths_for_this_repository": "Already deployed, patched, lifecycle-tested, simpler memory-only operational model, known data, and working OpenCode integration. Lowest short-term migration risk.",
+  "risks_and_unknowns": "Current setup depends on local wrapper/patch and an older self-host server lineage. Local product is single-tenant/single-machine. Hosted features remain stronger than local. Cross-harness shared context is less structurally explicit than OpenViking peers/resources.",
+  "data_migration_path": "Export/list current user and project memories plus profile data into immutable JSON. Preserve container tag, source, project, IDs, timestamps when available. Transform only curated data into OpenViking; keep original server/data directory read-only for rollback.",
+  "acceptance_tests": [
+    "Export all user/project memories and profile with stable counts.",
+    "Backup current server data directory and prove restore separately.",
+    "Current add/search/profile/list/forget remains green during pilot.",
+    "No automatic Supermemory and OpenViking context injection in same production session.",
+    "Imported facts retain user/project provenance and deletion mapping."
+  ],
+  "recommendation": "Keep as rollback source during OpenViking pilot. Do not remove until OpenViking restore, isolation, recall quality, and data import pass. Consider upgrading current self-host server independently if migration is deferred.",
+  "confidence": "High for current integration and new official self-host docs; medium for compatibility between the user's older server and current local binary; medium for export completeness.",
+  "source_quality_notes": "Official repositories/docs and installed package were used. Vendor quality comparisons between local and proprietary hosted models are marketing claims, not independent benchmarks.",
+  "uncertain": ["complete logical export of profile graph", "compatibility of legacy server data with current local binary"]
+}

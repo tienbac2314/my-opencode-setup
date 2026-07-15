@@ -1,0 +1,43 @@
+{
+  "name": "Mem0",
+  "official_ownership": "Official mem0ai/mem0 repository, PyPI mem0ai package, npm mem0ai package, and official OpenCode plugin source under integrations/mem0-plugin.",
+  "official_sources": [
+    {"type": "repository", "url": "https://github.com/mem0ai/mem0", "accessed": "2026-07-15"},
+    {"type": "OSS docs", "url": "https://docs.mem0.ai/open-source/overview", "accessed": "2026-07-15"},
+    {"type": "OpenCode docs", "url": "https://docs.mem0.ai/integrations/opencode", "accessed": "2026-07-15"},
+    {"type": "OpenCode source", "url": "https://github.com/mem0ai/mem0/tree/main/integrations/mem0-plugin/.opencode-plugin", "accessed": "2026-07-15"},
+    {"type": "package", "url": "https://pypi.org/project/mem0ai/", "accessed": "2026-07-15"}
+  ],
+  "current_version_or_commit": "PyPI mem0ai 2.0.12; npm mem0ai 3.1.0 metadata checked; repository active July 2026.",
+  "license": "Core repository and official integration report Apache-2.0.",
+  "maturity_signals": "Repository created 2023-06 with about 60.9k stars and 7.1k forks. Broad SDK/provider ecosystem, active 2026 releases, documented OSS/server/cloud modes, benchmarks, migration guides, and official OpenCode integration. Managed-platform benchmark results explicitly include proprietary optimizations not fully available in OSS.",
+  "product_focus": "Personalized memory layer with extraction, semantic/BM25/entity retrieval, user/agent/app/run scoping, OSS library/server, and managed platform. Commercial cloud remains prominent, but self-hosting is real and documented.",
+  "deployment_model": "In-process Python/TypeScript OSS library, Docker self-hosted server/dashboard with Postgres+pgvector, or managed platform. Hermes additionally supports platform, self-hosted server, and in-process OSS modes.",
+  "memory_and_retrieval_model": "ADD-oriented extraction, hash deduplication, vector/entity storage, semantic plus BM25 plus entity fusion, optional reranking, explicit update/delete, categories, metadata, and temporal attributes. User/agent/app/run dimensions provide scoping.",
+  "storage_and_model_dependencies": "OSS library defaults to OpenAI LLM/embeddings, local Qdrant, and SQLite history but supports many LLM/embedder/vector providers. Self-hosted server defaults to Postgres+pgvector. Local operation still requires configured model and embedding providers unless local equivalents are selected.",
+  "api_and_tool_surface": "Python/TypeScript SDKs, CLI, REST server, hosted MCP, official OpenCode plugin with nine native tools, lifecycle hooks, skills, automatic capture, project scope, consolidation/dream features, and export/import skills.",
+  "identity_and_isolation": "Platform and plugin use user_id, agent_id, app_id, and run_id. OpenCode defaults to project scope derived from git remote/root and supports session/global scope. Implicit-null filter semantics reduce accidental cross-scope results but require careful OR/wildcard use.",
+  "security_and_privacy": "Self-host server auth is enabled by default in current docs and supports API keys/audit logs. OSS mode keeps data under chosen stores. Managed integrations send data to Mem0 platform. Plugin requires persistent MEM0_API_KEY for platform mode.",
+  "opencode_integration": "Official full OpenCode plugin exists with native SDK tools, hooks, and skills. However official OpenCode setup is platform/API-key centered; self-host compatibility of the full plugin needs source-level verification before use.",
+  "hermes_integration": "Official Hermes Agent bundles Mem0 provider with platform, self-hosted HTTP server, and in-process OSS modes plus setup flags and explicit tools.",
+  "automatic_capture_and_recall": "Official OpenCode plugin searches at session start/before prompts, periodically captures learnings, injects context, captures errors/compaction state, and can auto-consolidate memories. Hermes provider supports provider-specific sync and tools.",
+  "repository_and_knowledge_support": "OpenCode plugin derives project app_id, imports project guidance, has coding categories, and captures tool/file context. It is not a unified resource filesystem and code retrieval database like OpenViking.",
+  "installation_and_configuration": "OpenCode full plugin installs as @mem0/opencode-plugin and expects MEM0_API_KEY for platform. Self-host server uses Docker bootstrap. Hermes supports `hermes memory setup mem0` with platform/selfhosted/oss choices.",
+  "backup_restore_and_portability": "Managed platform offers export APIs/skills. Official plugin includes portable Markdown export/import. OSS/server storage can be backed up at database/vector-store level. Migration guides exist between Mem0 versions and OSS/platform, but no official OpenViking importer exists.",
+  "observability_and_recovery": "Self-host server includes dashboard, API keys, request audit log; plugin exposes health/stats skills and lifecycle diagnostics; async platform processing supports event status/webhooks. Operational burden depends on library, server, or cloud mode.",
+  "resource_and_cost_profile": "More configurable and potentially heavier than Supermemory local because user chooses LLM/embedder/vector components; server stack includes Postgres+pgvector. Platform removes operations at subscription cost. OSS quality may differ from proprietary managed benchmark stack.",
+  "strengths_for_this_repository": "Mature ecosystem, Apache license, official OpenCode plugin, native Hermes provider, strong scoping, portable export/import skills, and multiple self-host modes. It is a credible alternative and should not be dismissed as cloud-only.",
+  "risks_and_unknowns": "Official OpenCode plugin appears platform-first; its large hook/skill surface can overlap current lazy loader and retired MCP-skill policy. Past repository Mem0 integration was complex and removed. OSS/server and platform behavior differ. Reintroducing it risks restoring old operational complexity.",
+  "data_migration_path": "Mem0 has export/import tooling, but current source is Supermemory. Use Supermemory logical export, normalize to portable JSON/Markdown, and import either via Mem0 raw mode or OpenViking explicit writes. No direct reason to route through Mem0 for an OpenViking migration.",
+  "acceptance_tests": [
+    "Verify full OpenCode plugin against self-host endpoint rather than platform only.",
+    "Confirm no duplicate skill/MCP registrations with current setup.",
+    "Validate project/session/global isolation and dangerous bulk-delete guard.",
+    "Compare OSS and platform recall quality without using vendor-only benchmark claims.",
+    "Test Hermes platform, self-host server, and OSS mode separately."
+  ],
+  "recommendation": "Do not reintroduce for this migration. Keep as benchmark comparator. OpenViking better matches shared context-database goal; Supermemory is safer current rollback. Mem0 remains a strong option if mature memory-only ecosystem and Apache licensing outweigh prior integration complexity.",
+  "confidence": "High for official ecosystem and deployment modes; medium for full OpenCode plugin self-host support; high that Hermes support is native.",
+  "source_quality_notes": "Official repository/docs/source were used. Managed benchmark numbers explicitly do not represent OSS identically. No demographic assumptions were used.",
+  "uncertain": ["full OpenCode plugin self-host endpoint support", "comparative OSS recall quality"]
+}
