@@ -3,8 +3,9 @@
   "schemaVersion": 1,
   "expectedServerPlugins": 7,
   "retired": {
-    "npmLocal": ["opencode-update-notifier"],
-    "pluginSpecs": ["opencode-update-notifier"]
+    "npmLocal": ["opencode-update-notifier", "@prevalentware/opencode-goal-plugin"],
+    "pluginSpecs": ["opencode-update-notifier"],
+    "skills": ["browser-automation", "devtools-debugger", "docs-fetcher"]
   },
   "components": [
     {

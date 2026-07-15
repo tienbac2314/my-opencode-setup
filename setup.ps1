@@ -1,3 +1,20 @@
+<#
+.SYNOPSIS
+  Install and converge the repository-managed OpenCode configuration.
+
+.DESCRIPTION
+  Copies tracked configuration, agents, data, commands, plugins, and skills into
+  the selected global config directory. Delegates approved component installs to
+  maintain.ps1, removes retired artifacts, configures optional machine integration,
+  and runs verification unless skipped. Existing private OpenCode and Supermemory
+  credential files are preserved.
+
+.EXAMPLE
+  pwsh ./setup.ps1
+
+.EXAMPLE
+  pwsh ./setup.ps1 -SkipRtk -SkipCodeGraph -SkipTests
+#>
 [CmdletBinding(SupportsShouldProcess)]
 param(
   [switch]$SkipRtk,
@@ -32,6 +49,9 @@ function Set-BackgroundAgentEnvironment {
 function Copy-UniqueSkills {
   $destination = Join-Path $ConfigDir "skills"
   New-Item -ItemType Directory -Path $destination -Force | Out-Null
+  foreach ($name in @($manifest.retired.skills)) {
+    Remove-Item -LiteralPath (Join-Path $destination $name) -Recurse -Force -ErrorAction SilentlyContinue
+  }
   $external = @(
     (Join-Path $HOME ".agents\skills"),
     (Join-Path $HOME ".claude\skills")

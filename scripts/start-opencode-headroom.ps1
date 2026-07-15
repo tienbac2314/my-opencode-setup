@@ -1,3 +1,15 @@
+<#
+.SYNOPSIS
+  Launch one isolated OpenCode session through the local Headroom proxy.
+
+.DESCRIPTION
+  Starts or reuses a healthy local Headroom proxy, injects in-memory provider and
+  transport overrides for one OpenCode process, records request metadata without
+  prompts, restores environment variables, and stops only the proxy it started.
+
+.EXAMPLE
+  pwsh ./scripts/start-opencode-headroom.ps1 -OpenCodeArgsJson '["run","Return exact text: HEADROOM_OK"]'
+#>
 param(
   [string]$PluginEntry = [IO.Path]::Combine($HOME, ".cache", "opencode-headroom", "source", "plugins", "opencode", "dist", "entry.opencode.js"),
   [int]$Port = 8787,

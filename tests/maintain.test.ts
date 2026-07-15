@@ -8,6 +8,18 @@ const maintainer = fileURLToPath(new URL("../maintain.ps1", import.meta.url))
 const setup = fileURLToPath(new URL("../setup.ps1", import.meta.url))
 const updateOpenCode = fileURLToPath(new URL("../scripts/update-opencode.ps1", import.meta.url))
 const repositoryManifest = JSON.parse(readFileSync(new URL("../config/components.json", import.meta.url), "utf8"))
+const activeDocs = [
+  "README.md",
+  "setup.md",
+  "PATCHES.md",
+  "pr.md",
+  "AGENTS.md",
+  "TROUBLESHOOTING.md",
+  "docs/agents.md",
+  "docs/maintenance-refactor.md",
+]
+const operationalDocs = activeDocs.filter((file) => file !== "docs/maintenance-refactor.md")
+const retiredMcpSkills = ["browser-automation", "devtools-debugger", "docs-fetcher"]
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "opencode-maintain-"))
@@ -41,6 +53,8 @@ test("component manifest is unique and complete", () => {
   expect(new Set(components.map((item) => item.id)).size).toBe(components.length)
   expect(repositoryManifest.expectedServerPlugins).toBe(7)
   expect(repositoryManifest.retired.npmLocal).toContain("opencode-update-notifier")
+  expect(repositoryManifest.retired.npmLocal).toContain("@prevalentware/opencode-goal-plugin")
+  expect(repositoryManifest.retired.skills).toEqual(retiredMcpSkills)
   for (const item of components) {
     expect(item.id).toBeTruthy()
     expect(item.kind).toBeTruthy()
@@ -62,8 +76,7 @@ test("Goal plugin stays disabled until its OpenCode integration bug is fixed", (
 })
 
 test("active docs use manifest and unified scripts only", () => {
-  const files = ["README.md", "setup.md", "PATCHES.md", "pr.md"]
-  for (const file of files) {
+  for (const file of operationalDocs) {
     const body = readFileSync(new URL(`../${file}`, import.meta.url), "utf8")
     expect(body).not.toContain("versions.env")
     expect(body).not.toContain("update-plugins.ps1")
@@ -72,13 +85,48 @@ test("active docs use manifest and unified scripts only", () => {
 })
 
 test("active documentation has no broken local links", () => {
-  const files = ["README.md", "setup.md", "PATCHES.md", "pr.md"]
-  for (const file of files) {
+  for (const file of activeDocs) {
     const body = readFileSync(new URL(`../${file}`, import.meta.url), "utf8")
     for (const match of body.matchAll(/\[[^\]]+\]\((?!https?:\/\/|#)([^)]+)\)/g)) {
       const target = match[1]!.split("#")[0]!
-      expect(existsSync(new URL(`../${target}`, import.meta.url))).toBe(true)
+      expect(existsSync(new URL(target, new URL(`../${file}`, import.meta.url)))).toBe(true)
     }
+  }
+})
+
+test("active instructions match current manifest and retained operations", () => {
+  const agents = readFileSync(new URL("../AGENTS.md", import.meta.url), "utf8")
+  const setup = readFileSync(new URL("../setup.md", import.meta.url), "utf8")
+  const journey = readFileSync(new URL("../docs/maintenance-refactor.md", import.meta.url), "utf8")
+
+  expect(agents).toContain("Repository source of truth")
+  expect(agents).toContain("TROUBLESHOOTING.md")
+  expect(agents).not.toContain("notifier checks npm packages")
+  expect(setup).toContain("scripts/set-credentials.ps1")
+  expect(setup).toContain("router_api_key")
+  expect(setup).toContain("Microsoft.VisualStudio.Workload.VCTools")
+  expect(setup).toContain('headroom-ai[all]==0.31.0')
+  expect(setup).toContain("does not replace another `rtk.exe`")
+  expect(journey).toContain("full Bun suite passing")
+  expect(journey).toContain(`${repositoryManifest.expectedServerPlugins} plugins`)
+  expect(journey).toContain("Goal remains disabled")
+  expect(journey).not.toContain("8 plugins, 8 origins")
+})
+
+test("obsolete MCP skills are retired from source and deployment", () => {
+  const setup = readFileSync(new URL("../setup.ps1", import.meta.url), "utf8")
+  expect(setup).toContain("retired.skills")
+  for (const name of retiredMcpSkills) {
+    expect(existsSync(new URL(`../skills/${name}`, import.meta.url))).toBe(false)
+  }
+})
+
+test("operator scripts expose comment-based help", () => {
+  for (const file of ["setup.ps1", "maintain.ps1", "scripts/update-opencode.ps1", "scripts/install-headroom-plugin.ps1", "scripts/start-opencode-headroom.ps1"]) {
+    const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8")
+    expect(source).toContain(".SYNOPSIS")
+    expect(source).toContain(".DESCRIPTION")
+    expect(source).toContain(".EXAMPLE")
   }
 })
 
@@ -363,6 +411,15 @@ test("setup converges isolated config without machine integration", () => {
   const log = join(root, "commands.log")
   try {
     mkdirSync(bin)
+    mkdirSync(configDir)
+    writeFileSync(join(configDir, "package.json"), JSON.stringify({ dependencies: {
+      "@prevalentware/opencode-goal-plugin": "0.1.24",
+    } }))
+    for (const name of retiredMcpSkills) {
+      const skill = join(configDir, "skills", name)
+      mkdirSync(skill, { recursive: true })
+      writeFileSync(join(skill, "SKILL.md"), "obsolete")
+    }
     writeFileSync(join(bin, "npm.cmd"), `@echo npm %*>>"${log}"\r\n@exit /b 0\r\n`)
     writeFileSync(join(bin, "bunx.cmd"), `@echo bunx %*>>"${log}"\r\n@exit /b 0\r\n`)
     const result = Bun.spawnSync([
@@ -376,10 +433,14 @@ test("setup converges isolated config without machine integration", () => {
     expect(existsSync(join(configDir, "tui.json"))).toBe(true)
     expect(existsSync(join(configDir, "plugins", "lazy-load.ts"))).toBe(true)
     expect(existsSync(join(configDir, "commands", "goal.md"))).toBe(false)
+    for (const name of retiredMcpSkills) {
+      expect(existsSync(join(configDir, "skills", name))).toBe(false)
+    }
     const commands = readFileSync(log, "utf8")
     expect(commands).toContain("opencode-ai@1.18.0")
     expect(commands).toContain("@opencode-ai/plugin@1.18.0")
-    expect(commands).not.toContain("@prevalentware/opencode-goal-plugin")
+    expect(commands).toContain("npm uninstall @prevalentware/opencode-goal-plugin")
+    expect(commands).not.toContain("install --save-exact @prevalentware/opencode-goal-plugin")
     expect(commands).not.toContain("headroom-ai")
   } finally {
     rmSync(root, { recursive: true, force: true })

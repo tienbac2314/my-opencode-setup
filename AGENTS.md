@@ -1,6 +1,21 @@
 # OpenCode Guidelines
 **Tradeoff:** Focused execution > broad autonomy. Trivial tasks: use judgment. (Merge with project rules)
 
+## 0. Repository source of truth
+
+**When changing this repository, resolve these paths from repository root and read current contracts before changing setup or runtime behavior.**
+
+* `README.md`: architecture, component map, runtime boundaries, daily commands.
+* `setup.md`: install, credentials, environment, updates, recovery, live checks.
+* `config/components.json`: only authority for approved versions, source commits, disabled components, and retired artifacts.
+* `PATCHES.md`: local forks, wrappers, package patches, verification, removal conditions.
+* `TROUBLESHOOTING.md`: symptom-first checks and safe recovery.
+* `docs/agents.md`: primary agents, `@` subagents, OMO roles, discovery paths.
+* `docs/maintenance-refactor.md`: root causes, rejected approaches, historical boundaries.
+* `pr.md`: upstream ownership; repository policy stays local.
+
+Current boundaries: Goal is disabled; runtime notifier is retired; Headroom is optional and launcher-only; local plugins are auto-discovered. Compare repository files with active `~/.config/opencode` before diagnosing drift. Never print full resolved config or credential values.
+
 ## 1. Think Before Coding
 
 **State assumptions. No silent decisions. Surface tradeoffs.**
@@ -68,4 +83,4 @@
 * **RTK:** Prefix supported shell commands with `rtk`. Hooks can rewrite commands or output. If command succeeds, treat output as final and follow user's requested output shape; do not rerun raw command. Use user PATH.
 * **Memory:** Supermemory is active memory. Read loaded schema before use; never guess fields or print credentials.
 * **Agents/skills:** Main tabs are primary agents. `@` invokes subagents allowed by `permission.task`. Runtime skill list is authoritative; read matching `SKILL.md`. Hidden Deep Research web search is intentional.
-* **Plugins:** `/tokens` reports token sources; model discovery builds 9router entries; notifier checks npm packages only. Local plugins auto-discover, so never add their paths or set `"plugin": []`.
+* **Plugins:** `/tokens` reports token sources; model discovery builds 9router entries; update checks belong to `maintain.ps1`. Local plugins auto-discover, so never add their paths or set `"plugin": []`.

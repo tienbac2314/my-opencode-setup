@@ -1,3 +1,25 @@
+<#
+.SYNOPSIS
+  Check, plan, apply, or verify manifest-managed OpenCode components.
+
+.DESCRIPTION
+  Uses config/components.json as the source of approved versions and component
+  state. Check is read-only, plan writes machine and human reports, apply changes
+  selected approved components and converges local files, and verify checks active
+  package pins, plugin origins, local hashes, patches, tests, and production audit.
+
+.EXAMPLE
+  pwsh ./maintain.ps1 check -Offline
+
+.EXAMPLE
+  pwsh ./maintain.ps1 plan
+
+.EXAMPLE
+  pwsh ./maintain.ps1 apply -Component opencode,omo-slim
+
+.EXAMPLE
+  pwsh ./maintain.ps1 verify
+#>
 [CmdletBinding(SupportsShouldProcess)]
 param(
   [Parameter(Position = 0)]

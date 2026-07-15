@@ -1,3 +1,15 @@
+<#
+.SYNOPSIS
+  Update a global npm OpenCode installation after running processes exit.
+
+.DESCRIPTION
+  Windows cannot replace an in-use opencode.exe. When OpenCode processes are
+  active, this script starts a hidden helper that waits for them to exit and then
+  installs the exact requested opencode-ai version with npm.
+
+.EXAMPLE
+  pwsh ./scripts/update-opencode.ps1 -Version 1.18.0
+#>
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)]

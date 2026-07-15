@@ -11,6 +11,8 @@ Current active references:
 - `README.md`: component map and daily commands.
 - `setup.md`: Windows/Linux install, update, recovery, and live checks.
 - `PATCHES.md`: every local fork, wrapper, package patch, and removal condition.
+- `TROUBLESHOOTING.md`: current symptom-first checks and recovery.
+- `docs/agents.md`: agent taxonomy, OMO roles, and discovery paths.
 - `pr.md`: minimal upstream issue/PR text and correct target repositories.
 - `config/components.json`: only source of approved versions and source commits.
 
@@ -23,6 +25,8 @@ Current active references:
 5. Removed old plans, duplicate debug docs, IDE files, and `mem0-archive/`. History remains available through Git.
 6. Added exact package patches and deterministic lifecycle verifiers for Goal and Supermemory.
 7. Added tracked `/goal` and `/tokens` commands, package/origin validation, documentation link checks, and high/critical npm audit gating.
+8. Disabled Goal after later live integration failures; retained its source, patch, and historical tests while removing package, pins, and command from active setup.
+9. Retired three MCP-bearing skills from an older lazy-load design: browser automation, DevTools debugger, and docs fetcher.
 
 ## Root causes and fixes
 
@@ -34,13 +38,15 @@ Fix lives in `plugins/lazy-load.ts`; regression coverage is `tests/lazy-load.tes
 
 ### Goal server tools
 
+Historical repair context follows. Goal remains disabled in current manifest because live OpenCode integration stayed unreliable after these package-level fixes.
+
 `@prevalentware/opencode-goal-plugin/server@VERSION` looked valid in resolved config but silently registered no tools. OpenCode selects `./server` or `./tui` only when both configs use the root package spec:
 
 ```text
 @prevalentware/opencode-goal-plugin@VERSION
 ```
 
-Do not restore the deleted local Goal wrapper. Root package loading now exposes `create_goal`, `get_goal`, `update_goal`, and related tools directly.
+Do not restore the deleted local Goal wrapper. If Goal is reconsidered, start with root package loading and prove complete lifecycle before removing disabled state.
 
 ### Goal sidebar
 
@@ -51,7 +57,7 @@ Four upstream TUI problems existed:
 - TUI only scanned loaded chat tool parts, while server-owned Goal state lives in its persisted state file;
 - persisted server records omit two display-only fields required by the TUI snapshot validator.
 
-`patches/opencode-goal-plugin-0.1.24.patch` fixes these in both config and cached TUI package copies. It polls and normalizes server-owned state, requests a host rerender, and shows a clear active block. Inactive Goal state renders nothing. `scripts/verify-goal-tui.ts` covers tool-backed active, file-backed active, empty, and cleared states.
+Dormant `patches/opencode-goal-plugin-0.1.24.patch` demonstrates package fixes. Historical verifier covers tool-backed active, file-backed active, empty, and cleared states, but these tests do not authorize runtime re-enable.
 
 OpenCode also persists sidebar visibility. A bare config still reuses that host state, so reinstalling the plugin does not make a hidden sidebar reappear. In a wide terminal, press `Ctrl+X`, then `B`. The built-in `Plugins` command distinguishes host state from plugin failure: `local.goal-mode.tui` must be active. A narrow terminal can hide all sidebars by responsive design.
 
@@ -92,11 +98,11 @@ RTK installs under `~/.local/bin` and resolves through `PATH`. Local wrapper onl
 - Re-running every installer during updates caused locked binaries, slow setup, and avoidable config churn. Apply now installs only missing/drifted approved targets, then always converges local files, pins, and patches.
 - Computer Use and Playwright MCP runtimes were not exposed in the final session. App proof used `opencode web`, HTTP 200, and a real headless Chrome screenshot; TUI proof used a live PTY plus the deterministic OpenTUI renderer.
 
-## Final evidence gathered
+## Current evidence
 
-- `pwsh ./maintain.ps1 verify`: 65 tests, 0 failures; exact targets, local hashes, package patches, and 8 plugin origins verified.
-- `opencode debug config`: 8 plugins, 8 origins, root Goal package, `/goal`, and `/tokens`.
-- Goal: create/get/update/clear lifecycle passed; empty and active sidebar frames passed.
+- Real global setup completed against `~/.config/opencode` with full Bun suite passing.
+- `opencode debug config`: 7 plugins and 7 origins; Goal package and `/goal` are absent from active runtime.
+- Goal remains disabled; dormant renderer tests preserve historical package investigation only.
 - Lazy loading: live `load_tool` then Bash execution passed.
 - OMO Slim: Oracle, Librarian, Designer, and Fixer task lifecycles passed; Explorer is intentionally disabled.
 - Token source: saved `/tokens` report showed real API usage after a model turn.
@@ -105,10 +111,12 @@ RTK installs under `~/.local/bin` and resolves through `PATH`. Local wrapper onl
 - CodeGraph: indexed exploration and unindexed startup passed.
 - Deep Research skill loaded; strategy modules remain hidden from agent autocomplete.
 - App: local web UI returned HTTP 200 and rendered through headless Chrome without plugin/server errors.
-- TUI: live plugin manager showed Goal and OMO active together. Deterministic rendering covers active state from both tool output and the persisted server state; empty and cleared states stay hidden.
+- TUI: OMO active; Goal intentionally absent.
 - Oracle VPS: both service hosts were reachable; unauthenticated 9router returned expected 401. Authenticated Supermemory CRUD was proven locally.
 - Production npm audit: 0 high, 0 critical. Remaining findings were transitive low/moderate packages with no safe forced fix.
 - Repository secret scan found placeholders/constants only. Private credential values stay outside Git.
+
+Earlier Goal-enabled revisions passed isolated renderer and lifecycle checks before later integration failures motivated disablement. Retrieve removed debug material read-only through `git show master:knownbug.md`, `git show master:docs/opencode-agents.md`, or branches `archive/broken-docs-reference` and `codex/pre-cleanup-c286bb8`; never deploy those historical trees.
 
 ## Future update workflow
 

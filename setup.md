@@ -9,6 +9,7 @@ Install Git, PowerShell 7, Node.js, npm, Bun, Python `uv`, and ripgrep. Keep use
 ```powershell
 $bin = "$HOME\.local\bin"
 [Environment]::SetEnvironmentVariable("PATH", "$bin;$([Environment]::GetEnvironmentVariable('PATH','User'))", "User")
+$env:PATH = "$bin;$env:PATH"
 ```
 
 Restart terminal. Confirm:
@@ -46,7 +47,39 @@ Optional components such as Headroom are not installed by default.
 
 ## 3. Private credentials
 
-Use machine-local credential script or edit these ignored files:
+Create an ignored private JSON file:
+
+```json
+{
+  "router_api_key": "",
+  "router_base_url": "",
+  "supermemory_api_key": "",
+  "supermemory_base_url": "",
+  "openrouter_api_key": ""
+}
+```
+
+Restore it after setup:
+
+```powershell
+pwsh ./scripts/set-credentials.ps1 -CredentialsFile "$HOME\.config\opencode\credentials.json"
+```
+
+Required fields are `router_api_key`, `router_base_url`, `supermemory_api_key`, and `supermemory_base_url`; `openrouter_api_key` is optional. Script updates only 9router options, Supermemory config, optional OpenRouter auth, and these user variables:
+
+```text
+SUPERMEMORY_API_KEY
+SUPERMEMORY_BASE_URL
+OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS
+```
+
+Restart terminals and OpenCode after persistent environment changes. To set only current shell:
+
+```powershell
+$env:OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS = "true"
+```
+
+Files remain ignored and machine-local:
 
 ```text
 ~/.config/opencode/opencode.jsonc
@@ -77,6 +110,13 @@ Live smoke tests:
    Automated verifier: `bun ./scripts/verify-supermemory.ts "$HOME/.config/opencode"`.
 7. Run RTK rewrite: `rtk rewrite "git status"`.
 
+RTK installer extracts approved binary under `~/.local/bin`; it does not replace another `rtk.exe` already present in System32 or another PATH directory. Executable cleanup and replacement remain user-managed. Diagnose precedence with:
+
+```powershell
+Get-Command rtk -All | Select-Object Source
+rtk --version
+```
+
 ## 5. Updates
 
 ```powershell
@@ -103,7 +143,16 @@ Use `-All` only after every target in manifest has been reviewed. Maintainer sto
 
 ## 6. Headroom optional launcher
 
+Windows Python dependencies require Visual Studio 2022 Build Tools with C++ workload. Run from Administrator PowerShell, then restart terminal:
+
 ```powershell
+winget install Microsoft.VisualStudio.2022.BuildTools --silent --accept-package-agreements --accept-source-agreements --override "--add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.Windows11SDK.22000 --includeRecommended --quiet --wait"
+```
+
+Install pinned Python proxy and build pinned OpenCode transport:
+
+```powershell
+uv tool install --force "headroom-ai[all]==0.31.0"
 pwsh ./scripts/install-headroom-plugin.ps1
 pwsh ./scripts/start-opencode-headroom.ps1 -OpenCodeArgsJson '["run","--model","opencode/deepseek-v4-flash-free","Return exact text: HEADROOM_OK"]'
 ```
@@ -118,6 +167,8 @@ pwsh ./maintain.ps1 verify
 ```
 
 Setup is safe to rerun. It restores tracked files and exact targets without replacing private credential files.
+
+Setup also removes retired npm packages and retired skill copies from active config. It does not replace executables outside repository-managed install locations. Use [TROUBLESHOOTING.md](TROUBLESHOOTING.md) when `check` still reports executable drift.
 
 ## 8. Linux setup differences
 

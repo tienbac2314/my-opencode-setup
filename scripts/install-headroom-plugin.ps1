@@ -1,3 +1,18 @@
+<#
+.SYNOPSIS
+  Build the pinned native Headroom OpenCode transport plugin.
+
+.DESCRIPTION
+  Fetches the approved Headroom source commit, installs its Bun dependencies, and
+  builds the OpenCode entry under the user cache. On Windows, install Visual Studio
+  Build Tools with the C++ workload and Windows SDK before installing headroom-ai[all].
+
+.EXAMPLE
+  pwsh ./scripts/install-headroom-plugin.ps1
+
+.EXAMPLE
+  pwsh ./scripts/install-headroom-plugin.ps1 -Commit a0699794660132313446e8c52c588d6ead05af21
+#>
 param(
   [string]$Commit,
   [string]$CacheDir = [IO.Path]::Combine($HOME, ".cache", "opencode-headroom"),

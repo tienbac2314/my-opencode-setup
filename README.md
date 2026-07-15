@@ -7,6 +7,8 @@ Personal OpenCode setup for Windows and Linux. One component manifest controls v
 - Install: [setup.md](setup.md)
 - Check or apply updates: `pwsh ./maintain.ps1 check|plan|apply|verify`
 - Understand local differences: [PATCHES.md](PATCHES.md)
+- Diagnose runtime problems: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- Understand agents and OMO roles: [docs/agents.md](docs/agents.md)
 - Prepare upstream reports: [pr.md](pr.md)
 - Understand this refactor and past failures: [docs/maintenance-refactor.md](docs/maintenance-refactor.md)
 
@@ -24,6 +26,8 @@ tests/                   behavior and maintenance contracts
 ```
 
 Private credentials stay outside this repository under `~/.config/opencode`.
+
+Flow: `setup.ps1` reads the component manifest and delegates installs to `maintain.ps1`; maintainer converges package pins, tracked runtime files, patches, and retired artifacts; OpenCode auto-discovers local files under `plugins/`; tests encode integration contracts. Read [docs/maintenance-refactor.md](docs/maintenance-refactor.md) before changing this flow.
 
 ## Components
 
@@ -64,7 +68,9 @@ pwsh ./maintain.ps1 verify
 - CodeGraph runs only when project has `.codegraph/codegraph.db`.
 - Goal package, patch, and command remain tracked but are not installed or loaded. `components.json` records the temporary disable reason.
 - Update checks come from `maintain.ps1`; no runtime notifier plugin is needed.
+- Browser automation, DevTools debugger, and docs-fetcher MCP skills are retired; MCP ownership stays in explicit OpenCode/OMO configuration.
 - Supermemory wrapper adapts package export only; memory behavior remains upstream.
+- RTK is installed under `~/.local/bin`; executable replacement and removal of stale copies elsewhere on `PATH` remain user-managed.
 - `npm ls --depth=0` and `opencode debug config` are authoritative. `bun pm ls` can show stale lock metadata after npm installs.
 - `.opencode/goals/` is user/runtime state and remains untracked.
 
@@ -76,7 +82,7 @@ pwsh ./maintain.ps1 verify
 - repository-to-runtime plugin hashes;
 - package patches;
 - resolved plugin/origin counts;
-- full Bun test suite.
+- full Bun test suite;
 - production dependency audit at high severity or above when online.
 
 Live checks still matter for provider traffic, App rendering, agent orchestration, and Supermemory CRUD.
