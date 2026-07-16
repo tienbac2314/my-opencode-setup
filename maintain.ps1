@@ -55,7 +55,8 @@ function Read-Manifest {
 
 function Invoke-Text {
   param([string]$File, [string[]]$Arguments, [string]$WorkingDirectory)
-  $command = Get-Command $File -ErrorAction SilentlyContinue
+  $command = Get-Command $File -CommandType Application,ExternalScript -ErrorAction SilentlyContinue |
+    Select-Object -First 1
   if (-not $command) { return $null }
   if ($WorkingDirectory) { Push-Location $WorkingDirectory }
   try {

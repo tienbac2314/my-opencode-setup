@@ -17,15 +17,17 @@ Non-goal: provider-specific model logic.
 
 ## `omarwaly-ai/OpenCode-tokens-source`
 
-Problem: repeated plugin initialization can install duplicate fetch wrappers or lose command registration depending on host reload behavior.
+Upstream commit `004e35f37` already has the `_tsFetchWrapped` idempotent wrapper guard and returns hooks on every plugin init. No upstream PR needed.
 
-Minimal PR: add idempotent wrapper registration while returning command/tool hooks on every initialization. Include repeated-init test. Keep filename ordering local.
+Local-only differences:
+- `0-` filename prefix for sort ordering (load before lazy-load)
+- `export const TokensSourcePlugin` (for repeated-init test in `tests/plugin-wrappers.test.ts`)
 
 ## `rtk-ai/rtk`
 
-Problem: generated OpenCode hook assumes `input.$` exists; Desktop-shaped input can omit shell.
+Problem: generated OpenCode hook assumes `input.$` exists; Desktop-shaped input can omit shell. Upstream uses `which rtk` (Unix-only) for binary detection.
 
-Minimal PR: fallback to `execFile`, support `bash` and `shell`, and add Windows/Desktop tests. Do not copy repository-specific config.
+Minimal PR: fallback to `execFile` when injected shell is missing. Use `where` / `--version` for cross-platform rtk detection. Add Windows/Desktop tests. Do not copy repository-specific config.
 
 ## `supermemoryai/opencode-supermemory`
 
@@ -82,5 +84,5 @@ No upstream PR target:
 
 - `plugins/models-discovery.js` unless published as standalone project;
 - `plugins/codegraph-helper.ts` unless proposed as new CodeGraph integration;
-- Headroom process isolation policy;
+- Headroom pinned source transport until the wheel ships its OpenCode transport;
 - manifest/maintainer/setup scripts.

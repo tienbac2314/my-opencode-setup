@@ -79,9 +79,11 @@ OMO also copied skills already visible under `~/.agents` or `~/.claude`. Setup n
 
 ### Headroom
 
-Headroom remains opt-in and launcher-only. `scripts/start-opencode-headroom.ps1` starts a local proxy, creates in-memory provider overrides for every non-loopback provider, injects the transport plugin only for that process, verifies config hashes, and stops only the proxy it started.
+Headroom remains optional. Official `headroom wrap opencode` now owns proxy startup, provider/config routing, MCP options, child launch, and cleanup, so the repository custom launcher was removed.
 
-Normal App/TUI sessions are never proxied. Both native OpenCode and 9router routes passed after the final source pin.
+The `headroom-ai` 0.31.0 wheel does not ship the transparent OpenCode transport. Repository keeps a pinned source build and supplies it through `HEADROOM_OPENCODE_PLUGIN_PATH` so custom providers such as 9router are intercepted. Remove that source build only after the wheel ships equivalent transport and live custom-provider tests pass.
+
+Direct executable/App launches are not proxied. This machine's PowerShell profile can route interactive `opencode` calls through official wrapper. Both native OpenCode and 9router routes passed after the source pin.
 
 ### CodeGraph and RTK
 

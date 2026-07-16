@@ -31,7 +31,9 @@ If another directory wins PATH, update/remove that copy yourself or prepend `~/.
 
 ## Headroom install or build fails
 
-Windows `headroom-ai[all]` native dependencies require Visual Studio 2022 Build Tools, C++ workload, and Windows SDK. Install command lives in [setup.md](setup.md#6-headroom-optional-launcher). Restart terminal, install pinned Python tool, then build pinned transport. Headroom remains launcher-only; never add persistent provider/plugin entries.
+Windows `headroom-ai[all]` native dependencies require Visual Studio 2022 Build Tools, C++ workload, and Windows SDK. Install command lives in [setup.md](setup.md#6-headroom-official-wrapper-optional). Restart terminal, install pinned Python tool, then build pinned transport.
+
+Use `headroom wrap opencode`, not the retired repository launcher. If custom-provider traffic bypasses Headroom, verify `HEADROOM_OPENCODE_PLUGIN_PATH` points to `~/.cache/opencode-headroom/source/plugins/opencode/dist/entry.opencode.js`. The 0.31.0 wheel can route built-in providers without that file but does not ship transparent transport for 9router and other custom providers.
 
 ## CodeGraph error outside indexed project
 
@@ -66,7 +68,7 @@ Setup avoids repository/external skill-name duplication and removes retired brow
 Windows holds `opencode.exe` open. Use exact approved version:
 
 ```powershell
-pwsh ./scripts/update-opencode.ps1 -Version 1.18.0
+pwsh ./scripts/update-opencode.ps1 -Version 1.18.1
 ```
 
 Close all OpenCode processes; hidden helper updates after locks release.

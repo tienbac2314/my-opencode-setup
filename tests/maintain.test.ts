@@ -52,6 +52,8 @@ test("component manifest is unique and complete", () => {
   const components = repositoryManifest.components as Array<Record<string, unknown>>
   expect(new Set(components.map((item) => item.id)).size).toBe(components.length)
   expect(repositoryManifest.expectedServerPlugins).toBe(7)
+  expect(repositoryManifest.components.find((item: any) => item.id === "opencode")?.target).toBe("1.18.1")
+  expect(repositoryManifest.components.find((item: any) => item.id === "opencode-plugin")?.target).toBe("1.18.1")
   expect(repositoryManifest.retired.npmLocal).toContain("opencode-update-notifier")
   expect(repositoryManifest.retired.npmLocal).toContain("@prevalentware/opencode-goal-plugin")
   expect(repositoryManifest.retired.skills).toEqual(retiredMcpSkills)
@@ -107,6 +109,7 @@ test("active instructions match current manifest and retained operations", () =>
   expect(setup).toContain("Microsoft.VisualStudio.Workload.VCTools")
   expect(setup).toContain('headroom-ai[all]==0.31.0')
   expect(setup).toContain("does not replace another `rtk.exe`")
+  expect(setup).toContain("Latest versions are reported, never auto-approved")
   expect(journey).toContain("full Bun suite passing")
   expect(journey).toContain(`${repositoryManifest.expectedServerPlugins} plugins`)
   expect(journey).toContain("Goal remains disabled")
@@ -122,7 +125,7 @@ test("obsolete MCP skills are retired from source and deployment", () => {
 })
 
 test("operator scripts expose comment-based help", () => {
-  for (const file of ["setup.ps1", "maintain.ps1", "scripts/update-opencode.ps1", "scripts/install-headroom-plugin.ps1", "scripts/start-opencode-headroom.ps1"]) {
+  for (const file of ["setup.ps1", "maintain.ps1", "scripts/update-opencode.ps1", "scripts/install-headroom-plugin.ps1"]) {
     const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8")
     expect(source).toContain(".SYNOPSIS")
     expect(source).toContain(".DESCRIPTION")
@@ -135,6 +138,7 @@ test("setup and maintainer use cross-platform config and temp paths", () => {
   const maintain = readFileSync(new URL("../maintain.ps1", import.meta.url), "utf8")
   expect(setup).toContain('[IO.Path]::Combine($HOME, ".config", "opencode")')
   expect(maintain).toContain("[IO.Path]::GetTempPath()")
+  expect(maintain).toContain("Get-Command $File -CommandType Application,ExternalScript")
   expect(setup).toContain("Copy-UniqueSkills")
   expect(setup).toContain("externalNames")
   expect(setup).toContain("foreach ($name in $externalNames)")
@@ -334,6 +338,23 @@ test("Headroom installer reads commit from component manifest", () => {
   expect(source).not.toContain("versions.env")
 })
 
+test("Headroom uses official wrapper with pinned source transport", () => {
+  const setup = readFileSync(new URL("../setup.md", import.meta.url), "utf8")
+  const patches = readFileSync(new URL("../PATCHES.md", import.meta.url), "utf8")
+  const source = repositoryManifest.components.find((item: any) => item.id === "headroom-source")
+
+  expect(existsSync(new URL("../scripts/start-opencode-headroom.ps1", import.meta.url))).toBe(false)
+  expect(existsSync(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))).toBe(true)
+  expect(setup).toContain("headroom wrap opencode --no-context-tool --")
+  expect(setup).toContain("HEADROOM_OPENCODE_PLUGIN_PATH")
+  expect(setup).toContain("Get-Command opencode -CommandType Application,ExternalScript")
+  expect(setup).toContain("Headroom changed OpenCode version")
+  expect(setup).toContain("Headroom OpenCode transport missing")
+  expect(setup).not.toContain("start-opencode-headroom.ps1")
+  expect(patches).toContain("Official `headroom wrap opencode`")
+  expect(source.removeWhen).toContain("wheel ships")
+})
+
 test("Goal package patch keeps active sidebar reactive and hides inactive state", () => {
   const patch = readFileSync(new URL("../patches/opencode-goal-plugin-0.1.24.patch", import.meta.url), "utf8")
   const manifest = repositoryManifest.components.find((item: any) => item.id === "goal")
@@ -437,8 +458,8 @@ test("setup converges isolated config without machine integration", () => {
       expect(existsSync(join(configDir, "skills", name))).toBe(false)
     }
     const commands = readFileSync(log, "utf8")
-    expect(commands).toContain("opencode-ai@1.18.0")
-    expect(commands).toContain("@opencode-ai/plugin@1.18.0")
+    expect(commands).toContain("opencode-ai@1.18.1")
+    expect(commands).toContain("@opencode-ai/plugin@1.18.1")
     expect(commands).toContain("npm uninstall @prevalentware/opencode-goal-plugin")
     expect(commands).not.toContain("install --save-exact @prevalentware/opencode-goal-plugin")
     expect(commands).not.toContain("headroom-ai")

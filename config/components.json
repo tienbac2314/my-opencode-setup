@@ -13,7 +13,7 @@
       "name": "OpenCode",
       "kind": "npm-global",
       "package": "opencode-ai",
-      "target": "1.18.0",
+      "target": "1.18.1",
       "command": "opencode",
       "repository": "https://github.com/anomalyco/opencode",
       "verify": "opencode --version"
@@ -23,7 +23,7 @@
       "name": "OpenCode plugin SDK",
       "kind": "npm-local",
       "package": "@opencode-ai/plugin",
-      "target": "1.18.0",
+      "target": "1.18.1",
       "repository": "https://github.com/anomalyco/opencode",
       "verify": "npm ls @opencode-ai/plugin --depth=0"
     },
@@ -112,6 +112,7 @@
       "branch": "main",
       "cache": "~/.cache/opencode-headroom/source",
       "repository": "https://github.com/headroomlabs-ai/headroom",
+      "removeWhen": "Remove pinned source build when headroom-ai wheel ships the OpenCode transport plugin and official wrapper passes custom-provider tests.",
       "verify": "9router and native OpenCode interception"
     },
     {

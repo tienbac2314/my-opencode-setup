@@ -14,7 +14,7 @@
 * `docs/maintenance-refactor.md`: root causes, rejected approaches, historical boundaries.
 * `pr.md`: upstream ownership; repository policy stays local.
 
-Current boundaries: Goal is disabled; runtime notifier is retired; Headroom is optional and launcher-only; local plugins are auto-discovered. Compare repository files with active `~/.config/opencode` before diagnosing drift. Never print full resolved config or credential values.
+Current boundaries: Goal is disabled; runtime notifier is retired; Headroom uses the official wrapper with optional machine-local profile routing; local plugins are auto-discovered. Compare repository files with active `~/.config/opencode` before diagnosing drift. Never print full resolved config or credential values.
 
 ## 1. Think Before Coding
 
