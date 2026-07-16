@@ -80,7 +80,7 @@ if (-not (Test-Path -LiteralPath $globalConfig)) {
 }
 Copy-Item "$RepoDir\config\tui.json" (Join-Path $ConfigDir "tui.json") -Force
 Copy-Item "$RepoDir\config\oh-my-opencode-slim.json" (Join-Path $ConfigDir "oh-my-opencode-slim.json") -Force
-Copy-Item "$RepoDir\AGENTS.md" (Join-Path $ConfigDir "AGENTS.md") -Force
+Copy-Item "$RepoDir\config\AGENTS.md" (Join-Path $ConfigDir "AGENTS.md") -Force
 Copy-Tree "$RepoDir\agents" (Join-Path $ConfigDir "agents")
 Copy-Tree "$RepoDir\data" (Join-Path $ConfigDir "data")
 Copy-Tree "$RepoDir\commands" (Join-Path $ConfigDir "commands")

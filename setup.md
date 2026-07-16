@@ -41,7 +41,7 @@ pwsh ./setup.ps1 -SkipTests
 pwsh ./setup.ps1 -SkipEnvironment
 ```
 
-`setup.ps1` copies repository-controlled files, installs manifest-approved components, applies package patches, configures CodeGraph/RTK, skips skills already discovered under `~/.agents` or `~/.claude`, and runs verification. Existing `opencode.jsonc` and `supermemory.jsonc` credentials are preserved.
+`setup.ps1` copies repository-controlled files, deploys `config/AGENTS.md` as global policy while leaving root `AGENTS.md` repository-only, installs manifest-approved components, applies package patches, configures CodeGraph/RTK, skips skills already discovered under `~/.agents` or `~/.claude`, and runs verification. Existing `opencode.jsonc` and `supermemory.jsonc` credentials are preserved.
 
 Optional components such as Headroom are not installed by default.
 

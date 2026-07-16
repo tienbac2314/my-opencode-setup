@@ -14,6 +14,7 @@ const activeDocs = [
   "PATCHES.md",
   "pr.md",
   "AGENTS.md",
+  "config/AGENTS.md",
   "TROUBLESHOOTING.md",
   "docs/agents.md",
   "docs/maintenance-refactor.md",
@@ -98,11 +99,18 @@ test("active documentation has no broken local links", () => {
 
 test("active instructions match current manifest and retained operations", () => {
   const agents = readFileSync(new URL("../AGENTS.md", import.meta.url), "utf8")
+  const globalAgents = readFileSync(new URL("../config/AGENTS.md", import.meta.url), "utf8")
   const setup = readFileSync(new URL("../setup.md", import.meta.url), "utf8")
   const journey = readFileSync(new URL("../docs/maintenance-refactor.md", import.meta.url), "utf8")
 
   expect(agents).toContain("Repository source of truth")
   expect(agents).toContain("TROUBLESHOOTING.md")
+  expect(agents).not.toContain("Think Before Coding")
+  expect(globalAgents).toContain("Think Before Coding")
+  expect(globalAgents).toContain("Runtime Tools")
+  for (const repositoryOnly of ["README.md", "PATCHES.md", "Goal package", "maintain.ps1", "9router", "Supermemory"]) {
+    expect(globalAgents).not.toContain(repositoryOnly)
+  }
   expect(agents).not.toContain("notifier checks npm packages")
   expect(setup).toContain("scripts/set-credentials.ps1")
   expect(setup).toContain("router_api_key")
@@ -140,6 +148,8 @@ test("setup and maintainer use cross-platform config and temp paths", () => {
   expect(maintain).toContain("[IO.Path]::GetTempPath()")
   expect(maintain).toContain("Get-Command $File -CommandType Application,ExternalScript")
   expect(setup).toContain("Copy-UniqueSkills")
+  expect(setup).toContain('Copy-Item "$RepoDir\\config\\AGENTS.md"')
+  expect(setup).not.toContain('Copy-Item "$RepoDir\\AGENTS.md"')
   expect(setup).toContain("externalNames")
   expect(setup).toContain("foreach ($name in $externalNames)")
   expect(setup).toContain("environment.d")
@@ -453,6 +463,10 @@ test("setup converges isolated config without machine integration", () => {
     expect(existsSync(join(configDir, "opencode.jsonc"))).toBe(true)
     expect(existsSync(join(configDir, "tui.json"))).toBe(true)
     expect(existsSync(join(configDir, "plugins", "lazy-load.ts"))).toBe(true)
+    expect(readFileSync(join(configDir, "AGENTS.md"), "utf8")).toBe(
+      readFileSync(new URL("../config/AGENTS.md", import.meta.url), "utf8"),
+    )
+    expect(readFileSync(join(configDir, "AGENTS.md"), "utf8")).not.toContain("Repository source of truth")
     expect(existsSync(join(configDir, "commands", "goal.md"))).toBe(false)
     for (const name of retiredMcpSkills) {
       expect(existsSync(join(configDir, "skills", name))).toBe(false)

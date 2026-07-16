@@ -16,6 +16,8 @@ Personal OpenCode setup for Windows and Linux. One component manifest controls v
 
 ```text
 config/components.json   approved versions, commits, sources, tests
+config/AGENTS.md         reusable global agent policy deployed by setup
+AGENTS.md                repository-only contracts and boundaries
 setup.ps1                first install and machine integration
 maintain.ps1             check, plan, apply, verify
 commands/                tracked slash commands
