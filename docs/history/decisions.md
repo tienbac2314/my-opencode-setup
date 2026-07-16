@@ -16,6 +16,20 @@ For any non-trivial architecture, integration, migration, or rejected approach, 
 
 Record conclusions and evidence, not internal deliberation. Never include credentials, full resolved config, personal data, private prompts, or unredacted logs. When a decision changes, mark the old entry superseded and link the replacement; do not silently erase history.
 
+## 2026-07-16: Normalized full-repository history
+
+Status: active.
+
+Problem: cleanup commit `e661d8f` correctly removed obsolete runbooks and unsafe archives from active documentation, but left important rationale discoverable only through Git archaeology. Existing maintenance history covered recent refactor, not initial triage, Mem0, broken-tree recovery, Goal/Headroom iterations, or OpenViking side-branch research.
+
+Alternatives: restore deleted documents verbatim, leave history in Git only, or normalize evidence into explicitly historical records.
+
+Decision: retain active guides as current authority and add a historical corpus: timeline, architecture evolution, incident ledger, and source index. Superseded commands remain summarized rather than executable. Source index freezes all 104 commits reachable across refs at reconstruction time and maps deleted documents to `git show` paths.
+
+Evidence: `git rev-list --all`, `git log --all`, Markdown add/delete/rename history, deleted blobs at representative transition commits, and current tests. Historical source index contains 104 unique commit rows with no missing pre-reconstruction hash.
+
+Supersede only with a history format that preserves equivalent graph coverage, deleted-document retrieval, current-versus-historical separation, and verifiable source references.
+
 ## 2026-07-16: Headroom service and OpenCode transport
 
 Status: active.

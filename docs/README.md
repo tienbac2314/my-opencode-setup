@@ -23,5 +23,9 @@ Current behavior is documented by purpose. Start with the smallest guide that an
 
 - [Engineering decisions](history/decisions.md): current architectural decisions, alternatives, implementation, and evidence.
 - [Maintenance refactor](history/maintenance-refactor.md): migration summary, root causes, and historical boundaries.
+- [Repository timeline](history/repository-timeline.md): complete narrative from initial triage setup through current architecture.
+- [Architecture evolution](history/architecture-evolution.md): subsystem-by-subsystem ownership changes.
+- [Incident ledger](history/incident-ledger.md): failures, rejected approaches, repairs, and present status.
+- [Historical source index](history/source-index.md): 104 reachable commits and deleted-document retrieval map.
 
 History explains current choices but does not override active source, the component manifest, or tests. Removed documents remain available through `git show`; obsolete runbooks are not restored as active guidance.

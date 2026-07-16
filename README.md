@@ -35,19 +35,21 @@ Purpose: show what this setup loads and where each part comes from.
 
 | Component | Source | What it does |
 |---|---|---|
-| OpenCode | `anomalyco/opencode` | App, TUI, server, LSP, and built-in tools |
+| OpenCode | [`anomalyco/opencode`](https://github.com/anomalyco/opencode) | App, TUI, server, plugin SDK, LSP, and built-in tools |
+| Vercel AI SDK | [`vercel/ai`](https://github.com/vercel/ai) | OpenAI-compatible provider used by configured transports |
 | 9router model discovery | Local `models-discovery.js` | Adds available 9router models with correct input types |
-| Oh My OpenCode Slim | `alvinunreal/oh-my-opencode-slim` | Orchestrator plus Oracle, Librarian, Designer, and Fixer agents |
-| Goal (disabled) | `prevalentWare/opencode-goal-plugin` | Retained for investigation; setup does not install or load it while OpenCode integration remains broken |
-| Supermemory | `supermemoryai/opencode-supermemory` | Self-hosted memory across sessions |
-| Lazy loading | `omarwaly-ai/opencode-lazy-loading` | Loads tool schemas only when the model asks for them |
-| Token source | `omarwaly-ai/OpenCode-tokens-source` | `/tokens` breakdown by prompt, tool, and message source |
-| CodeGraph | `colbymchenry/codegraph` plus local guard | Code search for indexed projects; no action elsewhere |
-| RTK | `rtk-ai/rtk` plus local OpenCode hook | Shorter shell output and Windows-safe command rewriting |
-| Deep Research | `Weizhena/Deep-Research-skills` | Research workflow without exposing strategy files as agents |
-| Headroom | `headroomlabs-ai/headroom` | Optional persistent proxy plus auto-discovered Desktop/CLI transport bridge |
+| Oh My OpenCode Slim | [`alvinunreal/oh-my-opencode-slim`](https://github.com/alvinunreal/oh-my-opencode-slim) | Orchestrator plus Oracle, Librarian, Designer, and Fixer agents |
+| Goal (disabled) | [`prevalentWare/opencode-goal-plugin`](https://github.com/prevalentWare/opencode-goal-plugin) | Retained for investigation; setup does not install or load it while OpenCode integration remains broken |
+| Supermemory | [`supermemoryai/opencode-supermemory`](https://github.com/supermemoryai/opencode-supermemory) | Self-hosted memory across sessions |
+| Lazy loading | [`omarwaly-ai/opencode-lazy-loading`](https://github.com/omarwaly-ai/opencode-lazy-loading) | Loads tool schemas only when the model asks for them |
+| Token source | [`omarwaly-ai/OpenCode-tokens-source`](https://github.com/omarwaly-ai/OpenCode-tokens-source) | `/tokens` breakdown by prompt, tool, and message source |
+| CodeGraph | [`colbymchenry/codegraph`](https://github.com/colbymchenry/codegraph) plus local guard | Code search for indexed projects; no action elsewhere |
+| RTK | [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk) plus local OpenCode hook | Shorter shell output and Windows-safe command rewriting |
+| Deep Research | [`Weizhena/Deep-Research-skills`](https://github.com/Weizhena/Deep-Research-skills) | Research workflow without exposing strategy files as agents |
+| Superpowers skills | [`obra/superpowers`](https://github.com/obra/superpowers) | Bundled planning, debugging, testing, review, and execution workflows |
+| Headroom | [`headroomlabs-ai/headroom`](https://github.com/headroomlabs-ai/headroom) plus local bridge | Optional persistent proxy plus auto-discovered Desktop/CLI transport bridge |
 
-Exact versions and source commits live only in `config/components.json`.
+Exact versions and source commits for managed components live only in `config/components.json`. Superpowers is vendored skill content, not a manifest-installed runtime component. Current Codex Security and VibeShell skill files do not retain a verifiable upstream URL, so this catalog does not guess one.
 
 ## Daily commands
 

@@ -22,6 +22,10 @@ const activeDocs = [
   "docs/reference/upstream.md",
   "docs/history/decisions.md",
   "docs/history/maintenance-refactor.md",
+  "docs/history/repository-timeline.md",
+  "docs/history/architecture-evolution.md",
+  "docs/history/incident-ledger.md",
+  "docs/history/source-index.md",
 ]
 const operationalDocs = activeDocs.filter((file) => !file.startsWith("docs/history/"))
 const retiredMcpSkills = ["browser-automation", "devtools-debugger", "docs-fetcher"]
@@ -387,6 +391,33 @@ test("Headroom uses auto-loaded bridge and independent proxy", () => {
   expect(headroomDocs).toContain("Bare `headroom proxy`")
   expect(headroomDocs).toContain("Supermemory is the single owner")
   expect(source.removeWhen).toContain("without provider, model, or MCP mutation")
+})
+
+test("README links every managed upstream repository", () => {
+  const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8")
+  const repositories = new Set(
+    repositoryManifest.components
+      .map((item: any) => item.repository)
+      .filter((repository: unknown): repository is string => typeof repository === "string"),
+  )
+
+  expect(repositories.size).toBe(11)
+  for (const repository of repositories) {
+    expect(readme).toContain(`](${repository})`)
+  }
+  expect(readme).toContain("](https://github.com/obra/superpowers)")
+})
+
+test("repository history indexes the full pre-reconstruction graph", () => {
+  const source = readFileSync(new URL("../docs/history/source-index.md", import.meta.url), "utf8")
+  const hashes = [...source.matchAll(/^\| `([0-9a-f]{7})` \|/gm)].map((match) => match[1])
+  expect(hashes.length).toBe(104)
+  expect(new Set(hashes).size).toBe(104)
+  for (const boundary of ["bccb45f", "d8fa757", "c286bb8", "03db0fd", "bf57a31", "48f5564"]) {
+    expect(hashes).toContain(boundary)
+  }
+  expect(source).toContain("Deleted-document map")
+  expect(source).toContain("archive/broken-docs-reference")
 })
 
 test("Goal package patch keeps active sidebar reactive and hides inactive state", () => {
