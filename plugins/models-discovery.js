@@ -1,3 +1,10 @@
+const HEADROOM_TRANSPORT_STATE = Symbol.for('headroom.opencode.transport')
+
+function modelDiscoveryFetch() {
+  const original = globalThis[HEADROOM_TRANSPORT_STATE]?.originalFetch
+  return typeof original === 'function' ? original : globalThis.fetch
+}
+
 export const ModelDiscovery = async ({ client }) => {
   return {
     config: async (config) => {
@@ -20,7 +27,7 @@ export const ModelDiscovery = async ({ client }) => {
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
             const url = `${baseURL.replace(/\/+$/, '')}/models`
-            const res = await fetch(url, {
+            const res = await modelDiscoveryFetch()(url, {
               headers: { Authorization: `Bearer ${opts.apiKey || ''}` },
               signal: AbortSignal.timeout(timeout),
             })

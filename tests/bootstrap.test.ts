@@ -11,6 +11,10 @@ const pinPluginScript = fileURLToPath(new URL("../scripts/pin-opencode-plugin.ps
 const setCredentialsScript = fileURLToPath(new URL("../scripts/set-credentials.ps1", import.meta.url))
 const removeLegacyGoalScript = fileURLToPath(new URL("../scripts/remove-legacy-goal-command.ps1", import.meta.url))
 const installHeadroomScript = fileURLToPath(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))
+const launchHeadroomScript = fileURLToPath(new URL("../scripts/start-opencode-headroom.ps1", import.meta.url))
+const manageHeadroomScript = fileURLToPath(new URL("../scripts/manage-headroom-proxy.ps1", import.meta.url))
+const runHeadroomScript = fileURLToPath(new URL("../scripts/run-headroom-proxy.ps1", import.meta.url))
+const cleanupHeadroomScript = fileURLToPath(new URL("../scripts/remove-headroom-opencode-pollution.ps1", import.meta.url))
 const projectConfig = JSON.parse(readFileSync(new URL("../.opencode/opencode.json", import.meta.url), "utf8"))
 const globalConfig = JSON.parse(readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""))
 
@@ -82,6 +86,68 @@ test("legacy raw goal command migration preserves other config", () => {
 
 test("Headroom native plugin installer is tracked", () => {
   expect(existsSync(installHeadroomScript)).toBe(true)
+  expect(existsSync(launchHeadroomScript)).toBe(true)
+  expect(existsSync(manageHeadroomScript)).toBe(true)
+  expect(existsSync(runHeadroomScript)).toBe(true)
+})
+
+test("Headroom service and fallback launcher preserve provider ownership", () => {
+  const source = readFileSync(launchHeadroomScript, "utf8")
+  const manager = readFileSync(manageHeadroomScript, "utf8")
+  const runner = readFileSync(runHeadroomScript, "utf8")
+  expect(source).toContain('headroom -CommandType Application,ExternalScript')
+  expect(source).toContain('$startInfo.ArgumentList.Add("proxy")')
+  expect(source).toContain("PositionalBinding = $false")
+  expect(source).toContain("Position = 0, ValueFromRemainingArguments")
+  expect(source).toContain("HEADROOM_PROXY_URL")
+  expect(manager).toContain("New-ScheduledTaskTrigger -AtLogOn")
+  expect(manager).toContain("New-ScheduledTaskPrincipal")
+  expect(manager).toContain("headroom-proxy.url")
+  expect(manager).toContain("-Hidden")
+  expect(manager).toContain("Headroom version drift")
+  expect(manager).toContain("restartOwnedTask")
+  expect(manager).toContain("-WindowStyle Hidden")
+  expect(manager).toContain("run-headroom-proxy.ps1")
+  expect(runner).toContain("LITELLM_SUPPRESS_DEBUG_INFO")
+  expect(runner).toContain("--no-memory-tools")
+  expect(runner).toContain("--no-memory-context")
+  expect(runner).toContain("proxy.stdout.log")
+  expect(runner).toContain("proxy.stderr.log")
+  expect(source).not.toContain("wrap opencode")
+  expect(source).not.toContain("provider =")
+  expect(source).not.toContain("mcp =")
+  expect(manager).not.toContain('"provider"')
+  expect(manager).not.toContain('"mcp"')
+})
+
+test("Headroom cleanup preserves unrelated JSONC configuration", () => {
+  const directory = mkdtempSync(join(tmpdir(), "opencode-headroom-cleanup-"))
+  const configPath = join(directory, "opencode.jsonc")
+  const original = `{
+  // keep this comment
+  "provider": {
+    "9router": { "options": { "apiKey": "keep-secret" } },
+    "headroom": { "name": "Headroom Proxy", "options": { "baseURL": "http://127.0.0.1:8787/v1" } }
+  },
+  "mcp": {
+    "codegraph": { "command": ["codegraph", "serve", "--mcp"] },
+    "headroom": { "command": ["headroom.exe", "mcp", "serve"] },
+    "serena": { "command": ["uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "agent", "--open-web-dashboard", "False"] }
+  }
+}`
+  try {
+    writeFileSync(configPath, original)
+    const result = Bun.spawnSync(["pwsh", "-NoProfile", "-File", cleanupHeadroomScript, "-ConfigFile", configPath])
+    expect(result.exitCode).toBe(0)
+    const updated = readFileSync(configPath, "utf8")
+    expect(updated).toContain("// keep this comment")
+    expect(updated).toContain("keep-secret")
+    expect(updated).toContain("codegraph")
+    expect(updated).not.toContain('"headroom"')
+    expect(updated).not.toContain('"serena"')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 test("retired notifier is removed from manifest and config", () => {

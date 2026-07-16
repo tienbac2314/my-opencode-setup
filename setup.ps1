@@ -81,6 +81,20 @@ if (-not (Test-Path -LiteralPath $globalConfig)) {
 Copy-Item "$RepoDir\config\tui.json" (Join-Path $ConfigDir "tui.json") -Force
 Copy-Item "$RepoDir\config\oh-my-opencode-slim.json" (Join-Path $ConfigDir "oh-my-opencode-slim.json") -Force
 Copy-Item "$RepoDir\config\AGENTS.md" (Join-Path $ConfigDir "AGENTS.md") -Force
+& "$RepoDir\scripts\remove-headroom-opencode-pollution.ps1" -ConfigFile $globalConfig
+$legacyJson = Join-Path $ConfigDir "opencode.json"
+if (Test-Path -LiteralPath $legacyJson -PathType Leaf) {
+  & "$RepoDir\scripts\remove-headroom-opencode-pollution.ps1" -ConfigFile $legacyJson
+  try {
+    $legacy = Get-Content -LiteralPath $legacyJson -Raw | ConvertFrom-Json
+    $legacyKeys = @($legacy.PSObject.Properties | Where-Object {
+      $_.Name -ne '$schema' -and -not (
+        $_.Name -in 'provider', 'mcp' -and @($_.Value.PSObject.Properties).Count -eq 0
+      )
+    })
+    if ($legacyKeys.Count -eq 0) { Remove-Item -LiteralPath $legacyJson -Force }
+  } catch {}
+}
 Copy-Tree "$RepoDir\agents" (Join-Path $ConfigDir "agents")
 Copy-Tree "$RepoDir\data" (Join-Path $ConfigDir "data")
 Copy-Tree "$RepoDir\commands" (Join-Path $ConfigDir "commands")

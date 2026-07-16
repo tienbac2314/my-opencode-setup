@@ -354,6 +354,11 @@ function Apply-Components($ManifestValue) {
       Remove-Item (Join-Path $activeCommands "goal.md") -Force -ErrorAction SilentlyContinue
     }
   }
+  $headroomUpdated = @($pending | Where-Object id -in "headroom-python", "headroom-source")
+  if ($IsWindows -and $headroomUpdated -and (Get-ScheduledTask -TaskName "OpenCode Headroom Proxy" -ErrorAction SilentlyContinue)) {
+    & "$RepoDir\scripts\manage-headroom-proxy.ps1" install -Manifest $Manifest
+    if ($LASTEXITCODE -ne 0) { throw "Headroom proxy task convergence failed" }
+  }
   & "$RepoDir\scripts\apply-package-patches.ps1" -ConfigDir $ConfigDir -CacheDir $CacheDir -Manifest $Manifest
   Sync-ConfigPins $ManifestValue
 }
