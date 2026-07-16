@@ -9,7 +9,7 @@ import type { Plugin } from "@opencode-ai/plugin";
 import * as fs from "fs";
 import * as path from "path";
 
-const BROAD_SEARCH_TOOLS = new Set(["grep_search", "glob_search"]);
+const BROAD_SEARCH_TOOLS = new Set(["grep", "glob", "grep_search", "glob_search"]);
 
 function isCodeGraphExplore(toolName: string): boolean {
   return toolName === "codegraph_explore" || toolName.endsWith("_codegraph_explore");

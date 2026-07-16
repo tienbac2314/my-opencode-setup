@@ -32,7 +32,7 @@ Current active references:
 
 ### Lazy loading
 
-Failure was not one bad tool name. Reloads could lose `load_tool`, namespaced tool names could be rewritten incorrectly, split SSE/DSML calls could lose data, and same-turn execution needed the real tool call restored without corrupting finish events.
+Failure was not one bad tool name. Reloads could lose `load_tool`, namespaced tool names could be rewritten incorrectly, split SSE or text-encoded calls could lose data, and models could serialize typed tool fields as strings. Same-turn execution needed the real tool call restored without corrupting finish events. Argument repair now uses each tool's captured JSON Schema at the common response path, so it applies across model formats without guessing missing keys or aliases.
 
 Fix lives in `plugins/lazy-load.ts`; regression coverage is `tests/lazy-load.test.ts`. Live proof showed the model call `load_tool`, load `bash`, execute a command, and return the marker.
 

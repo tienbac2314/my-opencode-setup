@@ -124,6 +124,57 @@ function parseDSML(xml: string): Array<{ name: string; args: Record<string, stri
   return calls
 }
 
+function schemaType(schema: any): string | undefined {
+  if (typeof schema?.type === "string") return schema.type
+  if (Array.isArray(schema?.type)) return schema.type.find((type: unknown) => type !== "null")
+  if (schema?.properties) return "object"
+  return undefined
+}
+
+function parseStructuredString(value: string, expectedType: "array" | "object"): unknown {
+  try {
+    const parsed = JSON.parse(value)
+    if (expectedType === "array" ? Array.isArray(parsed) : parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed
+    }
+  } catch {}
+  return value
+}
+
+function normalizeValueToSchema(value: unknown, schema: any): unknown {
+  const type = schemaType(schema)
+
+  if ((type === "number" || type === "integer") && typeof value === "string") {
+    const parsed = Number(value)
+    if (value.trim() !== "" && Number.isFinite(parsed) && (type !== "integer" || Number.isInteger(parsed))) return parsed
+  }
+  if (type === "boolean" && typeof value === "string") {
+    if (value === "true") return true
+    if (value === "false") return false
+  }
+  if ((type === "array" || type === "object") && typeof value === "string") {
+    value = parseStructuredString(value, type)
+  }
+  if (type === "array" && Array.isArray(value)) {
+    return schema?.items ? value.map((item) => normalizeValueToSchema(item, schema.items)) : value
+  }
+  if (type === "object" && value !== null && typeof value === "object" && !Array.isArray(value)) {
+    const result: Record<string, unknown> = { ...(value as Record<string, unknown>) }
+    for (const [key, propertySchema] of Object.entries(schema?.properties ?? {})) {
+      if (key in result) result[key] = normalizeValueToSchema(result[key], propertySchema)
+    }
+    return result
+  }
+  return value
+}
+
+function normalizeToolArguments(name: string, argumentsJSON: string): string {
+  const schema = originalSchemas.get(name)
+  if (!schema) return argumentsJSON
+  const args = JSON.parse(argumentsJSON)
+  return JSON.stringify(normalizeValueToSchema(args, schema))
+}
+
 function resolveOriginalToolName(name: string): string {
   const normalized = name.toLowerCase()
   for (const original of originals.keys()) {
@@ -386,7 +437,8 @@ export function createSSETransform(sessionID: string): TransformStream<Uint8Arra
 
   function rewriteToolCall(name: string, argumentsJSON: string, index: number, id?: string): any {
     const resolvedName = resolveOriginalToolName(name)
-    const args = JSON.parse(argumentsJSON)
+    const normalizedArguments = normalizeToolArguments(resolvedName, argumentsJSON)
+    const args = JSON.parse(normalizedArguments)
 
     if (isLoadToolName(resolvedName)) {
       if (args.name) getTurnLoaded().add(args.name)
@@ -394,7 +446,7 @@ export function createSSETransform(sessionID: string): TransformStream<Uint8Arra
         index,
         id,
         type: "function",
-        function: { name: activeLoadToolName, arguments: argumentsJSON },
+        function: { name: activeLoadToolName, arguments: normalizedArguments },
       }
     }
 
@@ -404,7 +456,7 @@ export function createSSETransform(sessionID: string): TransformStream<Uint8Arra
           index,
           id,
           type: "function",
-          function: { name: resolvedName, arguments: argumentsJSON },
+          function: { name: resolvedName, arguments: normalizedArguments },
         }
       }
 
@@ -424,7 +476,7 @@ export function createSSETransform(sessionID: string): TransformStream<Uint8Arra
       index,
       id,
       type: "function",
-      function: { name: resolvedName, arguments: argumentsJSON },
+      function: { name: resolvedName, arguments: normalizedArguments },
     }
   }
 
@@ -587,7 +639,8 @@ export function createSSETransform(sessionID: string): TransformStream<Uint8Arra
 
                 // Arguments complete — process by name
                 const name = resolveOriginalToolName(buf.name || "")
-                const callArgs = JSON.parse(buf.arguments)
+                const normalizedArguments = normalizeToolArguments(name, buf.arguments)
+                const callArgs = JSON.parse(normalizedArguments)
                 toolBuffers.delete(idx)
 
                 if (isLoadToolName(name)) {
@@ -601,7 +654,7 @@ export function createSSETransform(sessionID: string): TransformStream<Uint8Arra
                     type: "function",
                     function: {
                       name: activeLoadToolName,
-                      arguments: buf.arguments,
+                      arguments: normalizedArguments,
                     },
                   })
                 } else {
@@ -620,7 +673,7 @@ export function createSSETransform(sessionID: string): TransformStream<Uint8Arra
                         type: "function",
                         function: {
                           name,
-                          arguments: buf.arguments,
+                          arguments: normalizedArguments,
                         },
                       })
                     } else {
@@ -647,7 +700,7 @@ export function createSSETransform(sessionID: string): TransformStream<Uint8Arra
                       type: "function",
                       function: {
                         name,
-                        arguments: buf.arguments,
+                        arguments: normalizedArguments,
                       },
                     })
                   }

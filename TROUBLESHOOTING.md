@@ -47,9 +47,9 @@ Local plugins are auto-discovered. Never list local file paths in global/project
 
 Desktop may initialize plugins without injected Bun shell and may retain stale package/status state. Close Desktop fully, restart, wait for sidecar, create new session, then compare safe counts and origin specs. Plugin display and tool execution are separate checks.
 
-## `load_tool` missing or DSML appears as text
+## `load_tool` missing or tool arguments have wrong types
 
-Restore `plugins/lazy-load.ts`, restart process, and run `bun test tests/lazy-load.test.ts`. Loaded-tool state persists through one tool loop and clears on terminal stop. Repeated plugin initialization must return hooks every time; only fetch wrapping is idempotent.
+Restore `plugins/lazy-load.ts`, restart process, and run `bun test tests/lazy-load.test.ts`. The response adapter normalizes string-encoded numbers, booleans, arrays, and objects against each tool's captured JSON Schema for both native and text-encoded calls. It does not invent missing keys or rename model-provided keys. Loaded-tool state persists through one tool loop and clears on terminal stop. Repeated plugin initialization must return hooks every time; only fetch wrapping is idempotent.
 
 ## 9router model invalid or polluted namespace
 

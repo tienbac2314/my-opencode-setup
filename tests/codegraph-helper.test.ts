@@ -89,14 +89,14 @@ describe("CodeGraph search guard", () => {
     const before = hooks["tool.execute.before"]
 
     await expect(before(
-      { tool: "grep_search", sessionID: "session-a" },
+      { tool: "grep", sessionID: "session-a" },
       {},
     )).rejects.toThrow("Try CodeGraph first")
 
     await before({ tool: "codegraph_codegraph_explore", sessionID: "session-a" }, {})
 
     await expect(before(
-      { tool: "glob_search", sessionID: "session-a" },
+      { tool: "glob", sessionID: "session-a" },
       {},
     )).resolves.toBeUndefined()
   })

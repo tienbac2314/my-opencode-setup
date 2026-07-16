@@ -4,7 +4,7 @@ Purpose: record only differences this repository must preserve. Versions and sou
 
 | Component | Local change | Why | Verification | Remove when |
 |---|---|---|---|---|
-| Lazy loading | Maintained fork in `plugins/lazy-load.ts` | Namespaced tools, SSE chunking, DSML, schema capture, Desktop reload behavior | `tests/lazy-load.test.ts` plus App/TUI/CLI tool call | Upstream passes every local regression |
+| Lazy loading | Maintained fork in `plugins/lazy-load.ts` | Namespaced tools, SSE chunking, text-encoded tool calls, schema-guided argument normalization, Desktop reload behavior | `tests/lazy-load.test.ts` plus App/TUI/CLI tool call | Upstream passes every local regression |
 | Token source | `0-` filename prefix and `export const` TokensSourcePlugin | Must load before lazy loader for correct fetch wrapping order; named export for repeated-init test | `/tokens`, repeated-init test | Upstream preserves sort-order contract or provides equivalent init-order guarantee |
 | RTK | Child-process fallback | Desktop may omit injected shell | bootstrap RTK tests, live rewrite | Upstream generated hook supports Desktop input without injected shell |
 | Supermemory | Thin default module wrapper and self-host settings guard | Upstream exports named plugin only and calls cloud account settings endpoint on custom base URL | export-shape test, no-405 model call, CRUD lifecycle | Upstream exports default module and skips/catches settings update on custom base URL |
