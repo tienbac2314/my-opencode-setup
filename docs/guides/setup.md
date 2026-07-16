@@ -124,7 +124,7 @@ pwsh ./maintain.ps1 check
 pwsh ./maintain.ps1 plan
 ```
 
-Review `.state/update-plan.md`. To approve target, edit only matching `target` in `config/components.json`, review upstream diff and [PATCHES.md](PATCHES.md), then:
+Review `.state/update-plan.md`. To approve a target, edit only its `target` in `config/components.json`, review the upstream diff and [local patches](../reference/patches.md), then apply that component.
 
 Latest versions are reported, never auto-approved. Targets remain exact because package patches, copied forks, and runtime contracts require review before each version change; automatic `latest` resolution would bypass that safety boundary.
 
@@ -143,7 +143,7 @@ pwsh ./maintain.ps1 verify
 
 Use `-All` only after every target in manifest has been reviewed. Maintainer stops rather than overwriting copied upstream forks.
 
-## 6. Headroom official wrapper (optional)
+## 6. Headroom Desktop and CLI proxy (optional)
 
 Windows Python dependencies require Visual Studio 2022 Build Tools with C++ workload. Run from Administrator PowerShell, then restart terminal:
 
@@ -156,43 +156,17 @@ Install pinned Python proxy and build pinned OpenCode transport. The `headroom-a
 ```powershell
 uv tool install --force "headroom-ai[all]==0.31.0"
 pwsh ./scripts/install-headroom-plugin.ps1
-$env:HEADROOM_OPENCODE_PLUGIN_PATH = "$HOME\.cache\opencode-headroom\source\plugins\opencode\dist\entry.opencode.js"
-headroom wrap opencode --no-context-tool -- run --model opencode/deepseek-v4-flash-free "Return exact text: HEADROOM_OK"
+pwsh ./scripts/remove-headroom-opencode-pollution.ps1
+pwsh ./scripts/manage-headroom-proxy.ps1 install
+pwsh ./scripts/manage-headroom-proxy.ps1 status
+opencode models 9router
 ```
 
-`headroom wrap opencode` is the maintained proxy/provider/process lifecycle. By default it configures its context tool, Headroom MCP, and Serena MCP; use its `--no-context-tool`, `--no-mcp`, or `--no-serena` flags when those integrations are unwanted. Wrapper manages a Headroom provider block and saves a pre-wrap backup; `headroom unwrap opencode` restores it.
+The manager installs a hidden current-user login task that keeps `headroom proxy` independent of OpenCode. The task uses `scripts/run-headroom-proxy.ps1` to suppress the console and write bounded logs under `~/.local/state/opencode-headroom`. Auto-discovered `plugins/headroom.ts` gives both Desktop and CLI the same transport. It activates only when the login-task marker exists and `/livez` identifies a healthy Headroom service; otherwise it fails open to direct provider traffic. Normal use is opening Desktop or running `opencode`—no wrapper command or profile function is required. Dashboard and statistics remain available while the service runs. Headroom memory and learning remain disabled because Supermemory owns persistent memory; RTK remains enabled for shell-output compression and Headroom only reads its savings counters.
 
-To route every interactive PowerShell `opencode` call through Headroom, add this machine-local function to `$PROFILE.CurrentUserCurrentHost`:
+Do not use `headroom wrap opencode` with this configuration. Headroom 0.31.0 adds synthetic `anthropic`, `openai`, and `headroom` providers, a hardcoded Claude/OpenAI model catalog, and persistent Headroom/Serena MCP entries. This can hide dynamically discovered 9router models in TUI and pollute App model lists. The cleanup script removes only those recognized Headroom-owned entries while preserving 9router credentials and unrelated config.
 
-```powershell
-function opencode {
-  $plugin = "$HOME\.cache\opencode-headroom\source\plugins\opencode\dist\entry.opencode.js"
-  $previous = $env:HEADROOM_OPENCODE_PLUGIN_PATH
-  if (-not (Test-Path -LiteralPath $plugin)) {
-    throw "Headroom OpenCode transport missing: $plugin. Run scripts/install-headroom-plugin.ps1."
-  }
-  $binary = Get-Command opencode -CommandType Application,ExternalScript | Select-Object -First 1
-  if (-not $binary) { throw "OpenCode executable not found on PATH" }
-  $binaryBefore = $binary.Source
-  $versionBefore = ((& $binary.Source --version) -join " ").Trim()
-  $exitCode = 1
-  try {
-    $env:HEADROOM_OPENCODE_PLUGIN_PATH = $plugin
-    & headroom wrap opencode --no-context-tool -- @args
-    $exitCode = $LASTEXITCODE
-  } finally {
-    $env:HEADROOM_OPENCODE_PLUGIN_PATH = $previous
-    $binaryAfter = Get-Command opencode -CommandType Application,ExternalScript | Select-Object -First 1
-    $versionAfter = ((& $binaryAfter.Source --version) -join " ").Trim()
-    if ($binaryAfter.Source -ne $binaryBefore -or $versionAfter -ne $versionBefore) {
-      throw "Headroom changed OpenCode version or executable from $versionBefore ($binaryBefore) to $versionAfter ($($binaryAfter.Source))"
-    }
-  }
-  $global:LASTEXITCODE = $exitCode
-}
-```
-
-Headroom resolves the child `opencode` executable directly from PATH, so this PowerShell function does not recurse.
+`scripts/start-opencode-headroom.ps1` remains a diagnostic fallback that starts a temporary proxy before launching CLI OpenCode. It is not needed for normal Desktop or CLI use.
 
 ## 7. Recovery
 
@@ -203,7 +177,7 @@ pwsh ./maintain.ps1 verify
 
 Setup is safe to rerun. It restores tracked files and exact targets without replacing private credential files.
 
-Setup also removes retired npm packages and retired skill copies from active config. It does not replace executables outside repository-managed install locations. Use [TROUBLESHOOTING.md](TROUBLESHOOTING.md) when `check` still reports executable drift.
+Setup also removes retired npm packages and retired skill copies from active config. It does not replace executables outside repository-managed install locations. Use [troubleshooting](troubleshooting.md) when `check` still reports executable drift.
 
 ## 8. Linux setup differences
 
@@ -225,7 +199,7 @@ Differences:
 - Background-agent environment is written to `~/.config/environment.d/opencode.conf`; export it in current shell or log in again.
 - RTK uses Linux release archive and executable bit.
 - Native Bash skill scripts work directly; PowerShell launchers remain available.
-- Headroom uses its official `headroom wrap opencode` lifecycle. Export `HEADROOM_OPENCODE_PLUGIN_PATH` to the pinned source transport when wheel does not include it.
+- Windows Headroom uses the current-user login task. On Linux, run `headroom proxy --port 8787` from the user service manager and set `HEADROOM_PROXY_URL` for the OpenCode process until equivalent service installation is implemented.
 - Apply `chmod 600` to private credential files.
 - App availability depends on OpenCode Linux desktop support; TUI and web are baseline.
 

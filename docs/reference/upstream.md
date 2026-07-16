@@ -1,6 +1,6 @@
 # Upstream Issue and PR Targets
 
-Purpose: route each real upstream problem to repository that owns it. Personal policy and custom plugins stay in [PATCHES.md](PATCHES.md).
+Purpose: route each real upstream problem to the repository that owns it. Personal policy and custom plugins stay in [local patches](patches.md).
 
 ## `omarwaly-ai/opencode-lazy-loading`
 

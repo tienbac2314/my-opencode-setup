@@ -46,4 +46,4 @@ Browser automation, DevTools debugger, and docs-fetcher skills from an older laz
 5. OMO role has wrong model/tools: compare active `oh-my-opencode-slim.json` with tracked config, then apply only `omo-slim` and verify.
 6. Duplicate skill warning: compare active skills with external roots; setup preserves user-owned external roots and removes retired active copies.
 
-See [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) for runtime symptoms and [maintenance-refactor.md](maintenance-refactor.md) for design history.
+See [troubleshooting](../guides/troubleshooting.md) for runtime symptoms and [maintenance refactor](../history/maintenance-refactor.md) for design history.

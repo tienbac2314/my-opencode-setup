@@ -4,13 +4,11 @@ Personal OpenCode setup for Windows and Linux. One component manifest controls v
 
 ## Start here
 
-- Install: [setup.md](setup.md)
+- Documentation index: [docs/README.md](docs/README.md)
+- Install: [docs/guides/setup.md](docs/guides/setup.md)
 - Check or apply updates: `pwsh ./maintain.ps1 check|plan|apply|verify`
-- Understand local differences: [PATCHES.md](PATCHES.md)
-- Diagnose runtime problems: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- Understand agents and OMO roles: [docs/agents.md](docs/agents.md)
-- Prepare upstream reports: [pr.md](pr.md)
-- Understand this refactor and past failures: [docs/maintenance-refactor.md](docs/maintenance-refactor.md)
+- Diagnose runtime problems: [docs/guides/troubleshooting.md](docs/guides/troubleshooting.md)
+- Understand current integration decisions: [docs/history/decisions.md](docs/history/decisions.md)
 
 ## Architecture
 
@@ -29,7 +27,7 @@ tests/                   behavior and maintenance contracts
 
 Private credentials stay outside this repository under `~/.config/opencode`.
 
-Flow: `setup.ps1` reads the component manifest and delegates installs to `maintain.ps1`; maintainer converges package pins, tracked runtime files, patches, and retired artifacts; OpenCode auto-discovers local files under `plugins/`; tests encode integration contracts. Read [docs/maintenance-refactor.md](docs/maintenance-refactor.md) before changing this flow.
+Flow: `setup.ps1` reads the component manifest and delegates installs to `maintain.ps1`; maintainer converges package pins, tracked runtime files, patches, and retired artifacts; OpenCode auto-discovers local files under `plugins/`; tests encode integration contracts. Read [engineering decisions](docs/history/decisions.md) before changing ownership boundaries.
 
 ## Components
 
@@ -47,7 +45,7 @@ Purpose: show what this setup loads and where each part comes from.
 | CodeGraph | `colbymchenry/codegraph` plus local guard | Code search for indexed projects; no action elsewhere |
 | RTK | `rtk-ai/rtk` plus local OpenCode hook | Shorter shell output and Windows-safe command rewriting |
 | Deep Research | `Weizhena/Deep-Research-skills` | Research workflow without exposing strategy files as agents |
-| Headroom | `headroomlabs-ai/headroom` | Official `headroom wrap opencode` lifecycle plus pinned source transport for custom providers |
+| Headroom | `headroomlabs-ai/headroom` | Optional persistent proxy plus auto-discovered Desktop/CLI transport bridge |
 
 Exact versions and source commits live only in `config/components.json`.
 
@@ -66,12 +64,12 @@ pwsh ./maintain.ps1 verify
 ## Runtime boundaries
 
 - Project `.opencode/opencode.json` does not define `plugin`; global plugin origins remain authoritative.
-- Headroom is opt-in in repository setup. This machine's PowerShell profile routes interactive `opencode` through official wrapper. Wrapper may manage machine-local `opencode.json` provider/MCP entries with a backup; `headroom unwrap opencode` restores them.
+- Headroom is opt-in. Its hidden login task and auto-discovered bridge serve Desktop and TUI without taking ownership of providers, models, MCP, RTK, or memory. See [Headroom integration](docs/integrations/headroom.md).
 - CodeGraph runs only when project has `.codegraph/codegraph.db`.
 - Goal package, patch, and command remain tracked but are not installed or loaded. `components.json` records the temporary disable reason.
 - Update checks come from `maintain.ps1`; no runtime notifier plugin is needed.
 - Browser automation, DevTools debugger, and docs-fetcher MCP skills are retired; MCP ownership stays in explicit OpenCode/OMO configuration.
-- Supermemory wrapper adapts package export only; memory behavior remains upstream.
+- Supermemory is the single persistent-memory owner. Headroom memory and learning remain disabled.
 - RTK is installed under `~/.local/bin`; executable replacement and removal of stale copies elsewhere on `PATH` remain user-managed.
 - `npm ls --depth=0` and `opencode debug config` are authoritative. `bun pm ls` can show stale lock metadata after npm installs.
 - `.opencode/goals/` is user/runtime state and remains untracked.
