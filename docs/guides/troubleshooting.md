@@ -37,7 +37,7 @@ Run `pwsh ./scripts/manage-headroom-proxy.ps1 status`. Expected: installed task 
 
 `Context Tool: rtk` does not mean bare proxy rewrites OpenCode commands. `plugins/rtk.ts` owns OpenCode command rewriting; `headroom proxy` reads `rtk gain` for statistics. Headroom memory stays disabled because Supermemory owns persistent memory. See [Headroom integration](../integrations/headroom.md) for exact ownership boundaries.
 
-Do not use `headroom wrap opencode`: the pinned release injects synthetic providers/models and persistent Headroom/Serena MCP entries. Run `pwsh ./scripts/remove-headroom-opencode-pollution.ps1` once after migrating.
+Do not use `headroom wrap opencode`: the pinned release injects synthetic providers/models and persistent Headroom/Serena MCP entries. Run `pwsh ./scripts/remove-headroom-opencode-pollution.ps1` once after migrating. Default cleanup scrubs both `opencode.jsonc` and leftover `opencode.json`; empty leftover JSON shells are deleted. Restart every OpenCode session after cleanup, including IntelliJ terminals that loaded the old dual config.
 
 ## CodeGraph error outside indexed project
 

@@ -76,7 +76,7 @@ Responsibility split:
 
 For the pinned release, `headroom wrap opencode` mutates OpenCode runtime/config with synthetic providers, a fixed model catalog, Headroom MCP, optional Serena MCP, and RTK instructions. Those mutations hid dynamic 9router models and polluted Desktop/TUI state during live testing.
 
-The independent proxy plus local transport bridge preserves the useful proxy path without those ownership changes. `scripts/remove-headroom-opencode-pollution.ps1` removes only recognized wrapper-owned entries during migration.
+The independent proxy plus local transport bridge preserves the useful proxy path without those ownership changes. `scripts/remove-headroom-opencode-pollution.ps1` removes only recognized wrapper-owned entries during migration. Default cleanup scrubs both `opencode.jsonc` and leftover `opencode.json`, then deletes empty leftover JSON shells.
 
 ## Validation contract
 
@@ -93,5 +93,5 @@ Live proof requires all of these:
 - `/livez` healthy and dashboard HTTP 200;
 - normal Desktop and TUI requests increment `/v1/chat/completions` proxy stats;
 - only configured 9router provider and models remain visible;
-- no persistent Headroom or Serena MCP entry;
+- no persistent Headroom or Serena MCP entry in `opencode.jsonc` or leftover `opencode.json`;
 - no visible proxy terminal.

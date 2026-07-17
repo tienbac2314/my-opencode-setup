@@ -7,19 +7,23 @@
   installed by Headroom. Other providers, MCP servers, comments, credentials,
   and formatting remain unchanged.
 
+  With no -ConfigFile, scrub both ~/.config/opencode/opencode.jsonc and the
+  leftover ~/.config/opencode/opencode.json if present. Empty leftover
+  opencode.json shells (schema plus empty provider/mcp only) are deleted so a
+  stale dual-config merge cannot reintroduce Headroom/Serena MCP.
+
 .EXAMPLE
   pwsh ./scripts/remove-headroom-opencode-pollution.ps1
+
+.EXAMPLE
+  pwsh ./scripts/remove-headroom-opencode-pollution.ps1 -ConfigFile $HOME/.config/opencode/opencode.json
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-  [string]$ConfigFile = [IO.Path]::Combine($HOME, ".config", "opencode", "opencode.jsonc")
+  [string]$ConfigFile
 )
 
 $ErrorActionPreference = "Stop"
-if (-not (Test-Path -LiteralPath $ConfigFile -PathType Leaf)) { return }
-$resolvedPath = (Resolve-Path -LiteralPath $ConfigFile).Path
-$content = [IO.File]::ReadAllText($resolvedPath)
-$parsed = $content | ConvertFrom-Json
 
 function Test-HeadroomProvider($entry) {
   return $entry -and $entry.name -eq "Headroom Proxy" -and
@@ -138,18 +142,55 @@ function Remove-NestedObjectProperty([string]$text, [string]$parentName, [string
   return $text.Substring(0, $start) + $text.Substring($end)
 }
 
-$updated = $content
-if (Test-HeadroomProvider $parsed.provider.headroom) {
-  $updated = Remove-NestedObjectProperty $updated "provider" "headroom"
-}
-if (Test-HeadroomMcp $parsed.mcp.headroom) {
-  $updated = Remove-NestedObjectProperty $updated "mcp" "headroom"
-}
-if (Test-HeadroomSerena $parsed.mcp.serena) {
-  $updated = Remove-NestedObjectProperty $updated "mcp" "serena"
+function Test-EmptyOpenCodeShell($parsed) {
+  $keys = @($parsed.PSObject.Properties | Where-Object {
+    $_.Name -ne '$schema' -and -not (
+      $_.Name -in @('provider', 'mcp') -and @($_.Value.PSObject.Properties).Count -eq 0
+    )
+  })
+  return $keys.Count -eq 0
 }
 
-if ($updated -ne $content -and $PSCmdlet.ShouldProcess($resolvedPath, "remove Headroom-owned OpenCode entries")) {
-  [IO.File]::WriteAllText($resolvedPath, $updated, [Text.UTF8Encoding]::new($false))
-  Write-Output "Removed Headroom-owned provider and MCP entries from $resolvedPath"
+function Remove-HeadroomPollutionFromFile([string]$path) {
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return }
+  $resolvedPath = (Resolve-Path -LiteralPath $path).Path
+  $content = [IO.File]::ReadAllText($resolvedPath)
+  $parsed = $content | ConvertFrom-Json
+
+  $updated = $content
+  if (Test-HeadroomProvider $parsed.provider.headroom) {
+    $updated = Remove-NestedObjectProperty $updated "provider" "headroom"
+  }
+  if (Test-HeadroomMcp $parsed.mcp.headroom) {
+    $updated = Remove-NestedObjectProperty $updated "mcp" "headroom"
+  }
+  if (Test-HeadroomSerena $parsed.mcp.serena) {
+    $updated = Remove-NestedObjectProperty $updated "mcp" "serena"
+  }
+
+  if ($updated -ne $content -and $PSCmdlet.ShouldProcess($resolvedPath, "remove Headroom-owned OpenCode entries")) {
+    [IO.File]::WriteAllText($resolvedPath, $updated, [Text.UTF8Encoding]::new($false))
+    Write-Output "Removed Headroom-owned provider and MCP entries from $resolvedPath"
+    $parsed = $updated | ConvertFrom-Json
+  }
+
+  $isLegacyJson = [IO.Path]::GetFileName($resolvedPath) -eq "opencode.json"
+  if ($isLegacyJson -and (Test-EmptyOpenCodeShell $parsed) -and $PSCmdlet.ShouldProcess($resolvedPath, "remove empty leftover OpenCode JSON shell")) {
+    Remove-Item -LiteralPath $resolvedPath -Force
+    Write-Output "Removed empty leftover $resolvedPath"
+  }
+}
+
+$configDir = [IO.Path]::Combine($HOME, ".config", "opencode")
+$targets = if ($PSBoundParameters.ContainsKey("ConfigFile") -and $ConfigFile) {
+  @($ConfigFile)
+} else {
+  @(
+    [IO.Path]::Combine($configDir, "opencode.jsonc"),
+    [IO.Path]::Combine($configDir, "opencode.json")
+  )
+}
+
+foreach ($target in $targets) {
+  Remove-HeadroomPollutionFromFile $target
 }

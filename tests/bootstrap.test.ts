@@ -150,6 +150,51 @@ test("Headroom cleanup preserves unrelated JSONC configuration", () => {
   }
 })
 
+test("Headroom cleanup defaults to dual config and deletes empty leftover JSON", () => {
+  const directory = mkdtempSync(join(tmpdir(), "opencode-headroom-dual-"))
+  const home = join(directory, "home")
+  const configDir = join(home, ".config", "opencode")
+  const jsoncPath = join(configDir, "opencode.jsonc")
+  const jsonPath = join(configDir, "opencode.json")
+  try {
+    mkdirSync(configDir, { recursive: true })
+    writeFileSync(jsoncPath, `{
+  // keep this comment
+  "provider": {
+    "9router": { "options": { "apiKey": "keep-secret" } },
+    "headroom": { "name": "Headroom Proxy", "options": { "baseURL": "http://127.0.0.1:8787/v1" } }
+  },
+  "mcp": {
+    "codegraph": { "command": ["codegraph", "serve", "--mcp"] },
+    "headroom": { "command": ["headroom.exe", "mcp", "serve"] }
+  }
+}`)
+    writeFileSync(jsonPath, JSON.stringify({
+      $schema: "https://opencode.ai/config.json",
+      provider: {
+        headroom: { name: "Headroom Proxy", options: { baseURL: "http://127.0.0.1:8787/v1" } },
+      },
+      mcp: {
+        headroom: { command: ["headroom.exe", "mcp", "serve"] },
+        serena: { command: ["uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "agent", "--open-web-dashboard", "False"] },
+      },
+    }))
+    const result = Bun.spawnSync(["pwsh", "-NoProfile", "-File", cleanupHeadroomScript], {
+      env: { ...process.env, HOME: home, USERPROFILE: home },
+    })
+    expect(result.exitCode).toBe(0)
+    const updated = readFileSync(jsoncPath, "utf8")
+    expect(updated).toContain("// keep this comment")
+    expect(updated).toContain("keep-secret")
+    expect(updated).toContain("codegraph")
+    expect(updated).not.toContain('"headroom"')
+    expect(updated).not.toContain('"serena"')
+    expect(existsSync(jsonPath)).toBe(false)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test("retired notifier is removed from manifest and config", () => {
   const manifest = JSON.parse(readFileSync(new URL("../config/components.json", import.meta.url), "utf8"))
   expect(manifest.components.some((item: any) => item.id === "update-notifier")).toBe(false)
