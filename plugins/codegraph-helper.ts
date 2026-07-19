@@ -25,7 +25,7 @@ export const CodeGraphHelperPlugin: Plugin = async ({ directory }) => {
   return {
     async config(config: any) {
       const codeGraph = config?.mcp?.codegraph;
-      if (codeGraph && !hasCodeGraph()) codeGraph.enabled = false;
+      if (codeGraph) codeGraph.enabled = hasCodeGraph();
     },
 
     async "tool.execute.before"(input, output) {

@@ -41,7 +41,7 @@ Do not use `headroom wrap opencode`: the pinned release injects synthetic provid
 
 ## CodeGraph error outside indexed project
 
-CodeGraph helper enables MCP only when `.codegraph/codegraph.db` exists. Restore tracked helper into active plugins and restart OpenCode. Do not remove global CodeGraph config because indexed projects need it.
+CodeGraph helper owns the MCP enabled flag for automatic project switching: enabled only when the current plugin instance has `.codegraph/codegraph.db`. The assignment must be bidirectional because Desktop can reuse resolved config after opening an unindexed workspace; a disable-only hook leaves CodeGraph off when an indexed workspace opens later. Restore tracked helper into active plugins and restart OpenCode. Do not remove global CodeGraph config because indexed projects need it.
 
 ## Plugin executes twice or tools disappear
 

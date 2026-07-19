@@ -16,6 +16,22 @@ For any non-trivial architecture, integration, migration, or rejected approach, 
 
 Record conclusions and evidence, not internal deliberation. Never include credentials, full resolved config, personal data, private prompts, or unredacted logs. When a decision changes, mark the old entry superseded and link the replacement; do not silently erase history.
 
+## 2026-07-20: Bidirectional CodeGraph MCP state
+
+Status: active.
+
+Problem: the global CodeGraph MCP fails during startup outside indexed repositories, so the helper historically disabled it when `.codegraph/codegraph.db` was absent. That hook only wrote `false`. OpenCode Desktop can reuse the resolved config object across workspace initialization, so opening an unindexed workspace poisoned later indexed workspaces and CodeGraph remained disabled. TUI usually starts with one workspace and did not expose the stale transition.
+
+Alternatives: remove dynamic disabling, add a session-aware MCP proxy, or make the existing config hook assign both enabled and disabled states. Removing the hook restores the original unindexed startup error/freeze; a proxy duplicates OpenCode and CodeGraph lifecycle machinery.
+
+Decision: preserve the global MCP entry and let the helper own `codegraph.enabled`, setting it to the current plugin instance's `.codegraph/codegraph.db` result on every config hook. Search enforcement remains inert in unindexed workspaces and session-scoped in indexed workspaces. OpenCode exposes one mutable config property rather than a per-session MCP switch; if a host shares that live object across concurrently initialized workspaces, the most recent config hook wins. The sequential Desktop transition reported here is covered; true concurrent isolation requires an upstream workspace-scoped MCP API.
+
+Implementation: `plugins/codegraph-helper.ts`, `tests/codegraph-helper.test.ts`, troubleshooting, and local-patch reference.
+
+Evidence: commit `a55c657` records the original unindexed startup failure and disable-only mitigation. The regression passes one shared config through unindexed then indexed plugin instances; it fails with stale `false` before the fix and passes with bidirectional assignment. Focused and full repository tests verify existing metadata-only, session-isolation, and search-fallback behavior.
+
+Supersede when OpenCode provides workspace-scoped MCP configuration without shared mutable state, or CodeGraph starts safely outside indexed repositories.
+
 ## 2026-07-19: Direct OMO Slim image routing
 
 Status: active.
