@@ -104,8 +104,8 @@ npm 11 can report unapproved lifecycle scripts for pinned packages. Inspect firs
 Removed debug notes and Mem0 archive are historical, not deployable. Read without checkout:
 
 ```powershell
-git show master:knownbug.md
-git show master:docs/opencode-agents.md
+git show main:knownbug.md
+git show main:docs/opencode-agents.md
 git show archive/broken-docs-reference:docs/opencode-bugs-known.md
 ```
 

@@ -110,7 +110,7 @@ RTK installs under `~/.local/bin` and resolves through `PATH`. Local wrapper onl
 - Production npm audit: 0 high, 0 critical. Remaining findings were transitive low/moderate packages with no safe forced fix.
 - Repository secret scan found placeholders/constants only. Private credential values stay outside Git.
 
-Earlier Goal-enabled revisions passed isolated renderer and lifecycle checks before later integration failures motivated disablement. Retrieve removed debug material read-only through `git show master:knownbug.md`, `git show master:docs/opencode-agents.md`, or branches `archive/broken-docs-reference` and `codex/pre-cleanup-c286bb8`; never deploy those historical trees.
+Earlier Goal-enabled revisions passed isolated renderer and lifecycle checks before later integration failures motivated disablement. Retrieve removed debug material read-only through `git show main:knownbug.md`, `git show main:docs/opencode-agents.md`, or branches `archive/broken-docs-reference` and `codex/pre-cleanup-c286bb8`; never deploy those historical trees.
 
 ## Future update workflow
 

@@ -4,7 +4,7 @@ Purpose: reconstruct repository history across every reachable branch and delete
 
 ## Scope
 
-Reconstruction on 2026-07-16 covered 104 unique commits reachable from all local and remote refs: active `refactor/unified-maintenance`, merged `master`, both broken-doc archive refs, and `feat/openviking-migration-research`. Evidence came from commit subjects, tree changes, deleted Markdown read with `git show`, current tests, and retained decisions. [Source index](source-index.md) lists every commit and retrieval path.
+Reconstruction on 2026-07-16 covered 104 unique commits reachable from all local and remote refs: active `refactor/unified-maintenance`, merged `main` (then named `master`), both broken-doc archive refs, and `feat/openviking-migration-research`. Evidence came from commit subjects, tree changes, deleted Markdown read with `git show`, current tests, and retained decisions. [Source index](source-index.md) lists every commit and retrieval path.
 
 ## Era 1: triage-first dotfiles (2026-07-08)
 

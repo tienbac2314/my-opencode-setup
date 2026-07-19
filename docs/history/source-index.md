@@ -7,7 +7,7 @@ Purpose: make complete repository archaeology reproducible. Inventory covers all
 | Ref or boundary | Commit | Meaning |
 |---|---|---|
 | Active tip at reconstruction | `48f55648515a1d28cd1459c82463741ed5b7878a` | Structured docs before full-history reconstruction |
-| Merged master | `a2d3ae4b74cccd45871b883555b3d696b129c429` | PR #2 merge |
+| Merged main (named master at reconstruction) | `a2d3ae4b74cccd45871b883555b3d696b129c429` | PR #2 merge |
 | Trusted pre-recovery baseline | `d8fa757af2f97a640610fb00e32d4d811a255fab` | Stable provider/CodeGraph boundary |
 | Broken archive tip | `c286bb890666528fbdfed486f1851b1226a075b6` | Useful but unsafe migration lineage |
 | Restored lifecycle tip | `03db0fda4f03580217bb2f5ac5d467af8ac6e83a` | Recovery sequence completion |
