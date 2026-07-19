@@ -1,7 +1,7 @@
 {
   "$schema": "./components.schema.json",
   "schemaVersion": 1,
-  "expectedServerPlugins": 7,
+  "expectedServerPlugins": 8,
   "retired": {
     "npmLocal": ["opencode-update-notifier", "@prevalentware/opencode-goal-plugin"],
     "pluginSpecs": ["opencode-update-notifier"],
@@ -112,8 +112,16 @@
       "branch": "main",
       "cache": "~/.cache/opencode-headroom/source",
       "repository": "https://github.com/headroomlabs-ai/headroom",
-      "removeWhen": "Remove pinned source build when headroom-ai wheel ships the OpenCode transport plugin and official wrapper passes custom-provider tests.",
+      "removeWhen": "Remove pinned source build when headroom-ai wheel ships transparent OpenCode transport and supports launch without provider, model, or MCP mutation.",
       "verify": "9router and native OpenCode interception"
+    },
+    {
+      "id": "headroom-bridge",
+      "name": "Headroom Desktop and CLI bridge",
+      "kind": "local",
+      "target": "local",
+      "localFile": "plugins/headroom.ts",
+      "verify": "Desktop and CLI provider/model parity with fail-open proxy health check"
     },
     {
       "id": "lazy-load",

@@ -31,9 +31,13 @@ If another directory wins PATH, update/remove that copy yourself or prepend `~/.
 
 ## Headroom install or build fails
 
-Windows `headroom-ai[all]` native dependencies require Visual Studio 2022 Build Tools, C++ workload, and Windows SDK. Install command lives in [setup.md](setup.md#6-headroom-official-wrapper-optional). Restart terminal, install pinned Python tool, then build pinned transport.
+Windows `headroom-ai[all]` native dependencies require Visual Studio 2022 Build Tools, C++ workload, and Windows SDK. Install command lives in [setup](setup.md#6-headroom-desktop-and-cli-proxy-optional). Restart terminal, install pinned Python tool, then build pinned transport.
 
-Use `headroom wrap opencode`, not the retired repository launcher. If custom-provider traffic bypasses Headroom, verify `HEADROOM_OPENCODE_PLUGIN_PATH` points to `~/.cache/opencode-headroom/source/plugins/opencode/dist/entry.opencode.js`. The 0.31.0 wheel can route built-in providers without that file but does not ship transparent transport for 9router and other custom providers.
+Run `pwsh ./scripts/manage-headroom-proxy.ps1 status`. Expected: installed task and healthy `http://127.0.0.1:8787/livez`. The auto-discovered bridge makes four short health attempts and then fails open when the proxy is unavailable, so OpenCode still works but traffic bypasses Headroom. Re-run `install` after changing the pinned Headroom executable. Combined proxy output rolls between `proxy.log` and `proxy.log.previous` under `~/.local/state/opencode-headroom`; a visible Headroom terminal means the task still uses the obsolete direct executable action and should be reinstalled.
+
+`Context Tool: rtk` does not mean bare proxy rewrites OpenCode commands. `plugins/rtk.ts` owns OpenCode command rewriting; `headroom proxy` reads `rtk gain` for statistics. Headroom memory stays disabled because Supermemory owns persistent memory. See [Headroom integration](../integrations/headroom.md) for exact ownership boundaries.
+
+Do not use `headroom wrap opencode`: the pinned release injects synthetic providers/models and persistent Headroom/Serena MCP entries. Run `pwsh ./scripts/remove-headroom-opencode-pollution.ps1` once after migrating. Default cleanup scrubs both `opencode.jsonc` and leftover `opencode.json`; empty leftover JSON shells are deleted. Restart every OpenCode session after cleanup, including IntelliJ terminals that loaded the old dual config.
 
 ## CodeGraph error outside indexed project
 
@@ -47,13 +51,29 @@ Local plugins are auto-discovered. Never list local file paths in global/project
 
 Desktop may initialize plugins without injected Bun shell and may retain stale package/status state. Close Desktop fully, restart, wait for sidecar, create new session, then compare safe counts and origin specs. Plugin display and tool execution are separate checks.
 
-## `load_tool` missing or DSML appears as text
+## `load_tool` missing or tool arguments have wrong types
 
-Restore `plugins/lazy-load.ts`, restart process, and run `bun test tests/lazy-load.test.ts`. Loaded-tool state persists through one tool loop and clears on terminal stop. Repeated plugin initialization must return hooks every time; only fetch wrapping is idempotent.
+Restore `plugins/lazy-load.ts`, restart process, and run `bun test tests/lazy-load.test.ts`. The response adapter normalizes string-encoded numbers, booleans, arrays, and objects against each tool's captured JSON Schema for both native and text-encoded calls. It does not invent missing keys or rename model-provided keys. Loaded-tool state persists through one tool loop and clears on terminal stop. Repeated plugin initialization must return hooks every time; only fetch wrapping is idempotent.
 
 ## 9router model invalid or polluted namespace
 
 Run `opencode models 9router`. Required configured fallback models must remain available during discovery failure, and `9router/opencode/*` entries must be absent. Restore `plugins/models-discovery.js` and restart affected process.
+
+## Vision model cannot see attached image
+
+OMO Slim `auto` image routing intercepts attachments when Observer is enabled: it saves image data locally, strips binary image parts from the primary request, and appends delegation text for `@observer`. This prevents even a native-vision model from receiving the original payload through 9router.
+
+Tracked policy uses `"image_routing": "direct"` in `config/oh-my-opencode-slim.json`, deployed as `~/.config/opencode/oh-my-opencode-slim.json`. Direct mode preserves the image parts; the selected provider/model must still support images. Explicit `@observer` delegation remains available.
+
+If behavior still looks automatic, check for higher-precedence OMO config without printing credentials: project-local `.opencode/oh-my-opencode-slim.json` or global `~/.config/opencode/oh-my-opencode-slim.jsonc` can override the managed global JSON. Restart OpenCode after correcting config.
+
+## OpenCode free-tier quota appears unexpectedly
+
+If `Free usage exceeded` appears before a tool call, verify the selected model belongs to `9router`, not OpenCode Zen with a similar display name. Start a fresh session and select the explicit 9router entry before diagnosing plugins or Headroom.
+
+## Native Windows opens a WSL installation prompt
+
+An upstream skill likely launched a Bash helper through Windows `bash.exe`. Use the skill's PowerShell launcher on native Windows, such as `pwsh -File scripts/task-brief.ps1 ...`. Installing WSL does not translate native `C:\...` paths; run OpenCode inside WSL or keep the PowerShell path consistently.
 
 ## Supermemory tool missing or HTTP 405 appears
 
@@ -84,9 +104,9 @@ npm 11 can report unapproved lifecycle scripts for pinned packages. Inspect firs
 Removed debug notes and Mem0 archive are historical, not deployable. Read without checkout:
 
 ```powershell
-git show master:knownbug.md
-git show master:docs/opencode-agents.md
+git show main:knownbug.md
+git show main:docs/opencode-agents.md
 git show archive/broken-docs-reference:docs/opencode-bugs-known.md
 ```
 
-Current behavior remains governed by [README.md](README.md), [setup.md](setup.md), [PATCHES.md](PATCHES.md), `config/components.json`, tests, and active source.
+Current behavior remains governed by the repository [README](../../README.md), [setup](setup.md), [local patch reference](../reference/patches.md), `config/components.json`, tests, and active source.

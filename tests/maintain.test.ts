@@ -10,15 +10,24 @@ const updateOpenCode = fileURLToPath(new URL("../scripts/update-opencode.ps1", i
 const repositoryManifest = JSON.parse(readFileSync(new URL("../config/components.json", import.meta.url), "utf8"))
 const activeDocs = [
   "README.md",
-  "setup.md",
-  "PATCHES.md",
-  "pr.md",
   "AGENTS.md",
-  "TROUBLESHOOTING.md",
-  "docs/agents.md",
-  "docs/maintenance-refactor.md",
+  "config/AGENTS.md",
+  "docs/README.md",
+  "docs/guides/setup.md",
+  "docs/guides/troubleshooting.md",
+  "docs/integrations/headroom.md",
+  "docs/integrations/supermemory-server-embedding.md",
+  "docs/reference/agents.md",
+  "docs/reference/patches.md",
+  "docs/reference/upstream.md",
+  "docs/history/decisions.md",
+  "docs/history/maintenance-refactor.md",
+  "docs/history/repository-timeline.md",
+  "docs/history/architecture-evolution.md",
+  "docs/history/incident-ledger.md",
+  "docs/history/source-index.md",
 ]
-const operationalDocs = activeDocs.filter((file) => file !== "docs/maintenance-refactor.md")
+const operationalDocs = activeDocs.filter((file) => !file.startsWith("docs/history/"))
 const retiredMcpSkills = ["browser-automation", "devtools-debugger", "docs-fetcher"]
 
 function fixture() {
@@ -51,7 +60,7 @@ function fixture() {
 test("component manifest is unique and complete", () => {
   const components = repositoryManifest.components as Array<Record<string, unknown>>
   expect(new Set(components.map((item) => item.id)).size).toBe(components.length)
-  expect(repositoryManifest.expectedServerPlugins).toBe(7)
+  expect(repositoryManifest.expectedServerPlugins).toBe(8)
   expect(repositoryManifest.components.find((item: any) => item.id === "opencode")?.target).toBe("1.18.1")
   expect(repositoryManifest.components.find((item: any) => item.id === "opencode-plugin")?.target).toBe("1.18.1")
   expect(repositoryManifest.retired.npmLocal).toContain("opencode-update-notifier")
@@ -98,11 +107,20 @@ test("active documentation has no broken local links", () => {
 
 test("active instructions match current manifest and retained operations", () => {
   const agents = readFileSync(new URL("../AGENTS.md", import.meta.url), "utf8")
-  const setup = readFileSync(new URL("../setup.md", import.meta.url), "utf8")
-  const journey = readFileSync(new URL("../docs/maintenance-refactor.md", import.meta.url), "utf8")
+  const globalAgents = readFileSync(new URL("../config/AGENTS.md", import.meta.url), "utf8")
+  const setup = readFileSync(new URL("../docs/guides/setup.md", import.meta.url), "utf8")
+  const journey = readFileSync(new URL("../docs/history/maintenance-refactor.md", import.meta.url), "utf8")
+  const decisions = readFileSync(new URL("../docs/history/decisions.md", import.meta.url), "utf8")
 
   expect(agents).toContain("Repository source of truth")
-  expect(agents).toContain("TROUBLESHOOTING.md")
+  expect(agents).toContain("docs/guides/troubleshooting.md")
+  expect(agents).toContain("docs/history/decisions.md")
+  expect(agents).not.toContain("Think Before Coding")
+  expect(globalAgents).toContain("Think Before Coding")
+  expect(globalAgents).toContain("Runtime Tools")
+  for (const repositoryOnly of ["README.md", "PATCHES.md", "Goal package", "maintain.ps1", "9router", "Supermemory"]) {
+    expect(globalAgents).not.toContain(repositoryOnly)
+  }
   expect(agents).not.toContain("notifier checks npm packages")
   expect(setup).toContain("scripts/set-credentials.ps1")
   expect(setup).toContain("router_api_key")
@@ -114,6 +132,9 @@ test("active instructions match current manifest and retained operations", () =>
   expect(journey).toContain(`${repositoryManifest.expectedServerPlugins} plugins`)
   expect(journey).toContain("Goal remains disabled")
   expect(journey).not.toContain("8 plugins, 8 origins")
+  expect(decisions).toContain("Record conclusions and evidence, not internal deliberation")
+  expect(decisions).toContain("Single persistent-memory owner")
+  expect(decisions).toContain("Bare proxy reads `rtk gain`")
 })
 
 test("obsolete MCP skills are retired from source and deployment", () => {
@@ -140,6 +161,8 @@ test("setup and maintainer use cross-platform config and temp paths", () => {
   expect(maintain).toContain("[IO.Path]::GetTempPath()")
   expect(maintain).toContain("Get-Command $File -CommandType Application,ExternalScript")
   expect(setup).toContain("Copy-UniqueSkills")
+  expect(setup).toContain('Copy-Item "$RepoDir\\config\\AGENTS.md"')
+  expect(setup).not.toContain('Copy-Item "$RepoDir\\AGENTS.md"')
   expect(setup).toContain("externalNames")
   expect(setup).toContain("foreach ($name in $externalNames)")
   expect(setup).toContain("environment.d")
@@ -338,21 +361,63 @@ test("Headroom installer reads commit from component manifest", () => {
   expect(source).not.toContain("versions.env")
 })
 
-test("Headroom uses official wrapper with pinned source transport", () => {
-  const setup = readFileSync(new URL("../setup.md", import.meta.url), "utf8")
-  const patches = readFileSync(new URL("../PATCHES.md", import.meta.url), "utf8")
+test("Headroom uses auto-loaded bridge and independent proxy", () => {
+  const setup = readFileSync(new URL("../docs/guides/setup.md", import.meta.url), "utf8")
+  const patches = readFileSync(new URL("../docs/reference/patches.md", import.meta.url), "utf8")
+  const headroomDocs = readFileSync(new URL("../docs/integrations/headroom.md", import.meta.url), "utf8")
+  const bridge = readFileSync(new URL("../plugins/headroom.ts", import.meta.url), "utf8")
+  const manager = readFileSync(new URL("../scripts/manage-headroom-proxy.ps1", import.meta.url), "utf8")
+  const runner = readFileSync(new URL("../scripts/run-headroom-proxy.ps1", import.meta.url), "utf8")
+  const maintain = readFileSync(new URL("../maintain.ps1", import.meta.url), "utf8")
   const source = repositoryManifest.components.find((item: any) => item.id === "headroom-source")
 
-  expect(existsSync(new URL("../scripts/start-opencode-headroom.ps1", import.meta.url))).toBe(false)
+  expect(existsSync(new URL("../plugins/headroom.ts", import.meta.url))).toBe(true)
+  expect(existsSync(new URL("../scripts/manage-headroom-proxy.ps1", import.meta.url))).toBe(true)
+  expect(existsSync(new URL("../scripts/run-headroom-proxy.ps1", import.meta.url))).toBe(true)
+  expect(existsSync(new URL("../scripts/remove-headroom-opencode-pollution.ps1", import.meta.url))).toBe(true)
   expect(existsSync(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))).toBe(true)
-  expect(setup).toContain("headroom wrap opencode --no-context-tool --")
-  expect(setup).toContain("HEADROOM_OPENCODE_PLUGIN_PATH")
-  expect(setup).toContain("Get-Command opencode -CommandType Application,ExternalScript")
-  expect(setup).toContain("Headroom changed OpenCode version")
-  expect(setup).toContain("Headroom OpenCode transport missing")
-  expect(setup).not.toContain("start-opencode-headroom.ps1")
-  expect(patches).toContain("Official `headroom wrap opencode`")
-  expect(source.removeWhen).toContain("wheel ships")
+  expect(setup).toContain("scripts/manage-headroom-proxy.ps1 install")
+  expect(setup).toContain("scripts/remove-headroom-opencode-pollution.ps1")
+  expect(bridge).toContain("waitForHealthyHeadroomProxy")
+  expect(bridge).toContain("headroom-proxy.url")
+  expect(manager).toContain("New-ScheduledTaskTrigger -AtLogOn")
+  expect(manager).toContain("-WindowStyle Hidden")
+  expect(runner).toContain("--no-memory-tools")
+  expect(runner).toContain("LITELLM_SUPPRESS_DEBUG_INFO")
+  expect(runner).toContain("--no-learn")
+  expect(maintain).toContain("Headroom proxy task convergence failed")
+  expect(setup).not.toContain("headroom wrap opencode --no-context-tool --")
+  expect(patches).toContain("Auto-discovered `plugins/headroom.ts`")
+  expect(headroomDocs).toContain("Bare `headroom proxy`")
+  expect(headroomDocs).toContain("Supermemory is the single owner")
+  expect(source.removeWhen).toContain("without provider, model, or MCP mutation")
+})
+
+test("README links every managed upstream repository", () => {
+  const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8")
+  const repositories = new Set(
+    repositoryManifest.components
+      .map((item: any) => item.repository)
+      .filter((repository: unknown): repository is string => typeof repository === "string"),
+  )
+
+  expect(repositories.size).toBe(11)
+  for (const repository of repositories) {
+    expect(readme).toContain(`](${repository})`)
+  }
+  expect(readme).toContain("](https://github.com/obra/superpowers)")
+})
+
+test("repository history indexes the full pre-reconstruction graph", () => {
+  const source = readFileSync(new URL("../docs/history/source-index.md", import.meta.url), "utf8")
+  const hashes = [...source.matchAll(/^\| `([0-9a-f]{7})` \|/gm)].map((match) => match[1])
+  expect(hashes.length).toBe(104)
+  expect(new Set(hashes).size).toBe(104)
+  for (const boundary of ["bccb45f", "d8fa757", "c286bb8", "03db0fd", "bf57a31", "48f5564"]) {
+    expect(hashes).toContain(boundary)
+  }
+  expect(source).toContain("Deleted-document map")
+  expect(source).toContain("archive/broken-docs-reference")
 })
 
 test("Goal package patch keeps active sidebar reactive and hides inactive state", () => {
@@ -433,6 +498,16 @@ test("setup converges isolated config without machine integration", () => {
   try {
     mkdirSync(bin)
     mkdirSync(configDir)
+    writeFileSync(join(configDir, "opencode.json"), JSON.stringify({
+      $schema: "https://opencode.ai/config.json",
+      provider: {
+        headroom: { name: "Headroom Proxy", options: { baseURL: "http://127.0.0.1:8787/v1" } },
+      },
+      mcp: {
+        headroom: { command: ["headroom.exe", "mcp", "serve"] },
+        serena: { command: ["uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "agent", "--open-web-dashboard", "False"] },
+      },
+    }))
     writeFileSync(join(configDir, "package.json"), JSON.stringify({ dependencies: {
       "@prevalentware/opencode-goal-plugin": "0.1.24",
     } }))
@@ -451,8 +526,15 @@ test("setup converges isolated config without machine integration", () => {
     ], { env: { ...process.env, Path: `${bin};${process.env.Path}` } })
     expect(result.exitCode).toBe(0)
     expect(existsSync(join(configDir, "opencode.jsonc"))).toBe(true)
+    expect(existsSync(join(configDir, "opencode.json"))).toBe(false)
     expect(existsSync(join(configDir, "tui.json"))).toBe(true)
     expect(existsSync(join(configDir, "plugins", "lazy-load.ts"))).toBe(true)
+    const deployedOmo = JSON.parse(readFileSync(join(configDir, "oh-my-opencode-slim.json"), "utf8"))
+    expect(deployedOmo.image_routing).toBe("direct")
+    expect(readFileSync(join(configDir, "AGENTS.md"), "utf8")).toBe(
+      readFileSync(new URL("../config/AGENTS.md", import.meta.url), "utf8"),
+    )
+    expect(readFileSync(join(configDir, "AGENTS.md"), "utf8")).not.toContain("Repository source of truth")
     expect(existsSync(join(configDir, "commands", "goal.md"))).toBe(false)
     for (const name of retiredMcpSkills) {
       expect(existsSync(join(configDir, "skills", name))).toBe(false)

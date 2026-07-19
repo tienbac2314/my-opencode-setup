@@ -6,15 +6,7 @@ Purpose: explain why the current setup looks this way, what failed before, and w
 
 Work happened on `refactor/unified-maintenance`. Stable historical baseline was `d8fa757a`; Git history keeps all removed debug notes and the retired Mem0 bundle.
 
-Current active references:
-
-- `README.md`: component map and daily commands.
-- `setup.md`: Windows/Linux install, update, recovery, and live checks.
-- `PATCHES.md`: every local fork, wrapper, package patch, and removal condition.
-- `TROUBLESHOOTING.md`: current symptom-first checks and recovery.
-- `docs/agents.md`: agent taxonomy, OMO roles, and discovery paths.
-- `pr.md`: minimal upstream issue/PR text and correct target repositories.
-- `config/components.json`: only source of approved versions and source commits.
+Current active references are indexed by [Documentation](../README.md). `config/components.json` remains the only source of approved versions and source commits.
 
 ## Main changes
 
@@ -32,7 +24,7 @@ Current active references:
 
 ### Lazy loading
 
-Failure was not one bad tool name. Reloads could lose `load_tool`, namespaced tool names could be rewritten incorrectly, split SSE/DSML calls could lose data, and same-turn execution needed the real tool call restored without corrupting finish events.
+Failure was not one bad tool name. Reloads could lose `load_tool`, namespaced tool names could be rewritten incorrectly, split SSE or text-encoded calls could lose data, and models could serialize typed tool fields as strings. Same-turn execution needed the real tool call restored without corrupting finish events. Argument repair now uses each tool's captured JSON Schema at the common response path, so it applies across model formats without guessing missing keys or aliases.
 
 Fix lives in `plugins/lazy-load.ts`; regression coverage is `tests/lazy-load.test.ts`. Live proof showed the model call `load_tool`, load `bash`, execute a command, and return the marker.
 
@@ -79,11 +71,11 @@ OMO also copied skills already visible under `~/.agents` or `~/.claude`. Setup n
 
 ### Headroom
 
-Headroom remains optional. Official `headroom wrap opencode` now owns proxy startup, provider/config routing, MCP options, child launch, and cleanup, so the repository custom launcher was removed.
+Headroom remains optional. A hidden current-user login task owns the proxy independently of OpenCode. Auto-discovered `plugins/headroom.ts` activates the pinned transparent transport for Desktop and CLI only after the local health endpoint identifies a real Headroom proxy; otherwise it fails open to direct provider traffic.
 
-The `headroom-ai` 0.31.0 wheel does not ship the transparent OpenCode transport. Repository keeps a pinned source build and supplies it through `HEADROOM_OPENCODE_PLUGIN_PATH` so custom providers such as 9router are intercepted. Remove that source build only after the wheel ships equivalent transport and live custom-provider tests pass.
+The `headroom-ai` 0.31.0 wheel does not ship the transparent OpenCode transport. Repository keeps a pinned source build so custom providers such as 9router are intercepted without changing provider identity or model inventory. Official `headroom wrap opencode` was rejected here because it injects synthetic `anthropic`, `openai`, and `headroom` providers and persists Headroom/Serena MCP entries; those mutations hid dynamically discovered 9router models in TUI and polluted App config.
 
-Direct executable/App launches are not proxied. This machine's PowerShell profile can route interactive `opencode` calls through official wrapper. Both native OpenCode and 9router routes passed after the source pin.
+Desktop App and normal `opencode` launches use the same auto-discovered bridge and persistent proxy. No shell profile wrapper is required. App and TUI retain identical configured providers and model selection while both traverse Headroom when the service is healthy.
 
 ### CodeGraph and RTK
 
@@ -103,7 +95,7 @@ RTK installs under `~/.local/bin` and resolves through `PATH`. Local wrapper onl
 ## Current evidence
 
 - Real global setup completed against `~/.config/opencode` with full Bun suite passing.
-- `opencode debug config`: 7 plugins and 7 origins; Goal package and `/goal` are absent from active runtime.
+- `opencode debug config`: 8 plugins and 8 origins; Goal package and `/goal` are absent from active runtime.
 - Goal remains disabled; dormant renderer tests preserve historical package investigation only.
 - Lazy loading: live `load_tool` then Bash execution passed.
 - OMO Slim: Oracle, Librarian, Designer, and Fixer task lifecycles passed; Explorer is intentionally disabled.
@@ -118,12 +110,12 @@ RTK installs under `~/.local/bin` and resolves through `PATH`. Local wrapper onl
 - Production npm audit: 0 high, 0 critical. Remaining findings were transitive low/moderate packages with no safe forced fix.
 - Repository secret scan found placeholders/constants only. Private credential values stay outside Git.
 
-Earlier Goal-enabled revisions passed isolated renderer and lifecycle checks before later integration failures motivated disablement. Retrieve removed debug material read-only through `git show master:knownbug.md`, `git show master:docs/opencode-agents.md`, or branches `archive/broken-docs-reference` and `codex/pre-cleanup-c286bb8`; never deploy those historical trees.
+Earlier Goal-enabled revisions passed isolated renderer and lifecycle checks before later integration failures motivated disablement. Retrieve removed debug material read-only through `git show main:knownbug.md`, `git show main:docs/opencode-agents.md`, or branches `archive/broken-docs-reference` and `codex/pre-cleanup-c286bb8`; never deploy those historical trees.
 
 ## Future update workflow
 
 1. Run `pwsh ./maintain.ps1 check` and `plan`.
-2. Read upstream old-to-new diff and `PATCHES.md`.
+2. Read the upstream old-to-new diff and [local patches](../reference/patches.md).
 3. Change only the reviewed target in `config/components.json`.
 4. Run `apply -Component ID`, focused live lifecycle checks, then `verify`.
 5. Remove a patch/wrapper only when the manifest's `removeWhen` condition is proven against the new upstream release.

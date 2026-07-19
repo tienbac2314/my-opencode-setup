@@ -85,6 +85,23 @@ beforeAll(async () => {
       },
     },
   )
+  await hooks["tool.definition"](
+    { toolID: "typed_tool" },
+    {
+      description: "Exercise schema-guided argument normalization.",
+      jsonSchema: {
+        type: "object",
+        properties: {
+          offset: { type: "integer" },
+          timeout: { type: "number" },
+          enabled: { type: "boolean" },
+          questions: { type: "array", items: { type: "object", properties: { header: { type: "string" } } } },
+          options: { type: "object", properties: { retries: { type: "integer" } } },
+          code: { type: "string" },
+        },
+      },
+    },
+  )
 })
 
 afterAll(() => {
@@ -206,5 +223,46 @@ describe("lazy-load SSE transform", () => {
     expect(emittedToolNames(output)[0]).toContain("load_tool")
     expect(events.some((event) => event?.choices?.[0]?.delta?.content === " after")).toBe(true)
     expect(events.at(-1)?.choices?.[0]?.finish_reason).toBe("stop")
+  })
+
+  test("normalizes native tool arguments against their schema", async () => {
+    await transform("native-types", [toolCall("typed_tool", '{"offset":"1"}')])
+    const output = await transform("native-types", [
+      toolCall("typed_tool", '{"offset":"230","timeout":"300000","enabled":"true","questions":"[{\\"header\\":\\"Origin\\"}]","options":"{\\"retries\\":\\"2\\"}","code":"230"}'),
+    ])
+    const call = jsonEvents(output)[0].choices[0].delta.tool_calls[0]
+
+    expect(JSON.parse(call.function.arguments)).toEqual({
+      offset: 230,
+      timeout: 300000,
+      enabled: true,
+      questions: [{ header: "Origin" }],
+      options: { retries: 2 },
+      code: "230",
+    })
+  })
+
+  test("normalizes text-encoded tool arguments against their schema", async () => {
+    await transform("dsml-types", [toolCall("typed_tool", '{"offset":"1"}')])
+    const dsml = [
+      "<｜｜DSML｜｜tool_calls>",
+      '<｜｜DSML｜｜invoke name="typed_tool">',
+      '<｜｜DSML｜｜parameter name="offset">230</｜｜DSML｜｜parameter>',
+      '<｜｜DSML｜｜parameter name="questions">[{"header":"Origin"}]</｜｜DSML｜｜parameter>',
+      '<｜｜DSML｜｜parameter name="enabled">true</｜｜DSML｜｜parameter>',
+      '<｜｜DSML｜｜parameter name="code">230</｜｜DSML｜｜parameter>',
+      "</｜｜DSML｜｜invoke>",
+      "</｜｜DSML｜｜tool_calls>",
+    ].join("")
+
+    const output = await transform("dsml-types", [content(dsml), finish()])
+    const call = jsonEvents(output)[0].choices[0].delta.tool_calls[0]
+
+    expect(JSON.parse(call.function.arguments)).toEqual({
+      offset: 230,
+      questions: [{ header: "Origin" }],
+      enabled: true,
+      code: "230",
+    })
   })
 })

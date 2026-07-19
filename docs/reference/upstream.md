@@ -1,17 +1,18 @@
 # Upstream Issue and PR Targets
 
-Purpose: route each real upstream problem to repository that owns it. Personal policy and custom plugins stay in [PATCHES.md](PATCHES.md).
+Purpose: route each real upstream problem to the repository that owns it. Personal policy and custom plugins stay in [local patches](patches.md).
 
 ## `omarwaly-ai/opencode-lazy-loading`
 
-Problem: upstream plugin loses or rewrites tool calls under OpenCode-prefixed names, split SSE chunks, DSML text tool calls, and Desktop reloads.
+Problem: upstream plugin loses or rewrites tool calls under OpenCode-prefixed names, split SSE chunks, text-encoded tool calls, model-produced string values for typed fields, and Desktop reloads.
 
 Minimal PR sequence:
 
 1. Preserve active `load_tool` wire name and resolve tool names case-insensitively.
 2. Buffer split tool arguments without dropping content/reasoning deltas or finish events.
-3. Parse DSML tool calls split across stream events.
-4. Add tests equivalent to `tests/lazy-load.test.ts`.
+3. Parse text-encoded tool calls split across stream events.
+4. Normalize model-produced argument values against captured JSON Schema at the common response path; never invent missing keys or aliases.
+5. Add tests equivalent to `tests/lazy-load.test.ts`.
 
 Non-goal: provider-specific model logic.
 

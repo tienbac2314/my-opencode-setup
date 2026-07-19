@@ -4,18 +4,18 @@ Personal OpenCode setup for Windows and Linux. One component manifest controls v
 
 ## Start here
 
-- Install: [setup.md](setup.md)
+- Documentation index: [docs/README.md](docs/README.md)
+- Install: [docs/guides/setup.md](docs/guides/setup.md)
 - Check or apply updates: `pwsh ./maintain.ps1 check|plan|apply|verify`
-- Understand local differences: [PATCHES.md](PATCHES.md)
-- Diagnose runtime problems: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- Understand agents and OMO roles: [docs/agents.md](docs/agents.md)
-- Prepare upstream reports: [pr.md](pr.md)
-- Understand this refactor and past failures: [docs/maintenance-refactor.md](docs/maintenance-refactor.md)
+- Diagnose runtime problems: [docs/guides/troubleshooting.md](docs/guides/troubleshooting.md)
+- Understand current integration decisions: [docs/history/decisions.md](docs/history/decisions.md)
 
 ## Architecture
 
 ```text
 config/components.json   approved versions, commits, sources, tests
+config/AGENTS.md         reusable global agent policy deployed by setup
+AGENTS.md                repository-only contracts and boundaries
 setup.ps1                first install and machine integration
 maintain.ps1             check, plan, apply, verify
 commands/                tracked slash commands
@@ -27,7 +27,7 @@ tests/                   behavior and maintenance contracts
 
 Private credentials stay outside this repository under `~/.config/opencode`.
 
-Flow: `setup.ps1` reads the component manifest and delegates installs to `maintain.ps1`; maintainer converges package pins, tracked runtime files, patches, and retired artifacts; OpenCode auto-discovers local files under `plugins/`; tests encode integration contracts. Read [docs/maintenance-refactor.md](docs/maintenance-refactor.md) before changing this flow.
+Flow: `setup.ps1` reads the component manifest and delegates installs to `maintain.ps1`; maintainer converges package pins, tracked runtime files, patches, and retired artifacts; OpenCode auto-discovers local files under `plugins/`; tests encode integration contracts. Read [engineering decisions](docs/history/decisions.md) before changing ownership boundaries.
 
 ## Components
 
@@ -35,19 +35,21 @@ Purpose: show what this setup loads and where each part comes from.
 
 | Component | Source | What it does |
 |---|---|---|
-| OpenCode | `anomalyco/opencode` | App, TUI, server, LSP, and built-in tools |
+| OpenCode | [`anomalyco/opencode`](https://github.com/anomalyco/opencode) | App, TUI, server, plugin SDK, LSP, and built-in tools |
+| Vercel AI SDK | [`vercel/ai`](https://github.com/vercel/ai) | OpenAI-compatible provider used by configured transports |
 | 9router model discovery | Local `models-discovery.js` | Adds available 9router models with correct input types |
-| Oh My OpenCode Slim | `alvinunreal/oh-my-opencode-slim` | Orchestrator plus Oracle, Librarian, Designer, and Fixer agents |
-| Goal (disabled) | `prevalentWare/opencode-goal-plugin` | Retained for investigation; setup does not install or load it while OpenCode integration remains broken |
-| Supermemory | `supermemoryai/opencode-supermemory` | Self-hosted memory across sessions |
-| Lazy loading | `omarwaly-ai/opencode-lazy-loading` | Loads tool schemas only when the model asks for them |
-| Token source | `omarwaly-ai/OpenCode-tokens-source` | `/tokens` breakdown by prompt, tool, and message source |
-| CodeGraph | `colbymchenry/codegraph` plus local guard | Code search for indexed projects; no action elsewhere |
-| RTK | `rtk-ai/rtk` plus local OpenCode hook | Shorter shell output and Windows-safe command rewriting |
-| Deep Research | `Weizhena/Deep-Research-skills` | Research workflow without exposing strategy files as agents |
-| Headroom | `headroomlabs-ai/headroom` | Official `headroom wrap opencode` lifecycle plus pinned source transport for custom providers |
+| Oh My OpenCode Slim | [`alvinunreal/oh-my-opencode-slim`](https://github.com/alvinunreal/oh-my-opencode-slim) | Orchestrator plus Oracle, Librarian, Designer, and Fixer agents |
+| Goal (disabled) | [`prevalentWare/opencode-goal-plugin`](https://github.com/prevalentWare/opencode-goal-plugin) | Retained for investigation; setup does not install or load it while OpenCode integration remains broken |
+| Supermemory | [`supermemoryai/opencode-supermemory`](https://github.com/supermemoryai/opencode-supermemory) | Self-hosted memory across sessions |
+| Lazy loading | [`omarwaly-ai/opencode-lazy-loading`](https://github.com/omarwaly-ai/opencode-lazy-loading) | Loads tool schemas only when the model asks for them |
+| Token source | [`omarwaly-ai/OpenCode-tokens-source`](https://github.com/omarwaly-ai/OpenCode-tokens-source) | `/tokens` breakdown by prompt, tool, and message source |
+| CodeGraph | [`colbymchenry/codegraph`](https://github.com/colbymchenry/codegraph) plus local guard | Code search for indexed projects; no action elsewhere |
+| RTK | [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk) plus local OpenCode hook | Shorter shell output and Windows-safe command rewriting |
+| Deep Research | [`Weizhena/Deep-Research-skills`](https://github.com/Weizhena/Deep-Research-skills) | Research workflow without exposing strategy files as agents |
+| Superpowers skills | [`obra/superpowers`](https://github.com/obra/superpowers) | Bundled planning, debugging, testing, review, and execution workflows |
+| Headroom | [`headroomlabs-ai/headroom`](https://github.com/headroomlabs-ai/headroom) plus local bridge | Optional persistent proxy plus auto-discovered Desktop/CLI transport bridge |
 
-Exact versions and source commits live only in `config/components.json`.
+Exact versions and source commits for managed components live only in `config/components.json`. Superpowers is vendored skill content, not a manifest-installed runtime component. Current Codex Security and VibeShell skill files do not retain a verifiable upstream URL, so this catalog does not guess one.
 
 ## Daily commands
 
@@ -64,12 +66,13 @@ pwsh ./maintain.ps1 verify
 ## Runtime boundaries
 
 - Project `.opencode/opencode.json` does not define `plugin`; global plugin origins remain authoritative.
-- Headroom is opt-in in repository setup. This machine's PowerShell profile routes interactive `opencode` through official wrapper. Wrapper may manage machine-local `opencode.json` provider/MCP entries with a backup; `headroom unwrap opencode` restores them.
+- OMO Slim uses direct image routing so vision-capable models receive original attachments; Observer remains available only when explicitly delegated.
+- Headroom is opt-in. Its hidden login task and auto-discovered bridge serve Desktop and TUI without taking ownership of providers, models, MCP, RTK, or memory. See [Headroom integration](docs/integrations/headroom.md).
 - CodeGraph runs only when project has `.codegraph/codegraph.db`.
 - Goal package, patch, and command remain tracked but are not installed or loaded. `components.json` records the temporary disable reason.
 - Update checks come from `maintain.ps1`; no runtime notifier plugin is needed.
 - Browser automation, DevTools debugger, and docs-fetcher MCP skills are retired; MCP ownership stays in explicit OpenCode/OMO configuration.
-- Supermemory wrapper adapts package export only; memory behavior remains upstream.
+- Supermemory is the single persistent-memory owner. Headroom memory and learning remain disabled.
 - RTK is installed under `~/.local/bin`; executable replacement and removal of stale copies elsewhere on `PATH` remain user-managed.
 - `npm ls --depth=0` and `opencode debug config` are authoritative. `bun pm ls` can show stale lock metadata after npm installs.
 - `.opencode/goals/` is user/runtime state and remains untracked.
