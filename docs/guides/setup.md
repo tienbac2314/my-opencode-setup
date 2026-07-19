@@ -109,6 +109,9 @@ Live smoke tests:
 6. Add/search/list/forget disposable Supermemory marker.
    Automated verifier: `bun ./scripts/verify-supermemory.ts "$HOME/.config/opencode"`.
 7. Run RTK rewrite: `rtk rewrite "git status"`.
+8. Select a vision-capable 9router model, attach a disposable image, and confirm the model analyzes it directly without injected `@observer` delegation text.
+
+Tracked `config/oh-my-opencode-slim.json` sets `image_routing: direct`; setup deploys it to `~/.config/opencode/oh-my-opencode-slim.json`. This preserves original image parts for OpenCode/provider delivery. It does not add vision to text-only models, and explicit `@observer` delegation remains available. A project-local OMO config or global `oh-my-opencode-slim.jsonc` takes precedence and can override this managed JSON setting.
 
 RTK installer extracts approved binary under `~/.local/bin`; it does not replace another `rtk.exe` already present in System32 or another PATH directory. Executable cleanup and replacement remain user-managed. Diagnose precedence with:
 

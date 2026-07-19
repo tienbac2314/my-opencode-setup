@@ -14,6 +14,14 @@ afterEach(() => {
 })
 
 describe("9router model discovery fallback", () => {
+  test("preserves image attachments for native vision models", () => {
+    const config = JSON.parse(
+      readFileSync(join(import.meta.dir, "..", "config", "oh-my-opencode-slim.json"), "utf8"),
+    )
+
+    expect(config.image_routing).toBe("direct")
+  })
+
   test("uses native OpenCode model for OMO runtime roles", () => {
     const preset = JSON.parse(
       readFileSync(join(import.meta.dir, "..", "config", "oh-my-opencode-slim.json"), "utf8"),

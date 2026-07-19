@@ -16,6 +16,22 @@ For any non-trivial architecture, integration, migration, or rejected approach, 
 
 Record conclusions and evidence, not internal deliberation. Never include credentials, full resolved config, personal data, private prompts, or unredacted logs. When a decision changes, mark the old entry superseded and link the replacement; do not silently erase history.
 
+## 2026-07-19: Direct OMO Slim image routing
+
+Status: active.
+
+Problem: OMO Slim's effective `auto` image path intercepted attachments when Observer was enabled. It saved image data locally, removed binary image parts from the primary model request, and inserted `@observer` delegation text. Vision-capable models reached through 9router therefore never received the original image payload.
+
+Alternatives: retain automatic Observer delegation, patch/fork OMO Slim for model-capability detection, or select its supported direct-routing mode. Automatic delegation blocked native vision; a package fork added ownership and update cost for behavior already exposed by configuration.
+
+Decision: tracked OMO configuration sets top-level `image_routing: direct`. OMO Slim package/source remains vanilla. Model/provider selection owns image capability, while Observer remains available for explicit delegation. Existing auto-update, preset, fallback, MCP, tool, skill, and disabled-agent behavior stays unchanged.
+
+Implementation: `config/oh-my-opencode-slim.json`, setup/maintenance's existing config copy path, tracked/deployed config regression tests, and current setup/agent/troubleshooting documentation.
+
+Evidence: installed OMO Slim 2.2.1 schema and runtime implement `direct` as an early bypass of attachment processing; failing tests observed `image_routing` absent before the config change; focused tests prove tracked and isolated deployed configs contain `direct`. Live acceptance requires a vision-capable 9router model to analyze an attached image without injected Observer delegation text.
+
+Supersede when OMO Slim provides reliable capability-aware routing that preserves direct delivery for vision-capable models, or OpenCode owns an equivalent per-model attachment-routing policy.
+
 ## 2026-07-16: Normalized full-repository history
 
 Status: active.

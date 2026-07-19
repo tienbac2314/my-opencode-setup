@@ -529,6 +529,8 @@ test("setup converges isolated config without machine integration", () => {
     expect(existsSync(join(configDir, "opencode.json"))).toBe(false)
     expect(existsSync(join(configDir, "tui.json"))).toBe(true)
     expect(existsSync(join(configDir, "plugins", "lazy-load.ts"))).toBe(true)
+    const deployedOmo = JSON.parse(readFileSync(join(configDir, "oh-my-opencode-slim.json"), "utf8"))
+    expect(deployedOmo.image_routing).toBe("direct")
     expect(readFileSync(join(configDir, "AGENTS.md"), "utf8")).toBe(
       readFileSync(new URL("../config/AGENTS.md", import.meta.url), "utf8"),
     )

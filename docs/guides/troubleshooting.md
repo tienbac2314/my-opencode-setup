@@ -59,6 +59,14 @@ Restore `plugins/lazy-load.ts`, restart process, and run `bun test tests/lazy-lo
 
 Run `opencode models 9router`. Required configured fallback models must remain available during discovery failure, and `9router/opencode/*` entries must be absent. Restore `plugins/models-discovery.js` and restart affected process.
 
+## Vision model cannot see attached image
+
+OMO Slim `auto` image routing intercepts attachments when Observer is enabled: it saves image data locally, strips binary image parts from the primary request, and appends delegation text for `@observer`. This prevents even a native-vision model from receiving the original payload through 9router.
+
+Tracked policy uses `"image_routing": "direct"` in `config/oh-my-opencode-slim.json`, deployed as `~/.config/opencode/oh-my-opencode-slim.json`. Direct mode preserves the image parts; the selected provider/model must still support images. Explicit `@observer` delegation remains available.
+
+If behavior still looks automatic, check for higher-precedence OMO config without printing credentials: project-local `.opencode/oh-my-opencode-slim.json` or global `~/.config/opencode/oh-my-opencode-slim.jsonc` can override the managed global JSON. Restart OpenCode after correcting config.
+
 ## OpenCode free-tier quota appears unexpectedly
 
 If `Free usage exceeded` appears before a tool call, verify the selected model belongs to `9router`, not OpenCode Zen with a similar display name. Start a fresh session and select the explicit 9router entry before diagnosing plugins or Headroom.

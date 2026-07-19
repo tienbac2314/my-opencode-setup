@@ -66,6 +66,7 @@ pwsh ./maintain.ps1 verify
 ## Runtime boundaries
 
 - Project `.opencode/opencode.json` does not define `plugin`; global plugin origins remain authoritative.
+- OMO Slim uses direct image routing so vision-capable models receive original attachments; Observer remains available only when explicitly delegated.
 - Headroom is opt-in. Its hidden login task and auto-discovered bridge serve Desktop and TUI without taking ownership of providers, models, MCP, RTK, or memory. See [Headroom integration](docs/integrations/headroom.md).
 - CodeGraph runs only when project has `.codegraph/codegraph.db`.
 - Goal package, patch, and command remain tracked but are not installed or loaded. `components.json` records the temporary disable reason.
