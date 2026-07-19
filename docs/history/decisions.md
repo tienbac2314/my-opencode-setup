@@ -59,7 +59,7 @@ Alternatives:
 - per-OpenCode temporary proxy: rejected because Desktop and TUI would not share lifecycle;
 - independent proxy plus auto-discovered bridge: selected.
 
-Decision: a current-user login task owns one loopback proxy. `plugins/headroom.ts` provides fail-open in-process transport for both OpenCode surfaces. A hidden PowerShell runner redirects proxy output to bounded local logs.
+Decision: a current-user login task owns one loopback proxy. `plugins/headroom.ts` provides fail-open in-process transport for both OpenCode surfaces, with four short health attempts so stale state cannot hold startup. A hidden PowerShell runner merges output into a two-file rolling log and enforces memory, learning, and telemetry disablement on every launch path.
 
 Implementation: `plugins/headroom.ts`, `scripts/manage-headroom-proxy.ps1`, `scripts/run-headroom-proxy.ps1`, `scripts/remove-headroom-opencode-pollution.ps1`, and pinned source transport from `config/components.json`.
 

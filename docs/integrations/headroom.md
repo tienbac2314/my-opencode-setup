@@ -24,10 +24,12 @@ Provider names, model inventory, default model, and MCP servers remain owned by 
 
 On Windows, `scripts/manage-headroom-proxy.ps1 install` creates a current-user logon task. The task starts `pwsh -WindowStyle Hidden`, which runs `scripts/run-headroom-proxy.ps1`. The runner:
 
-- redirects proxy stdout and stderr to bounded logs under `~/.local/state/opencode-headroom`;
+- merges proxy stdout and stderr into a rolling `proxy.log`/`proxy.log.previous` pair under `~/.local/state/opencode-headroom`, bounded to two configured-size files;
 - sets LiteLLM suppression before Python imports;
 - keeps telemetry off;
 - keeps Headroom memory, memory tools, memory context, and learning off.
+
+The auto-discovered bridge checks service health four times over roughly one second. A stale marker or dead proxy therefore fails open promptly instead of delaying OpenCode startup.
 
 This indirection is required because Task Scheduler's hidden-task setting alone does not prevent a console executable from showing a terminal. Redirecting output also contains Headroom's startup banner and any LiteLLM `Provider List` message.
 

@@ -70,4 +70,22 @@ describe("Headroom Desktop and CLI bridge", () => {
       "http://127.0.0.1:8787", 1, 0, async () => { throw new Error("offline") },
     )).toBe(false)
   })
+
+  test("bounds the default startup grace before failing open", async () => {
+    let attempts = 0
+    const startedAt = performance.now()
+
+    expect(await waitForHealthyHeadroomProxy(
+      "http://127.0.0.1:8787",
+      undefined,
+      undefined,
+      async () => {
+        attempts++
+        throw new Error("offline")
+      },
+    )).toBe(false)
+
+    expect(attempts).toBeLessThanOrEqual(4)
+    expect(performance.now() - startedAt).toBeLessThan(2_000)
+  })
 })

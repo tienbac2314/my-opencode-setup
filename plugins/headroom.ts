@@ -62,8 +62,8 @@ export async function isHealthyHeadroomProxy(
 
 export async function waitForHealthyHeadroomProxy(
   proxyUrl: string,
-  attempts = 180,
-  delayMs = 250,
+  attempts = 4,
+  delayMs = 100,
   fetchImpl: typeof fetch = globalThis.fetch,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < attempts; attempt++) {

@@ -51,6 +51,10 @@ if (-not (Test-HeadroomProxy)) {
   $startInfo.ArgumentList.Add("proxy")
   $startInfo.ArgumentList.Add("--port")
   $startInfo.ArgumentList.Add([string]$Port)
+  $startInfo.ArgumentList.Add("--no-memory-tools")
+  $startInfo.ArgumentList.Add("--no-memory-context")
+  $startInfo.ArgumentList.Add("--no-learn")
+  $startInfo.ArgumentList.Add("--no-telemetry")
   $proxyProcess = [Diagnostics.Process]::Start($startInfo)
 
   $deadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
