@@ -125,6 +125,22 @@ Evidence: Headroom CLI exposes project/user/global memory storage, tool/context 
 
 Supersede only after a deliberate memory migration with export, re-ingestion, rollback, and duplicate-context tests.
 
+## 2026-07-20: Local embeddings for self-hosted Supermemory
+
+Status: active.
+
+Problem: after the VPS Nginx and embedding-model change, authenticated adds reached Supermemory but user and project search returned zero results. Supermemory 0.0.5 logs showed the remote `gemini-embedding-2-preview` route crossing its approximately 800 ms embedding deadline and failing vector upserts even when document status later read `done`.
+
+Alternatives: change Nginx/auth routing, configure an undocumented timeout, retain the remote model and accept intermittent indexing, or use Supermemory's documented local default. Nginx was ruled out by equivalent direct/proxied auth behavior and successful embedding endpoint responses; no supported embedding-timeout setting was documented.
+
+Decision: use local `Xenova/bge-base-en-v1.5` at 768 dimensions in a fresh `/home/ubuntu/.supermemory-local` data directory. Preserve the incompatible Gemini store at `/home/ubuntu/.supermemory` for rollback. Rotate the data-directory-generated API key across Nginx, user environment, and plugin config as one operation.
+
+Implementation: Oracle VPS systemd embedding and data-directory environment, existing Nginx edge, local `SUPERMEMORY_API_KEY`, and `~/.config/opencode/supermemory.jsonc`. No repository runtime code changed.
+
+Evidence: first-run model download completed and server reported local embeddings ready; public-endpoint disposable add/index/search/delete passed; the original user preference was re-ingested into user scope and retrieved by search; no post-cutover embedding timeout or vector-upsert error appeared.
+
+Supersede only with a measured embedding backend that stays within the server deadline, plus a fresh-store or full re-ingestion plan and live retrieval proof.
+
 ## 2026-07-15: Unified component maintenance
 
 Status: active.

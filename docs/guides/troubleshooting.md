@@ -79,6 +79,18 @@ An upstream skill likely launched a Bash helper through Windows `bash.exe`. Use 
 
 Wrapper adapts named package export. Package patch skips cloud settings update for custom base URL. Rerun setup, verify package pin/patch, restart OpenCode, then run disposable add/search/list/forget lifecycle. Correlate logs by timestamp; do not expose credentials.
 
+## Supermemory add succeeds but search returns zero
+
+Check server logs for embedding timeout, `all providers failed`, or `VectorDB upsert failed`. A document reaching `done` does not prove its vectors were stored. Current VPS contract uses local `Xenova/bge-base-en-v1.5` and `/home/ubuntu/.supermemory-local`; verify both before testing a unique add → search → forget lifecycle. A model/provider change requires a fresh data directory or full re-ingestion, even when dimensions match. See [Supermemory server embedding](../integrations/supermemory-server-embedding.md).
+
+## Supermemory returns 401 after key rotation
+
+Check equality without printing values across the Nginx edge, user `SUPERMEMORY_API_KEY`, and `~/.config/opencode/supermemory.jsonc`. If they match, fully exit and restart OpenCode plus launching terminal. Existing Desktop/TUI processes inherit the previous environment value and cannot observe a registry update. Test from a fresh process with `bun ./scripts/verify-supermemory.ts "$HOME/.config/opencode"`; do not weaken Nginx authentication to accommodate stale clients.
+
+## Supermemory refuses to start after embedding change
+
+Provider, model, and dimensions are locked to each data directory. Point `SUPERMEMORY_DATA_DIR` at a fresh path or restore the original embedding configuration. Never delete the old directory as the first recovery step. Preserve it for rollback, start the fresh store, rotate its generated API key, and re-ingest only after add → search → forget succeeds.
+
 ## Duplicate or obsolete skills
 
 Setup avoids repository/external skill-name duplication and removes retired browser automation, DevTools debugger, and docs-fetcher MCP skills from active config. It does not delete user-owned skill roots. Remove stale copies only after confirming ownership.
