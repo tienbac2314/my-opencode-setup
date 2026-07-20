@@ -53,7 +53,7 @@ Desktop may initialize plugins without injected Bun shell and may retain stale p
 
 ## `load_tool` missing or tool arguments have wrong types
 
-Restore `plugins/lazy-load.ts`, restart process, and run `bun test tests/lazy-load.test.ts`. The response adapter normalizes string-encoded numbers, booleans, arrays, and objects against each tool's captured JSON Schema for both native and text-encoded calls. It does not invent missing keys or rename model-provided keys. Loaded-tool state persists through one tool loop and clears on terminal stop. Repeated plugin initialization must return hooks every time; only fetch wrapping is idempotent.
+Restore `plugins/opencode-lazy-load.ts`, restart process, and run `bun test tests/opencode-lazy-load.test.ts`. The response adapter normalizes string-encoded numbers, booleans, arrays, and objects against each tool's captured JSON Schema for both native and text-encoded calls. It does not invent missing keys or rename model-provided keys. Loaded-tool state persists through one tool loop and clears on terminal stop. Repeated plugin initialization must return hooks every time; only fetch wrapping is idempotent.
 
 ## 9router model invalid or polluted namespace
 

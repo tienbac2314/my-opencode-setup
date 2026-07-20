@@ -127,12 +127,12 @@
       "id": "lazy-load",
       "name": "Lazy loading fork",
       "kind": "github-file",
-      "target": "11ee1745e34235c90ce3fbe3167a344096afbb83",
-      "branch": "main",
-      "repository": "https://github.com/omarwaly-ai/opencode-lazy-loading",
+      "target": "dcc5e7fce3734aa7fd95c8d6cbad39ec53867a9e",
+      "branch": "fix/tool-call-compatibility",
+      "repository": "https://github.com/tienbac2314/opencode-lazy-loading",
       "upstreamFile": "plugins/opencode-lazy-load.ts",
-      "localFile": "plugins/lazy-load.ts",
-      "verify": "tests/lazy-load.test.ts"
+      "localFile": "plugins/opencode-lazy-load.ts",
+      "verify": "tests/opencode-lazy-load.test.ts"
     },
     {
       "id": "tokens-source",

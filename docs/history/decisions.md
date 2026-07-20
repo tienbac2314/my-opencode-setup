@@ -16,6 +16,20 @@ For any non-trivial architecture, integration, migration, or rejected approach, 
 
 Record conclusions and evidence, not internal deliberation. Never include credentials, full resolved config, personal data, private prompts, or unredacted logs. When a decision changes, mark the old entry superseded and link the replacement; do not silently erase history.
 
+## 2026-07-20: Lazy-load maintained fork authority
+
+Status: active.
+
+Problem: dotfiles carried an early local compatibility patch while component authority still identified original upstream commit `11ee174`. The independently reviewed fork evolved those ideas into request-local gateway state, conservative schema normalization, strict streamed DSML conversion, preserved MCP routing, stable finish/index ordering, and 37 behavioral regressions. Keeping a divergent local copy made updates and provenance ambiguous.
+
+Alternatives: retain the local patch, wait for original upstream adoption, or pin the maintained fork. Retaining two implementations duplicates review; waiting restores known Desktop and model failures.
+
+Decision: `tienbac2314/opencode-lazy-loading` commit `dcc5e7f` is the managed lazy-load source. `plugins/opencode-lazy-load.ts` and `tests/opencode-lazy-load.test.ts` are exact copies of the fork files. Original `omarwaly-ai/opencode-lazy-loading` remains the PR target and historical upstream.
+
+Evidence: the fork suite against the prior dotfiles implementation produced 13 passes and 24 failures. The exact fork implementation produced 37 passes, 0 failures, and 123 assertions. Repository, fork, and active plugin hashes match; the full dotfiles suite covers deployment and manifest integration.
+
+Supersede when original upstream merges equivalent behavior and passes all fork regressions, or a newer reviewed fork commit replaces `dcc5e7f`.
+
 ## 2026-07-20: Bidirectional CodeGraph MCP state
 
 Status: active.

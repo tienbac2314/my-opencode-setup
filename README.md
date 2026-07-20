@@ -41,7 +41,7 @@ Purpose: show what this setup loads and where each part comes from.
 | Oh My OpenCode Slim | [`alvinunreal/oh-my-opencode-slim`](https://github.com/alvinunreal/oh-my-opencode-slim) | Orchestrator plus Oracle, Librarian, Designer, and Fixer agents |
 | Goal (disabled) | [`prevalentWare/opencode-goal-plugin`](https://github.com/prevalentWare/opencode-goal-plugin) | Retained for investigation; setup does not install or load it while OpenCode integration remains broken |
 | Supermemory | [`supermemoryai/opencode-supermemory`](https://github.com/supermemoryai/opencode-supermemory) | Self-hosted memory across sessions |
-| Lazy loading | [`omarwaly-ai/opencode-lazy-loading`](https://github.com/omarwaly-ai/opencode-lazy-loading) | Loads tool schemas only when the model asks for them |
+| Lazy loading | [`tienbac2314/opencode-lazy-loading`](https://github.com/tienbac2314/opencode-lazy-loading) | Maintained fork; loads tool schemas only when the model asks for them |
 | Token source | [`omarwaly-ai/OpenCode-tokens-source`](https://github.com/omarwaly-ai/OpenCode-tokens-source) | `/tokens` breakdown by prompt, tool, and message source |
 | CodeGraph | [`colbymchenry/codegraph`](https://github.com/colbymchenry/codegraph) plus local guard | Code search for indexed projects; no action elsewhere |
 | RTK | [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk) plus local OpenCode hook | Shorter shell output and Windows-safe command rewriting |

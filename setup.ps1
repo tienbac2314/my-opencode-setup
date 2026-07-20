@@ -104,7 +104,7 @@ if (-not (Test-Path -LiteralPath $supermemory)) {
   Copy-Item "$RepoDir\config\supermemory.jsonc.example" $supermemory
 }
 
-foreach ($legacy in @("opencode-lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
+foreach ($legacy in @("lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
   Remove-Item (Join-Path $ConfigDir "plugins\$legacy") -Force -ErrorAction SilentlyContinue
 }
 Remove-Item (Join-Path $ConfigDir "mem0-selfhost-patch.ts") -Force -ErrorAction SilentlyContinue

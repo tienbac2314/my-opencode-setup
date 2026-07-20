@@ -341,7 +341,7 @@ function Apply-Components($ManifestValue) {
   if ($PSCmdlet.ShouldProcess((Join-Path $ConfigDir "plugins"), "deploy repository local plugins")) {
     $activePlugins = Join-Path $ConfigDir "plugins"
     New-Item -ItemType Directory -Path $activePlugins -Force | Out-Null
-    foreach ($legacy in @("goal.ts", "opencode-lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
+    foreach ($legacy in @("goal.ts", "lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
       Remove-Item (Join-Path $activePlugins $legacy) -Force -ErrorAction SilentlyContinue
     }
     Copy-Item "$RepoDir\plugins\*" $activePlugins -Force
