@@ -9,6 +9,9 @@ const setupScript = readFileSync(new URL("../setup.ps1", import.meta.url), "utf8
 const maintainerScript = readFileSync(new URL("../maintain.ps1", import.meta.url), "utf8")
 const pinPluginScript = fileURLToPath(new URL("../scripts/pin-opencode-plugin.ps1", import.meta.url))
 const setCredentialsScript = fileURLToPath(new URL("../scripts/set-credentials.ps1", import.meta.url))
+const exportCredentialsScript = fileURLToPath(new URL("../scripts/export-credentials.ps1", import.meta.url))
+const setCredentialsSource = readFileSync(setCredentialsScript, "utf8")
+const exportCredentialsSource = readFileSync(exportCredentialsScript, "utf8")
 const removeLegacyGoalScript = fileURLToPath(new URL("../scripts/remove-legacy-goal-command.ps1", import.meta.url))
 const installHeadroomScript = fileURLToPath(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))
 const launchHeadroomScript = fileURLToPath(new URL("../scripts/start-opencode-headroom.ps1", import.meta.url))
@@ -302,6 +305,59 @@ test("credential restore updates only provider.9router.options", () => {
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
+})
+
+test("credential export collects populated 9router, Supermemory, and OpenRouter values", () => {
+  const directory = mkdtempSync(join(tmpdir(), "opencode-export-credentials-"))
+  const configDirectory = join(directory, ".config", "opencode")
+  const outputPath = join(directory, "my-opencode-credentials.json")
+  const authPath = join(directory, "auth.json")
+
+  try {
+    mkdirSync(configDirectory, { recursive: true })
+    writeFileSync(join(configDirectory, "opencode.jsonc"), `{
+  // decoy: "apiKey": "wrong-key"
+  "provider": {
+    "other": { "options": { "apiKey": "keep-key" } },
+    "9router": { "options": { "baseURL": "https://router.invalid/v1", "apiKey": "router-key" } }
+  }
+}`)
+    writeFileSync(join(configDirectory, "supermemory.jsonc"), `{
+  "apiKey": "memory-key",
+  "baseUrl": "https://memory.invalid"
+}`)
+    writeFileSync(authPath, JSON.stringify({
+      openrouter: { type: "api", key: "openrouter-key" },
+      unrelated: { type: "api", key: "ignore-key" },
+    }))
+
+    const result = Bun.spawnSync([
+      "pwsh", "-NoProfile", "-File", exportCredentialsScript,
+      "-OutputFile", outputPath,
+      "-ConfigDir", configDirectory,
+      "-AuthFile", authPath,
+      "-SkipAcl",
+    ])
+
+    expect(result.exitCode).toBe(0)
+    expect(JSON.parse(readFileSync(outputPath, "utf8"))).toEqual({
+      router_api_key: "router-key",
+      router_base_url: "https://router.invalid/v1",
+      supermemory_api_key: "memory-key",
+      supermemory_base_url: "https://memory.invalid",
+      openrouter_api_key: "openrouter-key",
+    })
+    expect(result.stdout.toString()).not.toContain("router-key")
+    expect(result.stdout.toString()).not.toContain("memory-key")
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test("credential export and restore share the same private default file", () => {
+  const sharedDefault = '[string]$CredentialsFile = "$env:USERPROFILE\\.config\\opencode\\credentials.json"'
+  expect(setCredentialsSource).toContain(sharedDefault)
+  expect(exportCredentialsSource.replace("$OutputFile", "$CredentialsFile")).toContain(sharedDefault)
 })
 
 describe("JSONC plugin pinning", () => {

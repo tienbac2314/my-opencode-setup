@@ -47,6 +47,20 @@ Optional components such as Headroom are not installed by default.
 
 ## 3. Private credentials
 
+### Export from an already configured Windows PC
+
+The repository includes a safe inverse of the restore script. On the fully configured source PC:
+
+```powershell
+pwsh ./scripts/export-credentials.ps1
+```
+
+Export and restore share the default private file `~/.config/opencode/credentials.json`. The output is JSON rather than `.ps1` so secrets cannot be executed accidentally. It contains only the managed 9router, Supermemory, and optional OpenRouter values. The script refuses to overwrite an existing file unless `-Force` is explicit, restricts the Windows ACL to the current user, and never prints credential values.
+
+Copy that private file to the target PC through a trusted channel, restore it with `set-credentials.ps1`, verify the target, then remove unnecessary copies. Never place it inside this repository, cloud-synced Desktop storage, chat, or shell history.
+
+### Restore on another PC
+
 Create an ignored private JSON file:
 
 ```json
@@ -62,7 +76,7 @@ Create an ignored private JSON file:
 Restore it after setup:
 
 ```powershell
-pwsh ./scripts/set-credentials.ps1 -CredentialsFile "$HOME\.config\opencode\credentials.json"
+pwsh ./scripts/set-credentials.ps1
 ```
 
 Required fields are `router_api_key`, `router_base_url`, `supermemory_api_key`, and `supermemory_base_url`; `openrouter_api_key` is optional. Script updates only 9router options, Supermemory config, optional OpenRouter auth, and these user variables:
@@ -88,6 +102,8 @@ Files remain ignored and machine-local:
 ```
 
 Never commit keys. Restrict credential file permissions to current user.
+
+After a self-hosted Supermemory data-directory change, its server generates a new API key. Rotate the Nginx-side key, `SUPERMEMORY_API_KEY`, and `supermemory.jsonc` together. Fully close and reopen Desktop/TUI afterward; already-running processes retain the old environment value and continue returning 401 even when files and user environment are correct.
 
 ## 4. Normal verification
 

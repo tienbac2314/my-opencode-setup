@@ -89,3 +89,5 @@ pwsh ./maintain.ps1 verify
 - production dependency audit at high severity or above when online.
 
 Live checks still matter for provider traffic, App rendering, agent orchestration, and Supermemory CRUD.
+
+Credential migration uses `scripts/export-credentials.ps1` on the configured Windows PC and `scripts/set-credentials.ps1` on the target; both default to `~/.config/opencode/credentials.json`. Keep the exported JSON outside Git and restart OpenCode after restore or Supermemory key rotation.
