@@ -37,7 +37,7 @@ Purpose: show what this setup loads and where each part comes from.
 |---|---|---|
 | OpenCode | [`anomalyco/opencode`](https://github.com/anomalyco/opencode) | App, TUI, server, plugin SDK, LSP, and built-in tools |
 | Vercel AI SDK | [`vercel/ai`](https://github.com/vercel/ai) | OpenAI-compatible provider used by configured transports |
-| 9router model discovery | Local `models-discovery.js` | Adds available 9router models with correct input types |
+| 9router model discovery | Local `models-discovery.js` | Adds available models with OpenCode modalities, reasoning, tools, and limits |
 | Oh My OpenCode Slim | [`alvinunreal/oh-my-opencode-slim`](https://github.com/alvinunreal/oh-my-opencode-slim) | Orchestrator plus Oracle, Librarian, Designer, and Fixer agents |
 | Goal (disabled) | [`prevalentWare/opencode-goal-plugin`](https://github.com/prevalentWare/opencode-goal-plugin) | Retained for investigation; setup does not install or load it while OpenCode integration remains broken |
 | Supermemory | [`supermemoryai/opencode-supermemory`](https://github.com/supermemoryai/opencode-supermemory) | Self-hosted memory across sessions |

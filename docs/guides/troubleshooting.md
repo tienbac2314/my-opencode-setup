@@ -59,6 +59,10 @@ Restore `plugins/opencode-lazy-load.ts`, restart process, and run `bun test test
 
 Run `opencode models 9router`. Required configured fallback models must remain available during discovery failure, and `9router/opencode/*` entries must be absent. Restore `plugins/models-discovery.js` and restart affected process.
 
+Discovery accepts the standard `{ "data": [...] }` response, a raw model array, or one standalone model object. It maps `vision`, audio/video/PDF input, image/audio output, `reasoning` (plus legacy `thinking`), `tools`, and context/output limits into OpenCode model fields. Manual model entries override discovered values while missing fields are filled from discovery.
+
+`search`, thinking-format/toggle/range metadata, `owned_by`, and `upstreamProvider` have no safe OpenCode model-config equivalent. They remain diagnostic log metadata and must not be copied into model `options`, which are provider request options. If capabilities look stale, restart OpenCode and inspect the discovery info log without printing provider credentials.
+
 ## Vision model cannot see attached image
 
 OMO Slim `auto` image routing intercepts attachments when Observer is enabled: it saves image data locally, strips binary image parts from the primary request, and appends delegation text for `@observer`. This prevents even a native-vision model from receiving the original payload through 9router.

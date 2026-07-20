@@ -161,7 +161,7 @@
       "kind": "local",
       "target": "local",
       "localFile": "plugins/models-discovery.js",
-      "verify": "tests/models-discovery.test.ts"
+      "verify": "tests/models-discovery.test.ts: response shapes, capabilities, overrides, fallback, and Headroom bypass"
     },
     {
       "id": "codegraph-helper",

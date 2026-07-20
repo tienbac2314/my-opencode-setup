@@ -16,6 +16,22 @@ For any non-trivial architecture, integration, migration, or rejected approach, 
 
 Record conclusions and evidence, not internal deliberation. Never include credentials, full resolved config, personal data, private prompts, or unredacted logs. When a decision changes, mark the old entry superseded and link the replacement; do not silently erase history.
 
+## 2026-07-20: Conservative 9router capability discovery
+
+Status: active.
+
+Problem: 9router `/models` returns richer capabilities than the local discovery plugin mapped. The plugin handled vision and limits but checked legacy `thinking` instead of current `reasoning`, omitted audio/video/PDF modalities and tool support, accepted only `{ data: [...] }`, and skipped discovery metadata whenever a manual model entry existed.
+
+Alternatives: copy every 9router field into arbitrary model options, map only OpenCode's documented schema, or keep the partial mapper. Arbitrary `options` are passed to providers and could mutate requests; the partial mapper hid real capabilities.
+
+Decision: map only fields supported by OpenCode's current custom-model schema: input/output modalities, attachment, reasoning, `tool_call`, and limits. Accept list envelopes, raw arrays, and standalone objects. Merge discovered defaults beneath manual entries so explicit user configuration remains authoritative. Keep `search`, thinking format/toggle/range, `owned_by`, and upstream-provider metadata in discovery logs only because OpenCode has no matching model-config fields.
+
+Implementation: `plugins/models-discovery.js`, `tests/models-discovery.test.ts`, component verification text, troubleshooting, and patch reference.
+
+Evidence: official OpenCode model documentation and `packages/opencode/src/provider/models.ts` define the supported fields. Exact Gemini and Kimi fixtures cover all supplied attributes; tests also cover legacy thinking, unsupported metadata isolation, response shapes, manual precedence, fallback preservation, and Headroom bypass.
+
+Supersede when OpenCode provides native custom-provider discovery with equivalent response normalization, capability mapping, override precedence, and safe unsupported-metadata handling.
+
 ## 2026-07-20: Lazy-load maintained fork authority
 
 Status: active.
