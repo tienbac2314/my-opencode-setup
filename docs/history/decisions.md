@@ -16,6 +16,68 @@ For any non-trivial architecture, integration, migration, or rejected approach, 
 
 Record conclusions and evidence, not internal deliberation. Never include credentials, full resolved config, personal data, private prompts, or unredacted logs. When a decision changes, mark the old entry superseded and link the replacement; do not silently erase history.
 
+## 2026-07-20: Vanilla OMO Slim auto-update prerequisites
+
+Status: active.
+
+Problem: OMO Slim 2.2.1 detected 2.2.4 but failed installation with `spawn bun ENOENT` in OpenCode Desktop. Its updater directly invokes `bun install`; OpenCode's internal runtime does not place a standalone Bun executable on process PATH. Upstream also deliberately skips installation when plugin config contains an exact version.
+
+Alternatives: patch OMO's updater, keep exact pins and update only through repository maintenance, install Bun through npm, or satisfy the upstream contract. Patching adds a local fork; exact pins contradict seamless auto-update; npm adds a secondary Bun distribution path.
+
+Decision: use Bun's official platform installer from `setup.ps1` only when `bun` or `bunx` is missing. Keep OMO 2.2.4 as the tested fresh-install baseline, but use `oh-my-opencode-slim@latest` in Desktop and TUI so vanilla same-major auto-update is authorized. Keep every other component's exact-version policy unchanged.
+
+Implementation: `scripts/ensure-bun.ps1`, `setup.ps1`, OMO manifest runtime target, config synchronization/verification, Desktop/TUI templates, setup/troubleshooting guidance, and isolated tests.
+
+Evidence: upstream OMO code classifies exact versions as pinned and calls `bun install` only for plain or `@latest` entries. Regression tests cover existing, broken, missing, and `-WhatIf` Bun paths without network access, exact baseline installation, latest-channel synchronization, and exact targets for other components. Full verification passed 125 tests with 638 assertions; active package/config checks showed baseline 2.2.4 plus `@latest` in Desktop and TUI, a fresh user-PATH process resolved Bun/Bunx 1.3.14, and OMO initialized with its health check passing and no new `spawn bun ENOENT` log.
+
+Supersede when OMO no longer requires an external Bun executable or OpenCode guarantees it in Desktop and TUI PATH; remove latest-channel exception if OMO removes its pinned-version guard.
+
+## 2026-07-20: Conservative 9router capability discovery
+
+Status: active.
+
+Problem: 9router `/models` returns richer capabilities than the local discovery plugin mapped. The plugin handled vision and limits but checked legacy `thinking` instead of current `reasoning`, omitted audio/video/PDF modalities and tool support, accepted only `{ data: [...] }`, and skipped discovery metadata whenever a manual model entry existed.
+
+Alternatives: copy every 9router field into arbitrary model options, map only OpenCode's documented schema, or keep the partial mapper. Arbitrary `options` are passed to providers and could mutate requests; the partial mapper hid real capabilities.
+
+Decision: map only fields supported by OpenCode's current custom-model schema: input/output modalities, attachment, reasoning, `tool_call`, and limits. Accept list envelopes, raw arrays, and standalone objects. Merge discovered defaults beneath manual entries so explicit user configuration remains authoritative. Keep `search`, thinking format/toggle/range, `owned_by`, and upstream-provider metadata in discovery logs only because OpenCode has no matching model-config fields.
+
+Implementation: `plugins/models-discovery.js`, `tests/models-discovery.test.ts`, component verification text, troubleshooting, and patch reference.
+
+Evidence: official OpenCode model documentation and `packages/opencode/src/provider/models.ts` define the supported fields. Exact Gemini and Kimi fixtures cover all supplied attributes; tests also cover legacy thinking, unsupported metadata isolation, response shapes, manual precedence, fallback preservation, and Headroom bypass.
+
+Supersede when OpenCode provides native custom-provider discovery with equivalent response normalization, capability mapping, override precedence, and safe unsupported-metadata handling.
+
+## 2026-07-20: Lazy-load maintained fork authority
+
+Status: active.
+
+Problem: dotfiles carried an early local compatibility patch while component authority still identified original upstream commit `11ee174`. The independently reviewed fork evolved those ideas into request-local gateway state, conservative schema normalization, strict streamed DSML conversion, preserved MCP routing, stable finish/index ordering, and 37 behavioral regressions. Keeping a divergent local copy made updates and provenance ambiguous.
+
+Alternatives: retain the local patch, wait for original upstream adoption, or pin the maintained fork. Retaining two implementations duplicates review; waiting restores known Desktop and model failures.
+
+Decision: `tienbac2314/opencode-lazy-loading` commit `dcc5e7f` is the managed lazy-load source. `plugins/opencode-lazy-load.ts` and `tests/opencode-lazy-load.test.ts` are exact copies of the fork files. Original `omarwaly-ai/opencode-lazy-loading` remains the PR target and historical upstream.
+
+Evidence: the fork suite against the prior dotfiles implementation produced 13 passes and 24 failures. The exact fork implementation produced 37 passes, 0 failures, and 123 assertions. Repository, fork, and active plugin hashes match; the full dotfiles suite covers deployment and manifest integration.
+
+Supersede when original upstream merges equivalent behavior and passes all fork regressions, or a newer reviewed fork commit replaces `dcc5e7f`.
+
+## 2026-07-20: Bidirectional CodeGraph MCP state
+
+Status: active.
+
+Problem: the global CodeGraph MCP fails during startup outside indexed repositories, so the helper historically disabled it when `.codegraph/codegraph.db` was absent. That hook only wrote `false`. OpenCode Desktop can reuse the resolved config object across workspace initialization, so opening an unindexed workspace poisoned later indexed workspaces and CodeGraph remained disabled. TUI usually starts with one workspace and did not expose the stale transition.
+
+Alternatives: remove dynamic disabling, add a session-aware MCP proxy, or make the existing config hook assign both enabled and disabled states. Removing the hook restores the original unindexed startup error/freeze; a proxy duplicates OpenCode and CodeGraph lifecycle machinery.
+
+Decision: preserve the global MCP entry and let the helper own `codegraph.enabled`, setting it to the current plugin instance's `.codegraph/codegraph.db` result on every config hook. Search enforcement remains inert in unindexed workspaces and session-scoped in indexed workspaces. OpenCode exposes one mutable config property rather than a per-session MCP switch; if a host shares that live object across concurrently initialized workspaces, the most recent config hook wins. The sequential Desktop transition reported here is covered; true concurrent isolation requires an upstream workspace-scoped MCP API.
+
+Implementation: `plugins/codegraph-helper.ts`, `tests/codegraph-helper.test.ts`, troubleshooting, and local-patch reference.
+
+Evidence: commit `a55c657` records the original unindexed startup failure and disable-only mitigation. The regression passes one shared config through unindexed then indexed plugin instances; it fails with stale `false` before the fix and passes with bidirectional assignment. Focused and full repository tests verify existing metadata-only, session-isolation, and search-fallback behavior.
+
+Supersede when OpenCode provides workspace-scoped MCP configuration without shared mutable state, or CodeGraph starts safely outside indexed repositories.
+
 ## 2026-07-19: Direct OMO Slim image routing
 
 Status: active.
@@ -94,6 +156,22 @@ Decision: Supermemory remains sole persistent-memory owner. Headroom memory, aut
 Evidence: Headroom CLI exposes project/user/global memory storage, tool/context injection, and learning; live proxy reports memory disabled; runner passes explicit memory/learning-off options; Supermemory CRUD lifecycle passes.
 
 Supersede only after a deliberate memory migration with export, re-ingestion, rollback, and duplicate-context tests.
+
+## 2026-07-20: Local embeddings for self-hosted Supermemory
+
+Status: active.
+
+Problem: after the VPS Nginx and embedding-model change, authenticated adds reached Supermemory but user and project search returned zero results. Supermemory 0.0.5 logs showed the remote `gemini-embedding-2-preview` route crossing its approximately 800 ms embedding deadline and failing vector upserts even when document status later read `done`.
+
+Alternatives: change Nginx/auth routing, configure an undocumented timeout, retain the remote model and accept intermittent indexing, or use Supermemory's documented local default. Nginx was ruled out by equivalent direct/proxied auth behavior and successful embedding endpoint responses; no supported embedding-timeout setting was documented.
+
+Decision: use local `Xenova/bge-base-en-v1.5` at 768 dimensions in a fresh `/home/ubuntu/.supermemory-local` data directory. Preserve the incompatible Gemini store at `/home/ubuntu/.supermemory` for rollback. Rotate the data-directory-generated API key across Nginx, user environment, and plugin config as one operation.
+
+Implementation: Oracle VPS systemd embedding and data-directory environment, existing Nginx edge, local `SUPERMEMORY_API_KEY`, and `~/.config/opencode/supermemory.jsonc`. No repository runtime code changed.
+
+Evidence: first-run model download completed and server reported local embeddings ready; public-endpoint disposable add/index/search/delete passed; the original user preference was re-ingested into user scope and retrieved by search; no post-cutover embedding timeout or vector-upsert error appeared.
+
+Supersede only with a measured embedding backend that stays within the server deadline, plus a fresh-store or full re-ingestion plan and live retrieval proof.
 
 ## 2026-07-15: Unified component maintenance
 

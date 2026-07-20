@@ -29,6 +29,8 @@ $ErrorActionPreference = "Stop"
 $RepoDir = $PSScriptRoot
 $manifest = Get-Content "$RepoDir\config\components.json" -Raw | ConvertFrom-Json
 
+& "$RepoDir\scripts\ensure-bun.ps1" -WhatIf:$WhatIfPreference
+
 function Copy-Tree([string]$Source, [string]$Destination) {
   if (-not (Test-Path -LiteralPath $Source)) { return }
   New-Item -ItemType Directory -Path $Destination -Force | Out-Null
@@ -104,7 +106,7 @@ if (-not (Test-Path -LiteralPath $supermemory)) {
   Copy-Item "$RepoDir\config\supermemory.jsonc.example" $supermemory
 }
 
-foreach ($legacy in @("opencode-lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
+foreach ($legacy in @("lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
   Remove-Item (Join-Path $ConfigDir "plugins\$legacy") -Force -ErrorAction SilentlyContinue
 }
 Remove-Item (Join-Path $ConfigDir "mem0-selfhost-patch.ts") -Force -ErrorAction SilentlyContinue

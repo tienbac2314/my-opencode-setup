@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url"
 
 const maintainer = fileURLToPath(new URL("../maintain.ps1", import.meta.url))
 const setup = fileURLToPath(new URL("../setup.ps1", import.meta.url))
+const ensureBun = fileURLToPath(new URL("../scripts/ensure-bun.ps1", import.meta.url))
+const powershell = Bun.which("pwsh") ?? "pwsh"
 const updateOpenCode = fileURLToPath(new URL("../scripts/update-opencode.ps1", import.meta.url))
 const repositoryManifest = JSON.parse(readFileSync(new URL("../config/components.json", import.meta.url), "utf8"))
 const activeDocs = [
@@ -63,6 +65,9 @@ test("component manifest is unique and complete", () => {
   expect(repositoryManifest.expectedServerPlugins).toBe(8)
   expect(repositoryManifest.components.find((item: any) => item.id === "opencode")?.target).toBe("1.18.1")
   expect(repositoryManifest.components.find((item: any) => item.id === "opencode-plugin")?.target).toBe("1.18.1")
+  const omo = repositoryManifest.components.find((item: any) => item.id === "omo-slim")
+  expect(omo?.target).toBe("2.2.4")
+  expect(omo?.runtimeTarget).toBe("latest")
   expect(repositoryManifest.retired.npmLocal).toContain("opencode-update-notifier")
   expect(repositoryManifest.retired.npmLocal).toContain("@prevalentware/opencode-goal-plugin")
   expect(repositoryManifest.retired.skills).toEqual(retiredMcpSkills)
@@ -329,14 +334,14 @@ test("OMO installer honors custom OpenCode config directory", () => {
       "oh-my-opencode-slim": "2.2.0",
       "@prevalentware/opencode-goal-plugin": "0.1.24",
     } }))
-    writeFileSync(join(configDir, "opencode.jsonc"), '{ "plugin": [] }')
-    writeFileSync(join(configDir, "tui.json"), '{ "plugin": [] }')
+    writeFileSync(join(configDir, "opencode.jsonc"), '{ "plugin": ["oh-my-opencode-slim@2.2.0"] }')
+    writeFileSync(join(configDir, "tui.json"), '{ "plugin": ["oh-my-opencode-slim@2.2.0"] }')
     writeFileSync(manifest, JSON.stringify({
       schemaVersion: 1,
       expectedServerPlugins: 2,
       retired: { npmLocal: [], pluginSpecs: [] },
       components: [
-        { id: "omo-slim", kind: "omo", package: "oh-my-opencode-slim", target: "2.2.1" },
+        { id: "omo-slim", kind: "omo", package: "oh-my-opencode-slim", target: "2.2.4", runtimeTarget: "latest" },
         { id: "goal", kind: "npm-local", package: "@prevalentware/opencode-goal-plugin", target: "0.1.24" },
       ],
     }))
@@ -348,7 +353,10 @@ test("OMO installer honors custom OpenCode config directory", () => {
       "-Manifest", manifest, "-ConfigDir", configDir, "-CacheDir", cacheDir,
     ], { env: { ...process.env, Path: `${bin};${process.env.Path}`, OPENCODE_CONFIG_DIR: "sentinel" } })
     expect(result.exitCode).toBe(0)
-    expect(readFileSync(log, "utf8")).toContain(`bunx config=${configDir} oh-my-opencode-slim@2.2.1 install --yes`)
+    expect(readFileSync(log, "utf8")).toContain(`bunx config=${configDir} oh-my-opencode-slim@2.2.4 install --yes`)
+    expect(readFileSync(join(configDir, "opencode.jsonc"), "utf8")).toContain("oh-my-opencode-slim@latest")
+    expect(readFileSync(join(configDir, "tui.json"), "utf8")).toContain("oh-my-opencode-slim@latest")
+    expect(readFileSync(join(configDir, "opencode.jsonc"), "utf8")).toContain("@prevalentware/opencode-goal-plugin@0.1.24")
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -391,6 +399,122 @@ test("Headroom uses auto-loaded bridge and independent proxy", () => {
   expect(headroomDocs).toContain("Bare `headroom proxy`")
   expect(headroomDocs).toContain("Supermemory is the single owner")
   expect(source.removeWhen).toContain("without provider, model, or MCP mutation")
+})
+
+test("Bun prerequisite preserves an existing working installation", () => {
+  const root = mkdtempSync(join(tmpdir(), "opencode-bun-existing-"))
+  const bin = join(root, "bin")
+  try {
+    mkdirSync(bin)
+    writeFileSync(join(bin, "bun.cmd"), "@echo bun-existing\r\n")
+    writeFileSync(join(bin, "bunx.cmd"), "@echo bunx-existing\r\n")
+    const command = `function Invoke-RestMethod { throw 'installer must not run' }; & '${ensureBun.replaceAll("'", "''")}'`
+    const result = Bun.spawnSync([powershell, "-NoProfile", "-Command", command], {
+      env: { ...process.env, Path: bin },
+    })
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.toString()).toContain("Bun prerequisite already available")
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test("Bun prerequisite repairs resolved commands that cannot run", () => {
+  const root = mkdtempSync(join(tmpdir(), "opencode-bun-broken-"))
+  const bin = join(root, "bin")
+  const installer = [
+    `Set-Content -LiteralPath (Join-Path $env:TEST_BUN_BIN 'bun.cmd') -Value '@exit /b 0'`,
+    `Set-Content -LiteralPath (Join-Path $env:TEST_BUN_BIN 'bunx.cmd') -Value '@exit /b 0'`,
+  ].join("; ")
+  try {
+    mkdirSync(bin)
+    writeFileSync(join(bin, "bun.cmd"), "@exit /b 1\r\n")
+    writeFileSync(join(bin, "bunx.cmd"), "@exit /b 0\r\n")
+    const command = `function Invoke-RestMethod { $env:TEST_BUN_INSTALLER }; & '${ensureBun.replaceAll("'", "''")}'`
+    const result = Bun.spawnSync([powershell, "-NoProfile", "-Command", command], {
+      env: { ...process.env, Path: bin, TEST_BUN_BIN: bin, TEST_BUN_INSTALLER: installer },
+    })
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.toString()).toContain("Installed official Bun prerequisite")
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test("Bun prerequisite WhatIf never executes the remote installer", () => {
+  const root = mkdtempSync(join(tmpdir(), "opencode-bun-whatif-"))
+  try {
+    const command = `function Invoke-RestMethod { throw 'installer executed' }; & '${ensureBun.replaceAll("'", "''")}' -WhatIf`
+    const result = Bun.spawnSync([powershell, "-NoProfile", "-Command", command], {
+      env: { ...process.env, Path: join(root, "empty-bin"), BUN_INSTALL: join(root, ".bun") },
+    })
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stderr.toString()).not.toContain("installer executed")
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test("setup checks Bun before component installation and propagates WhatIf", () => {
+  const source = readFileSync(new URL("../setup.ps1", import.meta.url), "utf8")
+  const prerequisite = source.indexOf("scripts\\ensure-bun.ps1")
+  const components = source.indexOf("& pwsh @apply")
+
+  expect(prerequisite).toBeGreaterThan(-1)
+  expect(prerequisite).toBeLessThan(components)
+  expect(source).toContain("-WhatIf:$WhatIfPreference")
+})
+
+test("Bun prerequisite uses the official installer when commands are missing", () => {
+  const root = mkdtempSync(join(tmpdir(), "opencode-bun-install-"))
+  const bunBin = join(root, ".bun", "bin")
+  const installer = [
+    `$bin = Join-Path $env:BUN_INSTALL 'bin'`,
+    `New-Item -ItemType Directory -Path $bin -Force | Out-Null`,
+    `Set-Content -LiteralPath (Join-Path $bin 'bun.cmd') -Value '@echo bun-installed'`,
+    `Set-Content -LiteralPath (Join-Path $bin 'bunx.cmd') -Value '@echo bunx-installed'`,
+  ].join("; ")
+  try {
+    const command = `function Invoke-RestMethod { $env:TEST_BUN_INSTALLER }; & '${ensureBun.replaceAll("'", "''")}'`
+    const result = Bun.spawnSync([powershell, "-NoProfile", "-Command", command], {
+      env: {
+        ...process.env,
+        Path: join(root, "empty-bin"),
+        BUN_INSTALL: join(root, ".bun"),
+        TEST_BUN_INSTALLER: installer,
+      },
+    })
+
+    expect(result.exitCode).toBe(0)
+    expect(existsSync(join(bunBin, "bun.cmd"))).toBe(true)
+    expect(existsSync(join(bunBin, "bunx.cmd"))).toBe(true)
+    expect(result.stdout.toString()).toContain("Installed official Bun prerequisite")
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test("OMO follows its upstream latest channel while other plugins stay exact", () => {
+  const globalConfig = JSON.parse(readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""))
+  const tuiConfig = JSON.parse(readFileSync(new URL("../config/tui.json", import.meta.url), "utf8"))
+
+  expect(globalConfig.plugin).toContain("oh-my-opencode-slim@latest")
+  expect(tuiConfig.plugin).toContain("oh-my-opencode-slim@latest")
+  expect(repositoryManifest.components.find((item: any) => item.id === "supermemory")?.target).toBe("2.0.8")
+})
+
+test("bare-machine docs explain vanilla OMO auto-update prerequisites", () => {
+  const setupGuide = readFileSync(new URL("../docs/guides/setup.md", import.meta.url), "utf8")
+  const troubleshooting = readFileSync(new URL("../docs/guides/troubleshooting.md", import.meta.url), "utf8")
+  const decisions = readFileSync(new URL("../docs/history/decisions.md", import.meta.url), "utf8")
+
+  expect(setupGuide).toContain("automatically installs official Bun")
+  expect(setupGuide).toContain("oh-my-opencode-slim@latest")
+  expect(troubleshooting).toContain("spawn bun ENOENT")
+  expect(decisions).toContain("Vanilla OMO Slim auto-update prerequisites")
 })
 
 test("README links every managed upstream repository", () => {
@@ -528,7 +652,7 @@ test("setup converges isolated config without machine integration", () => {
     expect(existsSync(join(configDir, "opencode.jsonc"))).toBe(true)
     expect(existsSync(join(configDir, "opencode.json"))).toBe(false)
     expect(existsSync(join(configDir, "tui.json"))).toBe(true)
-    expect(existsSync(join(configDir, "plugins", "lazy-load.ts"))).toBe(true)
+    expect(existsSync(join(configDir, "plugins", "opencode-lazy-load.ts"))).toBe(true)
     const deployedOmo = JSON.parse(readFileSync(join(configDir, "oh-my-opencode-slim.json"), "utf8"))
     expect(deployedOmo.image_routing).toBe("direct")
     expect(readFileSync(join(configDir, "AGENTS.md"), "utf8")).toBe(

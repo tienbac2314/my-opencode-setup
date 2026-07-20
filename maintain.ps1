@@ -231,7 +231,8 @@ function Sync-ConfigPins($ManifestValue) {
     if (-not (Test-Path -LiteralPath $pin.path)) { continue }
     $item = $ManifestValue.components | Where-Object id -eq $pin.id
     if ($item -and -not $item.disabled) {
-      & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Version $item.target -Add:([bool]$pin.add)
+      $configTarget = $item.runtimeTarget ?? $item.target
+      & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Version $configTarget -Add:([bool]$pin.add)
     } elseif ($item.disabled) {
       & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Remove
     }
@@ -341,7 +342,7 @@ function Apply-Components($ManifestValue) {
   if ($PSCmdlet.ShouldProcess((Join-Path $ConfigDir "plugins"), "deploy repository local plugins")) {
     $activePlugins = Join-Path $ConfigDir "plugins"
     New-Item -ItemType Directory -Path $activePlugins -Force | Out-Null
-    foreach ($legacy in @("goal.ts", "opencode-lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
+    foreach ($legacy in @("goal.ts", "lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
       Remove-Item (Join-Path $activePlugins $legacy) -Force -ErrorAction SilentlyContinue
     }
     Copy-Item "$RepoDir\plugins\*" $activePlugins -Force
@@ -369,7 +370,7 @@ function Verify-State($ManifestValue) {
   $package = if (Test-Path -LiteralPath $packageFile) { Get-Content -LiteralPath $packageFile -Raw | ConvertFrom-Json } else { $null }
   $expectedTui = @(
     $omo = $ManifestValue.components | Where-Object id -eq "omo-slim"
-    if ($omo) { "oh-my-opencode-slim@$($omo.target)" }
+    if ($omo) { "oh-my-opencode-slim@$($omo.runtimeTarget ?? $omo.target)" }
     $goal = $ManifestValue.components | Where-Object { $_.id -eq "goal" -and -not $_.disabled }
     if ($goal) { "@prevalentware/opencode-goal-plugin@$($goal.target)" }
   )

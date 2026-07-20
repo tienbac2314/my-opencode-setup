@@ -75,6 +75,24 @@ describe("CodeGraph search guard", () => {
     expect(config.mcp.codegraph.enabled).toBe(true)
   })
 
+  test("re-enables CodeGraph when Desktop reuses config for an indexed workspace", async () => {
+    const config: any = {
+      mcp: {
+        codegraph: {
+          type: "local",
+          command: ["codegraph", "serve", "--mcp"],
+          enabled: true,
+        },
+      },
+    }
+
+    await (await plugin(workspace(false))).config(config)
+    expect(config.mcp.codegraph.enabled).toBe(false)
+
+    await (await plugin(workspace())).config(config)
+    expect(config.mcp.codegraph.enabled).toBe(true)
+  })
+
   test("does nothing when workspace has no CodeGraph index", async () => {
     const hooks = await plugin(workspace(false))
 

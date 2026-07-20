@@ -36,7 +36,7 @@ export const ModelDiscovery = async ({ client }) => {
               break
             }
             const body = await res.json()
-            models = body?.data || []
+            models = normalizeModelsResponse(body)
             break
           } catch {
             if (attempt === 1) {
@@ -80,6 +80,7 @@ export const ModelDiscovery = async ({ client }) => {
         const userMeta = p.models || {}
         const built = { ...userMeta }
         const added = []
+        const metadata = {}
 
         for (const m of models) {
           const id = m.id || m.name
@@ -88,61 +89,95 @@ export const ModelDiscovery = async ({ client }) => {
           if (include && !include.test(id)) continue
           if (exclude && exclude.test(id)) continue
 
-          const prev = userMeta[id]
-          if (prev) {
-            built[id] = { ...prev }
-            continue
-          }
-
           const entry = { name: id }
           const caps = m.capabilities || {}
 
-          if (caps.vision === true) {
-            entry.modalities = { input: ["text", "image"], output: ["text"] }
-          } else if (caps.vision === false) {
-            entry.modalities = { input: ["text"], output: ["text"] }
-          } else {
-            entry.modalities = { input: ["text", "image"], output: ["text"] }
+          const input = ["text"]
+          if (caps.audioInput === true) input.push("audio")
+          if (caps.vision !== false) input.push("image")
+          if (caps.videoInput === true) input.push("video")
+          if (caps.pdf === true) input.push("pdf")
+
+          const output = ["text"]
+          if (caps.audioOutput === true) output.push("audio")
+          if (caps.imageOutput === true) output.push("image")
+
+          entry.attachment = input.length > 1
+          entry.modalities = { input, output }
+
+          const inferredLimit = inferContext(id) || { context: 1000000, output: 65536 }
+          entry.limit = {
+            context: positiveNumber(caps.contextWindow) ?? inferredLimit.context,
+            output: positiveNumber(caps.maxOutput) ?? inferredLimit.output,
           }
 
-          if (caps.contextWindow || caps.maxOutput) {
-            entry.limit = {}
-            if (caps.contextWindow) entry.limit.context = caps.contextWindow
-            if (caps.maxOutput) entry.limit.output = caps.maxOutput
-          }
+          const reasoning = caps.reasoning ?? caps.thinking
+          if (typeof reasoning === "boolean") entry.reasoning = reasoning
+          if (typeof caps.tools === "boolean") entry.tool_call = caps.tools
 
-          if (caps.thinking === true) {
-            entry.reasoning = true
-          }
+          const prev = userMeta[id]
+          built[id] = mergeModelEntry(entry, prev)
+          if (!prev) added.push(id)
 
-          if (!entry.limit) {
-            const ctx = inferContext(id)
-            if (ctx) {
-              entry.limit = ctx
-            } else {
-              entry.limit = { context: 1000000, output: 65536 }
-            }
-          }
-
-          built[id] = entry
-          added.push(id)
+          const extra = unsupportedModelMetadata(m, caps)
+          if (Object.keys(extra).length) metadata[id] = extra
         }
 
         p.models = built
 
-        if (added.length) {
+        if (added.length || Object.keys(metadata).length) {
           await client?.app?.log?.({
             body: {
               service: 'models-discovery',
               level: 'info',
-              message: `${providerId}: ${added.length} new models discovered`,
-              extra: { added },
+              message: added.length
+                ? `${providerId}: ${added.length} new models discovered`
+                : `${providerId}: model metadata refreshed`,
+              extra: { added, metadata },
             },
           })
         }
       }
     },
   }
+}
+
+function normalizeModelsResponse(body) {
+  if (Array.isArray(body?.data)) return body.data
+  if (Array.isArray(body)) return body
+  if (body?.data && typeof body.data === "object") return [body.data]
+  if (body && typeof body === "object" && (body.id || body.name)) return [body]
+  return []
+}
+
+function positiveNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+function mergeModelEntry(discovered, manual) {
+  if (!manual) return discovered
+  return {
+    ...discovered,
+    ...manual,
+    limit: { ...discovered.limit, ...manual.limit },
+    modalities: { ...discovered.modalities, ...manual.modalities },
+  }
+}
+
+function unsupportedModelMetadata(model, capabilities) {
+  const metadata = {}
+  const values = {
+    owned_by: model.owned_by,
+    search: capabilities.search,
+    thinkingFormat: capabilities.thinkingFormat,
+    thinkingCanDisable: capabilities.thinkingCanDisable,
+    thinkingRange: capabilities.thinkingRange,
+    upstreamProvider: capabilities.upstreamProvider,
+  }
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined) metadata[key] = value
+  }
+  return metadata
 }
 
 function inferContext(id) {

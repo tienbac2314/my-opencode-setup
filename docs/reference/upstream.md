@@ -4,7 +4,9 @@ Purpose: route each real upstream problem to the repository that owns it. Person
 
 ## `omarwaly-ai/opencode-lazy-loading`
 
-Problem: upstream plugin loses or rewrites tool calls under OpenCode-prefixed names, split SSE chunks, text-encoded tool calls, model-produced string values for typed fields, and Desktop reloads.
+Maintained proposal: [`tienbac2314/opencode-lazy-loading`](https://github.com/tienbac2314/opencode-lazy-loading), branch `fix/tool-call-compatibility`, pinned by `config/components.json`.
+
+Problem: original upstream plugin loses or rewrites tool calls under OpenCode-prefixed names, split SSE chunks, text-encoded tool calls, model-produced string values for typed fields, and Desktop reloads.
 
 Minimal PR sequence:
 
@@ -12,7 +14,7 @@ Minimal PR sequence:
 2. Buffer split tool arguments without dropping content/reasoning deltas or finish events.
 3. Parse text-encoded tool calls split across stream events.
 4. Normalize model-produced argument values against captured JSON Schema at the common response path; never invent missing keys or aliases.
-5. Add tests equivalent to `tests/lazy-load.test.ts`.
+5. Add tests equivalent to `tests/opencode-lazy-load.test.ts`.
 
 Non-goal: provider-specific model logic.
 

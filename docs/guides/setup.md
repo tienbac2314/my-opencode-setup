@@ -4,7 +4,7 @@ Purpose: install this repository on a new machine, restore private credentials, 
 
 ## 1. Prerequisites
 
-Install Git, PowerShell 7, Node.js, npm, Bun, Python `uv`, and ripgrep. Keep user binary directory on `PATH`:
+Install Git, PowerShell 7, Node.js, npm, Python `uv`, and ripgrep. `setup.ps1` automatically installs official Bun when `bun` or `bunx` is missing because vanilla OMO Slim updates invoke `bun install`. Keep user binary directory on `PATH`:
 
 ```powershell
 $bin = "$HOME\.local\bin"
@@ -47,6 +47,20 @@ Optional components such as Headroom are not installed by default.
 
 ## 3. Private credentials
 
+### Export from an already configured Windows PC
+
+The repository includes a safe inverse of the restore script. On the fully configured source PC:
+
+```powershell
+pwsh ./scripts/export-credentials.ps1
+```
+
+Export and restore share the default private file `~/.config/opencode/credentials.json`. The output is JSON rather than `.ps1` so secrets cannot be executed accidentally. It contains only the managed 9router, Supermemory, and optional OpenRouter values. The script refuses to overwrite an existing file unless `-Force` is explicit, restricts the Windows ACL to the current user, and never prints credential values.
+
+Copy that private file to the target PC through a trusted channel, restore it with `set-credentials.ps1`, verify the target, then remove unnecessary copies. Never place it inside this repository, cloud-synced Desktop storage, chat, or shell history.
+
+### Restore on another PC
+
 Create an ignored private JSON file:
 
 ```json
@@ -62,7 +76,7 @@ Create an ignored private JSON file:
 Restore it after setup:
 
 ```powershell
-pwsh ./scripts/set-credentials.ps1 -CredentialsFile "$HOME\.config\opencode\credentials.json"
+pwsh ./scripts/set-credentials.ps1
 ```
 
 Required fields are `router_api_key`, `router_base_url`, `supermemory_api_key`, and `supermemory_base_url`; `openrouter_api_key` is optional. Script updates only 9router options, Supermemory config, optional OpenRouter auth, and these user variables:
@@ -88,6 +102,8 @@ Files remain ignored and machine-local:
 ```
 
 Never commit keys. Restrict credential file permissions to current user.
+
+After a self-hosted Supermemory data-directory change, its server generates a new API key. Rotate the Nginx-side key, `SUPERMEMORY_API_KEY`, and `supermemory.jsonc` together. Fully close and reopen Desktop/TUI afterward; already-running processes retain the old environment value and continue returning 401 even when files and user environment are correct.
 
 ## 4. Normal verification
 
@@ -129,7 +145,7 @@ pwsh ./maintain.ps1 plan
 
 Review `.state/update-plan.md`. To approve a target, edit only its `target` in `config/components.json`, review the upstream diff and [local patches](../reference/patches.md), then apply that component.
 
-Latest versions are reported, never auto-approved. Targets remain exact because package patches, copied forks, and runtime contracts require review before each version change; automatic `latest` resolution would bypass that safety boundary.
+Latest versions are reported, never auto-approved. Targets remain exact because package patches, copied forks, and runtime contracts require review before each version change. OMO Slim is the deliberate exception: its tested fresh-install baseline remains exact in `config/components.json`, while Desktop and TUI load `oh-my-opencode-slim@latest` so OMO's vanilla same-major auto-updater is authorized.
 
 On Windows, OpenCode cannot replace its running `opencode.exe`; built-in npm upgrade fails with `EBUSY` (shown as exit code 14). Queue update, then close all OpenCode windows:
 
@@ -178,7 +194,7 @@ pwsh ./setup.ps1
 pwsh ./maintain.ps1 verify
 ```
 
-Setup is safe to rerun. It restores tracked files and exact targets without replacing private credential files.
+Setup is safe to rerun. It restores tracked files, tested package baselines, and the OMO latest-channel exception without replacing private credential files.
 
 Setup also removes retired npm packages and retired skill copies from active config. It does not replace executables outside repository-managed install locations. Use [troubleshooting](troubleshooting.md) when `check` still reports executable drift.
 
@@ -186,7 +202,7 @@ Setup also removes retired npm packages and retired skill copies from active con
 
 Linux support uses same PowerShell scripts; do not maintain duplicate shell installers.
 
-1. Install `pwsh`, Git, Node/npm, Bun, `uv`, `rg`, and distro build tools.
+1. Install `pwsh`, Git, Node/npm, `uv`, `rg`, and distro build tools. Setup installs Bun through its official shell installer when missing; `bash` and `curl` must be available.
 2. Add `~/.local/bin` to `PATH` in `~/.profile` or shell config.
 3. Run:
 

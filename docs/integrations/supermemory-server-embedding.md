@@ -1,41 +1,60 @@
 # Supermemory Server Embedding
 
-Current remote server (`161.118.215.190`) uses **Gemini Embedding 2 Preview** through the OpenAI-compatible proxy at `tienbac.dpdns.org`. Credentials remain machine-local.
+The Oracle VPS uses Supermemory's default local embedding model. Nginx remains the authenticated public edge; Supermemory listens behind it on port `6769`. Credentials remain machine-local.
 
-## Config
+## Active configuration
 
 ### systemd service (`/etc/systemd/system/supermemory.service`)
 
-```
-Environment=SUPERMEMORY_EMBEDDING_PROVIDER=openai
-Environment=SUPERMEMORY_EMBEDDING_MODEL=gemini-embedding-2-preview
+```ini
+Environment=SUPERMEMORY_EMBEDDING_PROVIDER=local
+Environment=SUPERMEMORY_EMBEDDING_MODEL=Xenova/bge-base-en-v1.5
 Environment=SUPERMEMORY_EMBEDDING_DIMENSIONS=768
-Environment=SUPERMEMORY_EMBEDDING_BASE_URL=https://tienbac.dpdns.org/v1
-Environment=OPENAI_API_KEY=<set outside Git>
+Environment=SUPERMEMORY_DATA_DIR=/home/ubuntu/.supermemory-local
 ```
 
-### `embedding-plan.json` (`/home/ubuntu/.supermemory/embedding-plan.json`)
+The local model needs no embedding API key or base URL. First boot downloads about 106 MB into `/home/ubuntu/.supermemory-local/models`.
 
-```json
-{
-  "provider": "openai",
-  "modelId": "gemini-embedding-2-preview",
-  "dimensions": 768,
-  "baseUrl": "https://tienbac.dpdns.org/v1"
-}
-```
+Nginx listens on loopback port `6767` and proxies to Supermemory on port `6769`. A new data directory generates a new Supermemory API key; rotate the Nginx-injected key, user `SUPERMEMORY_API_KEY`, and `~/.config/opencode/supermemory.jsonc` together without printing the value. Restart OpenCode afterward so existing processes do not retain the old key.
 
-## Utility scripts (on VPS at `~/scripts/`)
+## Model migration boundary
 
-| Script | What it does |
-|--------|-------------|
-| `verify-embedding.py` | Ping `/v1/embeddings`, print dims & model name |
-| `list-proxy-models.py` | List all models advertised at the proxy (`/v1/models`) |
+Supermemory locks provider, model, and dimensions in the data directory. Equal dimensions do not make vectors from different models comparable. A model change must use a fresh data directory or a deliberate backup-and-re-ingestion migration.
 
-Wipe after model change: `sudo systemctl stop supermemory.service && sudo rm -f /home/ubuntu/.supermemory/data && sudo systemctl start supermemory.service`
+The previous Gemini store remains at `/home/ubuntu/.supermemory`; do not delete it during routine recovery. Current local-model data lives at `/home/ubuntu/.supermemory-local`.
+
+VPS rebuild references and the July 20 recovery scripts live under `/home/ubuntu/oracle-vps-setup`. The legacy tunnel bundle moved intact to its `proxy_setup/` child; that tree contains private SSH keys and is mode `0700`/`0600`, so it must never enter a public repository unchanged.
+
+## July 20 incident
+
+The remote `gemini-embedding-2-preview` route often exceeded Supermemory 0.0.5's approximately 800 ms primary embedding deadline. Logs showed embedding timeouts and `VectorDB upsert failed`; document status could still become `done` while search returned zero results. Nginx authentication and direct embedding responses were healthy, so changing proxy/auth handling would not fix retrieval.
+
+The service moved to the documented local default instead of relaxing an undocumented timeout. Live proof through the public endpoint passed add, indexing, search, deletion, and user-preference retrieval. Post-cutover logs contained no embedding timeout or vector-upsert failure.
+
+## Recovery checks
+
+1. Confirm `systemctl is-active supermemory` and the ready log identifies `local · Xenova/bge-base-en-v1.5 · 768d`.
+2. Confirm Nginx configuration validates before reload.
+3. Compare API-key values by hash or equality only; never print them.
+4. Run `bun ./scripts/verify-supermemory.ts "$HOME/.config/opencode"` from a fresh OpenCode environment.
+5. Treat `done` as insufficient evidence after an embedding incident; require a unique add → search → forget lifecycle.
+
+## Backup, rollback, and upgrades
+
+- Before changing the server binary, unit, embedding plan, or data directory, keep a root-only copy of the systemd unit and preserve both data directories.
+- Rollback means restoring the matching provider/model/data-directory tuple. Do not point the Gemini store at the local model or mix their vectors.
+- A new data directory also creates a new server API key. Nginx and every OpenCode client must rotate together.
+- Server upgrades do not justify changing embeddings. Review release notes, back up the unit/data, confirm the active embedding tuple after restart, and rerun the complete disposable lifecycle.
+- Supermemory 0.0.5's bundled interactive SDK embedding path uses an approximately 800 ms hardcoded deadline. The binary exposes no supported environment override. Do not patch the compiled timeout; use the local model or a measured upstream release that changes this behavior explicitly.
+
+## VPS rebuild material
+
+`/home/ubuntu/oracle-vps-setup` contains the legacy proxy/tunnel bundle, reusable Supermemory inspection utilities, and the July 20 recovery artifacts. The folder is reference material rather than a live service root. Run `/home/ubuntu/oracle-vps-setup/verify-layout.sh` after reorganizing it.
+
+The `proxy_setup/Keys` subtree contains private SSH keys. A future public VPS-setup repository must exclude that subtree and any generated credential-transfer files before its first commit.
 
 ## Caveats
 
-- **Re-ingestion required on model change.** Old and new vectors live in different model spaces even at same dimensions. Search returns empty results for old data. Use the wipe command above, then re-save memories.
-- The `env.enc` file holds encrypted config from first-boot wizard. Env vars in systemd override it at runtime.
-- Never commit an API key. The key previously written in the draft appeared in chat output and must be rotated before relying on it again.
+- `Xenova/bge-base-en-v1.5` is English-focused. Use a fresh store and full re-ingestion before adopting a multilingual model.
+- `env.enc` holds encrypted first-boot configuration; systemd environment variables override it at runtime.
+- Never commit, log, or paste an API key.

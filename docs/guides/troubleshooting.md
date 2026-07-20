@@ -41,7 +41,7 @@ Do not use `headroom wrap opencode`: the pinned release injects synthetic provid
 
 ## CodeGraph error outside indexed project
 
-CodeGraph helper enables MCP only when `.codegraph/codegraph.db` exists. Restore tracked helper into active plugins and restart OpenCode. Do not remove global CodeGraph config because indexed projects need it.
+CodeGraph helper owns the MCP enabled flag for automatic project switching: enabled only when the current plugin instance has `.codegraph/codegraph.db`. The assignment must be bidirectional because Desktop can reuse resolved config after opening an unindexed workspace; a disable-only hook leaves CodeGraph off when an indexed workspace opens later. Restore tracked helper into active plugins and restart OpenCode. Do not remove global CodeGraph config because indexed projects need it.
 
 ## Plugin executes twice or tools disappear
 
@@ -53,11 +53,15 @@ Desktop may initialize plugins without injected Bun shell and may retain stale p
 
 ## `load_tool` missing or tool arguments have wrong types
 
-Restore `plugins/lazy-load.ts`, restart process, and run `bun test tests/lazy-load.test.ts`. The response adapter normalizes string-encoded numbers, booleans, arrays, and objects against each tool's captured JSON Schema for both native and text-encoded calls. It does not invent missing keys or rename model-provided keys. Loaded-tool state persists through one tool loop and clears on terminal stop. Repeated plugin initialization must return hooks every time; only fetch wrapping is idempotent.
+Restore `plugins/opencode-lazy-load.ts`, restart process, and run `bun test tests/opencode-lazy-load.test.ts`. The response adapter normalizes string-encoded numbers, booleans, arrays, and objects against each tool's captured JSON Schema for both native and text-encoded calls. It does not invent missing keys or rename model-provided keys. Loaded-tool state persists through one tool loop and clears on terminal stop. Repeated plugin initialization must return hooks every time; only fetch wrapping is idempotent.
 
 ## 9router model invalid or polluted namespace
 
 Run `opencode models 9router`. Required configured fallback models must remain available during discovery failure, and `9router/opencode/*` entries must be absent. Restore `plugins/models-discovery.js` and restart affected process.
+
+Discovery accepts the standard `{ "data": [...] }` response, a raw model array, or one standalone model object. It maps `vision`, audio/video/PDF input, image/audio output, `reasoning` (plus legacy `thinking`), `tools`, and context/output limits into OpenCode model fields. Manual model entries override discovered values while missing fields are filled from discovery.
+
+`search`, thinking-format/toggle/range metadata, `owned_by`, and `upstreamProvider` have no safe OpenCode model-config equivalent. They remain diagnostic log metadata and must not be copied into model `options`, which are provider request options. If capabilities look stale, restart OpenCode and inspect the discovery info log without printing provider credentials.
 
 ## Vision model cannot see attached image
 
@@ -66,6 +70,12 @@ OMO Slim `auto` image routing intercepts attachments when Observer is enabled: i
 Tracked policy uses `"image_routing": "direct"` in `config/oh-my-opencode-slim.json`, deployed as `~/.config/opencode/oh-my-opencode-slim.json`. Direct mode preserves the image parts; the selected provider/model must still support images. Explicit `@observer` delegation remains available.
 
 If behavior still looks automatic, check for higher-precedence OMO config without printing credentials: project-local `.opencode/oh-my-opencode-slim.json` or global `~/.config/opencode/oh-my-opencode-slim.jsonc` can override the managed global JSON. Restart OpenCode after correcting config.
+
+## OMO Slim auto-update reports `spawn bun ENOENT`
+
+OMO Slim's upstream updater invokes `bun install` and only installs updates when its plugin entry is unpinned. Rerun `pwsh ./setup.ps1`: it installs official Bun when `bun` or `bunx` is missing, refreshes PATH for setup, and restores `oh-my-opencode-slim@latest` in Desktop and TUI config. Fully restart OpenCode afterward so it inherits the user PATH and loads the updated package.
+
+If the error remains in a fresh process, run `Get-Command bun,bunx` on Windows or `command -v bun bunx` on Linux. Both commands must resolve. Do not point OMO at an exact version when seamless upstream auto-update is desired; exact entries intentionally receive notification only.
 
 ## OpenCode free-tier quota appears unexpectedly
 
@@ -78,6 +88,18 @@ An upstream skill likely launched a Bash helper through Windows `bash.exe`. Use 
 ## Supermemory tool missing or HTTP 405 appears
 
 Wrapper adapts named package export. Package patch skips cloud settings update for custom base URL. Rerun setup, verify package pin/patch, restart OpenCode, then run disposable add/search/list/forget lifecycle. Correlate logs by timestamp; do not expose credentials.
+
+## Supermemory add succeeds but search returns zero
+
+Check server logs for embedding timeout, `all providers failed`, or `VectorDB upsert failed`. A document reaching `done` does not prove its vectors were stored. Current VPS contract uses local `Xenova/bge-base-en-v1.5` and `/home/ubuntu/.supermemory-local`; verify both before testing a unique add → search → forget lifecycle. A model/provider change requires a fresh data directory or full re-ingestion, even when dimensions match. See [Supermemory server embedding](../integrations/supermemory-server-embedding.md).
+
+## Supermemory returns 401 after key rotation
+
+Check equality without printing values across the Nginx edge, user `SUPERMEMORY_API_KEY`, and `~/.config/opencode/supermemory.jsonc`. If they match, fully exit and restart OpenCode plus launching terminal. Existing Desktop/TUI processes inherit the previous environment value and cannot observe a registry update. Test from a fresh process with `bun ./scripts/verify-supermemory.ts "$HOME/.config/opencode"`; do not weaken Nginx authentication to accommodate stale clients.
+
+## Supermemory refuses to start after embedding change
+
+Provider, model, and dimensions are locked to each data directory. Point `SUPERMEMORY_DATA_DIR` at a fresh path or restore the original embedding configuration. Never delete the old directory as the first recovery step. Preserve it for rollback, start the fresh store, rotate its generated API key, and re-ingest only after add → search → forget succeeds.
 
 ## Duplicate or obsolete skills
 
