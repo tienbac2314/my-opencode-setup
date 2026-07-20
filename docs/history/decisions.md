@@ -16,6 +16,22 @@ For any non-trivial architecture, integration, migration, or rejected approach, 
 
 Record conclusions and evidence, not internal deliberation. Never include credentials, full resolved config, personal data, private prompts, or unredacted logs. When a decision changes, mark the old entry superseded and link the replacement; do not silently erase history.
 
+## 2026-07-20: Vanilla OMO Slim auto-update prerequisites
+
+Status: active.
+
+Problem: OMO Slim 2.2.1 detected 2.2.4 but failed installation with `spawn bun ENOENT` in OpenCode Desktop. Its updater directly invokes `bun install`; OpenCode's internal runtime does not place a standalone Bun executable on process PATH. Upstream also deliberately skips installation when plugin config contains an exact version.
+
+Alternatives: patch OMO's updater, keep exact pins and update only through repository maintenance, install Bun through npm, or satisfy the upstream contract. Patching adds a local fork; exact pins contradict seamless auto-update; npm adds a secondary Bun distribution path.
+
+Decision: use Bun's official platform installer from `setup.ps1` only when `bun` or `bunx` is missing. Keep OMO 2.2.4 as the tested fresh-install baseline, but use `oh-my-opencode-slim@latest` in Desktop and TUI so vanilla same-major auto-update is authorized. Keep every other component's exact-version policy unchanged.
+
+Implementation: `scripts/ensure-bun.ps1`, `setup.ps1`, OMO manifest runtime target, config synchronization/verification, Desktop/TUI templates, setup/troubleshooting guidance, and isolated tests.
+
+Evidence: upstream OMO code classifies exact versions as pinned and calls `bun install` only for plain or `@latest` entries. Regression tests cover existing, broken, missing, and `-WhatIf` Bun paths without network access, exact baseline installation, latest-channel synchronization, and exact targets for other components. Full verification passed 125 tests with 638 assertions; active package/config checks showed baseline 2.2.4 plus `@latest` in Desktop and TUI, a fresh user-PATH process resolved Bun/Bunx 1.3.14, and OMO initialized with its health check passing and no new `spawn bun ENOENT` log.
+
+Supersede when OMO no longer requires an external Bun executable or OpenCode guarantees it in Desktop and TUI PATH; remove latest-channel exception if OMO removes its pinned-version guard.
+
 ## 2026-07-20: Conservative 9router capability discovery
 
 Status: active.

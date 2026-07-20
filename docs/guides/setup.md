@@ -4,7 +4,7 @@ Purpose: install this repository on a new machine, restore private credentials, 
 
 ## 1. Prerequisites
 
-Install Git, PowerShell 7, Node.js, npm, Bun, Python `uv`, and ripgrep. Keep user binary directory on `PATH`:
+Install Git, PowerShell 7, Node.js, npm, Python `uv`, and ripgrep. `setup.ps1` automatically installs official Bun when `bun` or `bunx` is missing because vanilla OMO Slim updates invoke `bun install`. Keep user binary directory on `PATH`:
 
 ```powershell
 $bin = "$HOME\.local\bin"
@@ -145,7 +145,7 @@ pwsh ./maintain.ps1 plan
 
 Review `.state/update-plan.md`. To approve a target, edit only its `target` in `config/components.json`, review the upstream diff and [local patches](../reference/patches.md), then apply that component.
 
-Latest versions are reported, never auto-approved. Targets remain exact because package patches, copied forks, and runtime contracts require review before each version change; automatic `latest` resolution would bypass that safety boundary.
+Latest versions are reported, never auto-approved. Targets remain exact because package patches, copied forks, and runtime contracts require review before each version change. OMO Slim is the deliberate exception: its tested fresh-install baseline remains exact in `config/components.json`, while Desktop and TUI load `oh-my-opencode-slim@latest` so OMO's vanilla same-major auto-updater is authorized.
 
 On Windows, OpenCode cannot replace its running `opencode.exe`; built-in npm upgrade fails with `EBUSY` (shown as exit code 14). Queue update, then close all OpenCode windows:
 
@@ -194,7 +194,7 @@ pwsh ./setup.ps1
 pwsh ./maintain.ps1 verify
 ```
 
-Setup is safe to rerun. It restores tracked files and exact targets without replacing private credential files.
+Setup is safe to rerun. It restores tracked files, tested package baselines, and the OMO latest-channel exception without replacing private credential files.
 
 Setup also removes retired npm packages and retired skill copies from active config. It does not replace executables outside repository-managed install locations. Use [troubleshooting](troubleshooting.md) when `check` still reports executable drift.
 
@@ -202,7 +202,7 @@ Setup also removes retired npm packages and retired skill copies from active con
 
 Linux support uses same PowerShell scripts; do not maintain duplicate shell installers.
 
-1. Install `pwsh`, Git, Node/npm, Bun, `uv`, `rg`, and distro build tools.
+1. Install `pwsh`, Git, Node/npm, `uv`, `rg`, and distro build tools. Setup installs Bun through its official shell installer when missing; `bash` and `curl` must be available.
 2. Add `~/.local/bin` to `PATH` in `~/.profile` or shell config.
 3. Run:
 

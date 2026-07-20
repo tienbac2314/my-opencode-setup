@@ -71,6 +71,12 @@ Tracked policy uses `"image_routing": "direct"` in `config/oh-my-opencode-slim.j
 
 If behavior still looks automatic, check for higher-precedence OMO config without printing credentials: project-local `.opencode/oh-my-opencode-slim.json` or global `~/.config/opencode/oh-my-opencode-slim.jsonc` can override the managed global JSON. Restart OpenCode after correcting config.
 
+## OMO Slim auto-update reports `spawn bun ENOENT`
+
+OMO Slim's upstream updater invokes `bun install` and only installs updates when its plugin entry is unpinned. Rerun `pwsh ./setup.ps1`: it installs official Bun when `bun` or `bunx` is missing, refreshes PATH for setup, and restores `oh-my-opencode-slim@latest` in Desktop and TUI config. Fully restart OpenCode afterward so it inherits the user PATH and loads the updated package.
+
+If the error remains in a fresh process, run `Get-Command bun,bunx` on Windows or `command -v bun bunx` on Linux. Both commands must resolve. Do not point OMO at an exact version when seamless upstream auto-update is desired; exact entries intentionally receive notification only.
+
 ## OpenCode free-tier quota appears unexpectedly
 
 If `Free usage exceeded` appears before a tool call, verify the selected model belongs to `9router`, not OpenCode Zen with a similar display name. Start a fresh session and select the explicit 9router entry before diagnosing plugins or Headroom.

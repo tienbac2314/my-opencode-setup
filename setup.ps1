@@ -29,6 +29,8 @@ $ErrorActionPreference = "Stop"
 $RepoDir = $PSScriptRoot
 $manifest = Get-Content "$RepoDir\config\components.json" -Raw | ConvertFrom-Json
 
+& "$RepoDir\scripts\ensure-bun.ps1" -WhatIf:$WhatIfPreference
+
 function Copy-Tree([string]$Source, [string]$Destination) {
   if (-not (Test-Path -LiteralPath $Source)) { return }
   New-Item -ItemType Directory -Path $Destination -Force | Out-Null

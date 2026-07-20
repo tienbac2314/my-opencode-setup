@@ -53,7 +53,8 @@
       "name": "Oh My OpenCode Slim",
       "kind": "omo",
       "package": "oh-my-opencode-slim",
-      "target": "2.2.1",
+      "target": "2.2.4",
+      "runtimeTarget": "latest",
       "repository": "https://github.com/alvinunreal/oh-my-opencode-slim",
       "verify": "ping all agents"
     },

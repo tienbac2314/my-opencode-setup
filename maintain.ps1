@@ -231,7 +231,8 @@ function Sync-ConfigPins($ManifestValue) {
     if (-not (Test-Path -LiteralPath $pin.path)) { continue }
     $item = $ManifestValue.components | Where-Object id -eq $pin.id
     if ($item -and -not $item.disabled) {
-      & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Version $item.target -Add:([bool]$pin.add)
+      $configTarget = $item.runtimeTarget ?? $item.target
+      & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Version $configTarget -Add:([bool]$pin.add)
     } elseif ($item.disabled) {
       & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Remove
     }
@@ -369,7 +370,7 @@ function Verify-State($ManifestValue) {
   $package = if (Test-Path -LiteralPath $packageFile) { Get-Content -LiteralPath $packageFile -Raw | ConvertFrom-Json } else { $null }
   $expectedTui = @(
     $omo = $ManifestValue.components | Where-Object id -eq "omo-slim"
-    if ($omo) { "oh-my-opencode-slim@$($omo.target)" }
+    if ($omo) { "oh-my-opencode-slim@$($omo.runtimeTarget ?? $omo.target)" }
     $goal = $ManifestValue.components | Where-Object { $_.id -eq "goal" -and -not $_.disabled }
     if ($goal) { "@prevalentware/opencode-goal-plugin@$($goal.target)" }
   )
