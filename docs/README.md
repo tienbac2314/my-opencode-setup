@@ -10,7 +10,6 @@ Current behavior is documented by purpose. Start with the smallest guide that an
 ## Integrations
 
 - [Headroom](integrations/headroom.md): Desktop/TUI transport, proxy service, RTK boundary, memory policy, logs, and validation.
-- [Supermemory server embedding](integrations/supermemory-server-embedding.md): self-hosted embedding configuration and re-ingestion rules.
 
 ## Reference
 

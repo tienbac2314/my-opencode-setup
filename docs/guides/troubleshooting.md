@@ -13,10 +13,6 @@ $config = ((opencode debug config 2>$null) -join "`n") | ConvertFrom-Json
 
 Expected plugin/origin count comes from `config/components.json.expectedServerPlugins`. Compare `npm --prefix "$HOME\.config\opencode" ls --depth=0` with manifest. Never use `npm audit fix --force`.
 
-## Goal still appears
-
-Goal is disabled. Active config must not contain Goal npm pin or `/goal`; setup also retires old package dependency. Rerun setup, restart OpenCode, then inspect counts. Dormant command, patch, and verifier remain only as investigation evidence.
-
 ## RTK version drift
 
 Setup installs RTK under `~/.local/bin` but does not replace another `rtk.exe` elsewhere. User owns executable cleanup/update.
@@ -35,13 +31,13 @@ Windows `headroom-ai[all]` native dependencies require Visual Studio 2022 Build 
 
 Run `pwsh ./scripts/manage-headroom-proxy.ps1 status`. Expected: installed task and healthy `http://127.0.0.1:8787/livez`. The auto-discovered bridge makes four short health attempts and then fails open when the proxy is unavailable, so OpenCode still works but traffic bypasses Headroom. Re-run `install` after changing the pinned Headroom executable. Combined proxy output rolls between `proxy.log` and `proxy.log.previous` under `~/.local/state/opencode-headroom`; a visible Headroom terminal means the task still uses the obsolete direct executable action and should be reinstalled.
 
-`Context Tool: rtk` does not mean bare proxy rewrites OpenCode commands. `plugins/rtk.ts` owns OpenCode command rewriting; `headroom proxy` reads `rtk gain` for statistics. Headroom memory stays disabled because Supermemory owns persistent memory. See [Headroom integration](../integrations/headroom.md) for exact ownership boundaries.
+`Context Tool: rtk` does not mean bare proxy rewrites OpenCode commands. `plugins/rtk.ts` owns OpenCode command rewriting; `headroom proxy` reads `rtk gain` for statistics. Headroom memory stays disabled so the proxy remains transport-only. See [Headroom integration](../integrations/headroom.md) for exact ownership boundaries.
 
 Do not use `headroom wrap opencode`: the pinned release injects synthetic providers/models and persistent Headroom/Serena MCP entries. Run `pwsh ./scripts/remove-headroom-opencode-pollution.ps1` once after migrating. Default cleanup scrubs both `opencode.jsonc` and leftover `opencode.json`; empty leftover JSON shells are deleted. Restart every OpenCode session after cleanup, including IntelliJ terminals that loaded the old dual config.
 
-## CodeGraph error outside indexed project
+## CodeGraph is not initialized
 
-CodeGraph helper owns the MCP enabled flag for automatic project switching: enabled only when the current plugin instance has `.codegraph/codegraph.db`. The assignment must be bidirectional because Desktop can reuse resolved config after opening an unindexed workspace; a disable-only hook leaves CodeGraph off when an indexed workspace opens later. Restore tracked helper into active plugins and restart OpenCode. Do not remove global CodeGraph config because indexed projects need it.
+This is normal outside indexed projects. Use normal search, or run `codegraph init -i` when the project should be indexed. If an indexed project cannot call CodeGraph, confirm `.codegraph/codegraph.db` exists and `load_tool` lists `codegraph_codegraph_explore` for that agent. MCP names are request-scoped: subagents configured without CodeGraph must not see it.
 
 ## Plugin executes twice or tools disappear
 
@@ -73,9 +69,13 @@ If behavior still looks automatic, check for higher-precedence OMO config withou
 
 ## OMO Slim auto-update reports `spawn bun ENOENT`
 
-OMO Slim's upstream updater invokes `bun install` and only installs updates when its plugin entry is unpinned. Rerun `pwsh ./setup.ps1`: it installs official Bun when `bun` or `bunx` is missing, refreshes PATH for setup, and restores `oh-my-opencode-slim@latest` in Desktop and TUI config. Fully restart OpenCode afterward so it inherits the user PATH and loads the updated package.
+OMO Slim is pinned to the tested manifest target; do not use its unpinned update channel. A working `bun.ps1` or `bun.cmd` is not enough: installation still needs standalone `bun.exe`. Rerun `pwsh ./setup.ps1`; it repairs shim-only installs, puts official Bun first during maintenance, and restores the exact OMO version in Desktop and TUI config. Fully restart OpenCode afterward so it inherits user PATH.
 
 If the error remains in a fresh process, run `Get-Command bun,bunx` on Windows or `command -v bun bunx` on Linux. Both commands must resolve. Do not point OMO at an exact version when seamless upstream auto-update is desired; exact entries intentionally receive notification only.
+
+OMO 2.2.6 uses a managed tuple in `opencode.jsonc`. Keep that tuple; `maintain.ps1` updates it to `@latest` and removes duplicate string entries left by older synchronization.
+
+OMO 2.2.6 also exports a test helper that OpenCode mistakes for another plugin entry, producing `disabledTools.filter is not a function` while the real plugin may still report healthy. The managed package patch removes only that export and must exist in installed, exact-version cache, and `@latest` cache copies.
 
 ## OpenCode free-tier quota appears unexpectedly
 
@@ -85,25 +85,9 @@ If `Free usage exceeded` appears before a tool call, verify the selected model b
 
 An upstream skill likely launched a Bash helper through Windows `bash.exe`. Use the skill's PowerShell launcher on native Windows, such as `pwsh -File scripts/task-brief.ps1 ...`. Installing WSL does not translate native `C:\...` paths; run OpenCode inside WSL or keep the PowerShell path consistently.
 
-## Supermemory tool missing or HTTP 405 appears
-
-Wrapper adapts named package export. Package patch skips cloud settings update for custom base URL. Rerun setup, verify package pin/patch, restart OpenCode, then run disposable add/search/list/forget lifecycle. Correlate logs by timestamp; do not expose credentials.
-
-## Supermemory add succeeds but search returns zero
-
-Check server logs for embedding timeout, `all providers failed`, or `VectorDB upsert failed`. A document reaching `done` does not prove its vectors were stored. Current VPS contract uses local `Xenova/bge-base-en-v1.5` and `/home/ubuntu/.supermemory-local`; verify both before testing a unique add → search → forget lifecycle. A model/provider change requires a fresh data directory or full re-ingestion, even when dimensions match. See [Supermemory server embedding](../integrations/supermemory-server-embedding.md).
-
-## Supermemory returns 401 after key rotation
-
-Check equality without printing values across the Nginx edge, user `SUPERMEMORY_API_KEY`, and `~/.config/opencode/supermemory.jsonc`. If they match, fully exit and restart OpenCode plus launching terminal. Existing Desktop/TUI processes inherit the previous environment value and cannot observe a registry update. Test from a fresh process with `bun ./scripts/verify-supermemory.ts "$HOME/.config/opencode"`; do not weaken Nginx authentication to accommodate stale clients.
-
-## Supermemory refuses to start after embedding change
-
-Provider, model, and dimensions are locked to each data directory. Point `SUPERMEMORY_DATA_DIR` at a fresh path or restore the original embedding configuration. Never delete the old directory as the first recovery step. Preserve it for rollback, start the fresh store, rotate its generated API key, and re-ingest only after add → search → forget succeeds.
-
 ## Duplicate or obsolete skills
 
-Setup avoids repository/external skill-name duplication and removes retired browser automation, DevTools debugger, and docs-fetcher MCP skills from active config. It does not delete user-owned skill roots. Remove stale copies only after confirming ownership.
+Setup avoids repository/external skill-name duplication and does not delete user-owned skill roots. Remove stale copies only after confirming ownership.
 
 ## OpenCode npm update fails with exit code 14
 
@@ -123,7 +107,7 @@ npm 11 can report unapproved lifecycle scripts for pinned packages. Inspect firs
 
 ## Historical retrieval
 
-Removed debug notes and Mem0 archive are historical, not deployable. Read without checkout:
+Removed debug notes are historical, not deployable. Read without checkout:
 
 ```powershell
 git show main:knownbug.md

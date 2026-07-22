@@ -214,45 +214,15 @@ function Test-TargetCurrent($Item) {
 function Sync-ConfigPins($ManifestValue) {
   $globalPath = Join-Path $ConfigDir "opencode.jsonc"
   $tuiPath = Join-Path $ConfigDir "tui.json"
-  if (Test-Path -LiteralPath $globalPath) {
-    & "$RepoDir\scripts\remove-legacy-goal-command.ps1" -Path $globalPath
-    & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $globalPath -Name "@prevalentware/opencode-goal-plugin/server" -Remove
-  }
-  if (Test-Path -LiteralPath $tuiPath) {
-    & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $tuiPath -Name "@prevalentware/opencode-goal-plugin/tui" -Remove
-  }
   $pins = @(
     @{ id = "omo-slim"; path = $globalPath; name = "oh-my-opencode-slim" },
-    @{ id = "goal"; path = $globalPath; name = "@prevalentware/opencode-goal-plugin"; add = $true },
-    @{ id = "omo-slim"; path = $tuiPath; name = "oh-my-opencode-slim" },
-    @{ id = "goal"; path = $tuiPath; name = "@prevalentware/opencode-goal-plugin"; add = $true }
+    @{ id = "omo-slim"; path = $tuiPath; name = "oh-my-opencode-slim" }
   )
   foreach ($pin in $pins) {
     if (-not (Test-Path -LiteralPath $pin.path)) { continue }
     $item = $ManifestValue.components | Where-Object id -eq $pin.id
     if ($item -and -not $item.disabled) {
-      $configTarget = $item.runtimeTarget ?? $item.target
-      & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Version $configTarget -Add:([bool]$pin.add)
-    } elseif ($item.disabled) {
-      & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Remove
-    }
-  }
-}
-
-function Remove-Retired($ManifestValue) {
-  $packageFile = Join-Path $ConfigDir "package.json"
-  if (Test-Path -LiteralPath $packageFile) {
-    $installed = Get-Content -LiteralPath $packageFile -Raw | ConvertFrom-Json
-    $packages = @($ManifestValue.retired.npmLocal | Where-Object { $installed.dependencies.PSObject.Properties.Name -contains $_ })
-    if ($packages -and $PSCmdlet.ShouldProcess($ConfigDir, "remove retired packages: $($packages -join ', ')")) {
-      Push-Location $ConfigDir
-      try { & npm uninstall @packages; if ($LASTEXITCODE -ne 0) { throw "npm uninstall failed" } } finally { Pop-Location }
-    }
-  }
-  $globalPath = Join-Path $ConfigDir "opencode.jsonc"
-  if (Test-Path -LiteralPath $globalPath) {
-    foreach ($spec in @($ManifestValue.retired.pluginSpecs)) {
-      & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $globalPath -Name $spec -Remove
+      & "$RepoDir\scripts\pin-opencode-plugin.ps1" -Path $pin.path -Name $pin.name -Version $item.target -Add:([bool]$pin.add)
     }
   }
 }
@@ -277,7 +247,6 @@ function Install-Rtk($Item) {
 }
 
 function Apply-Components($ManifestValue) {
-  Remove-Retired $ManifestValue
   $selected = Select-Components $ManifestValue
   $installKinds = @("npm-global", "npm-local", "omo", "pypi", "github-release", "github-commit")
   $pending = @($selected | Where-Object { $_.kind -in $installKinds -and -not (Test-TargetCurrent $_) })
@@ -321,12 +290,16 @@ function Apply-Components($ManifestValue) {
     try {
       $env:OPENCODE_CONFIG_DIR = $ConfigDir
       if ($IsWindows) {
-        $bunShim = Get-Command bun -ErrorAction SilentlyContinue
-        if ($bunShim) {
-          $bunExecutable = Join-Path (Split-Path $bunShim.Source) "node_modules\bun\bin\bun.exe"
-          if (Test-Path -LiteralPath $bunExecutable) {
-            $env:PATH = "$(Split-Path $bunExecutable)$([IO.Path]::PathSeparator)$originalPath"
+        $bunRoot = if ($env:BUN_INSTALL) { $env:BUN_INSTALL } else { Join-Path $HOME ".bun" }
+        $bunExecutable = Join-Path $bunRoot "bin\bun.exe"
+        if (-not (Test-Path -LiteralPath $bunExecutable)) {
+          $bunShim = Get-Command bun -ErrorAction SilentlyContinue
+          if ($bunShim) {
+            $bunExecutable = Join-Path (Split-Path $bunShim.Source) "node_modules\bun\bin\bun.exe"
           }
+        }
+        if (Test-Path -LiteralPath $bunExecutable) {
+          $env:PATH = "$(Split-Path $bunExecutable)$([IO.Path]::PathSeparator)$originalPath"
         }
       }
       & bunx "$($omo.package)@$($omo.target)" install --yes
@@ -342,18 +315,12 @@ function Apply-Components($ManifestValue) {
   if ($PSCmdlet.ShouldProcess((Join-Path $ConfigDir "plugins"), "deploy repository local plugins")) {
     $activePlugins = Join-Path $ConfigDir "plugins"
     New-Item -ItemType Directory -Path $activePlugins -Force | Out-Null
-    foreach ($legacy in @("goal.ts", "lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
-      Remove-Item (Join-Path $activePlugins $legacy) -Force -ErrorAction SilentlyContinue
-    }
     Copy-Item "$RepoDir\plugins\*" $activePlugins -Force
   }
   if ($PSCmdlet.ShouldProcess((Join-Path $ConfigDir "commands"), "deploy repository commands")) {
     $activeCommands = Join-Path $ConfigDir "commands"
     New-Item -ItemType Directory -Path $activeCommands -Force | Out-Null
     Copy-Item "$RepoDir\commands\*" $activeCommands -Force
-    if ($ManifestValue.components | Where-Object { $_.id -eq "goal" -and $_.disabled }) {
-      Remove-Item (Join-Path $activeCommands "goal.md") -Force -ErrorAction SilentlyContinue
-    }
   }
   $headroomUpdated = @($pending | Where-Object id -in "headroom-python", "headroom-source")
   if ($IsWindows -and $headroomUpdated -and (Get-ScheduledTask -TaskName "OpenCode Headroom Proxy" -ErrorAction SilentlyContinue)) {
@@ -370,14 +337,8 @@ function Verify-State($ManifestValue) {
   $package = if (Test-Path -LiteralPath $packageFile) { Get-Content -LiteralPath $packageFile -Raw | ConvertFrom-Json } else { $null }
   $expectedTui = @(
     $omo = $ManifestValue.components | Where-Object id -eq "omo-slim"
-    if ($omo) { "oh-my-opencode-slim@$($omo.runtimeTarget ?? $omo.target)" }
-    $goal = $ManifestValue.components | Where-Object { $_.id -eq "goal" -and -not $_.disabled }
-    if ($goal) { "@prevalentware/opencode-goal-plugin@$($goal.target)" }
+    if ($omo) { "oh-my-opencode-slim@$($omo.target)" }
   )
-
-  foreach ($retired in @($ManifestValue.retired.npmLocal)) {
-    if ($package.dependencies.PSObject.Properties.Name -contains $retired) { $failures.Add("retired package still installed: $retired") }
-  }
 
   foreach ($item in $ManifestValue.components | Where-Object { -not $_.disabled -and $_.kind -in "npm-local", "omo" }) {
     $actual = $package.dependencies.($item.package)
@@ -412,10 +373,14 @@ function Verify-State($ManifestValue) {
   $resolved = Invoke-Text opencode @("debug", "config")
   if ($resolved) {
     $cfg = $resolved | ConvertFrom-Json
+    $resolvedSpecs = @()
+    foreach ($entry in @($cfg.plugin)) {
+      $resolvedSpecs += if ($entry -is [Array]) { [string]$entry[0] } else { [string]$entry }
+    }
     if ($cfg.plugin.Count -ne $ManifestValue.expectedServerPlugins) { $failures.Add("resolved plugin count is $($cfg.plugin.Count), expected $($ManifestValue.expectedServerPlugins)") }
     if ($cfg.plugin_origins.Count -ne $ManifestValue.expectedServerPlugins) { $failures.Add("plugin origin count is $($cfg.plugin_origins.Count), expected $($ManifestValue.expectedServerPlugins)") }
     foreach ($spec in $expectedTui) {
-      if ($spec -notin @($cfg.plugin)) { $failures.Add("resolved server config is missing exact plugin pin: $spec") }
+      if ($spec -notin $resolvedSpecs) { $failures.Add("resolved server config is missing exact plugin pin: $spec") }
     }
   } else { $failures.Add("opencode debug config failed") }
 

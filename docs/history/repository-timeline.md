@@ -87,10 +87,10 @@ Durable lesson: active cleanup is valuable, but removed rationale needs normaliz
 | opencode-triage and skill MCPs | Removed after command/policy churn | Retired |
 | Custom Explorer/scout | Recursion and policy complexity | Retired |
 | Mem0 self-host patch | Proved ten API incompatibilities | Retired, history only |
-| Supermemory | Replaced Mem0 after recovery | Active sole persistent-memory owner |
+| Supermemory | Replaced Mem0 after recovery | Archived from lean setup on 2026-07-22 |
 | OpenViking | Strategic fit but immature integration | Research/pilot proposal only |
 | Broken lazy-load branch | Useful DSML ideas, unsafe SSE/lifecycle | Archived; repaired implementation active |
-| Goal plugin | Package/TUI fixes failed live reliability gate | Disabled |
+| Goal plugin | Package/TUI fixes failed live reliability gate | Archived from lean setup on 2026-07-22 |
 | Headroom persistent provider | Synthetic namespace, no lifecycle ownership | Superseded |
 | Headroom isolated launcher | Provider-neutral but CLI-only | Superseded |
 | Headroom official wrapper | Provider/model/MCP pollution and Desktop mismatch | Superseded |

@@ -11,8 +11,6 @@
   {
     "router_api_key": "",
     "router_base_url": "",
-    "supermemory_api_key": "",
-    "supermemory_base_url": "",
     "openrouter_api_key": ""
   }
 
@@ -29,7 +27,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ConfigFile = Join-Path $ConfigDir "opencode.jsonc"
-$SupermemoryFile = Join-Path $ConfigDir "supermemory.jsonc"
 
 function Get-JsoncTokens([string]$Content) {
   $tokens = [Collections.Generic.List[object]]::new()
@@ -115,9 +112,7 @@ if (-not (Test-Path -LiteralPath $CredentialsFile)) {
 $Credentials = Get-Content -Raw -LiteralPath $CredentialsFile | ConvertFrom-Json
 $required = @(
   "router_api_key",
-  "router_base_url",
-  "supermemory_api_key",
-  "supermemory_base_url"
+  "router_base_url"
 )
 
 foreach ($name in $required) {
@@ -153,12 +148,6 @@ foreach ($change in $changes | Sort-Object { $_.Token.Start } -Descending) {
 Set-Content -LiteralPath $ConfigFile -Value $configText -NoNewline -Encoding UTF8
 Write-Output "[ok] Restored 9router config"
 
-[ordered]@{
-  apiKey = [string]$Credentials.supermemory_api_key
-  baseUrl = [string]$Credentials.supermemory_base_url
-} | ConvertTo-Json | Set-Content -LiteralPath $SupermemoryFile -Encoding UTF8
-Write-Output "[ok] Restored Supermemory config"
-
 $openrouterKey = [string]$Credentials.openrouter_api_key
 if (-not [string]::IsNullOrWhiteSpace($openrouterKey)) {
   New-Item -ItemType Directory -Path (Split-Path $AuthFile) -Force | Out-Null
@@ -178,16 +167,6 @@ if (-not [string]::IsNullOrWhiteSpace($openrouterKey)) {
 }
 
 if (-not $SkipUserEnvironment) {
-  [Environment]::SetEnvironmentVariable(
-    "SUPERMEMORY_API_KEY",
-    [string]$Credentials.supermemory_api_key,
-    "User"
-  )
-  [Environment]::SetEnvironmentVariable(
-    "SUPERMEMORY_BASE_URL",
-    [string]$Credentials.supermemory_base_url,
-    "User"
-  )
   [Environment]::SetEnvironmentVariable(
     "OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS",
     "true",

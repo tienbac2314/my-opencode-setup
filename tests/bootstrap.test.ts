@@ -12,7 +12,6 @@ const setCredentialsScript = fileURLToPath(new URL("../scripts/set-credentials.p
 const exportCredentialsScript = fileURLToPath(new URL("../scripts/export-credentials.ps1", import.meta.url))
 const setCredentialsSource = readFileSync(setCredentialsScript, "utf8")
 const exportCredentialsSource = readFileSync(exportCredentialsScript, "utf8")
-const removeLegacyGoalScript = fileURLToPath(new URL("../scripts/remove-legacy-goal-command.ps1", import.meta.url))
 const installHeadroomScript = fileURLToPath(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))
 const launchHeadroomScript = fileURLToPath(new URL("../scripts/start-opencode-headroom.ps1", import.meta.url))
 const manageHeadroomScript = fileURLToPath(new URL("../scripts/manage-headroom-proxy.ps1", import.meta.url))
@@ -31,11 +30,9 @@ test("Headroom stays out of tracked global config", () => {
   expect(globalConfig.mcp?.headroom).toBeUndefined()
 })
 
-test("goal plugin is commented out while its OpenCode integration is broken", () => {
-  expect(globalConfig.plugin ?? []).not.toContain("@prevalentware/opencode-goal-plugin@0.1.24")
-  expect(setupScript).toContain("-not $_.disabled")
-  expect(globalConfig.plugin.some((item: string) => item.includes("/server@"))).toBe(false)
-  expect(globalConfig.command?.goal).toBeUndefined()
+test("archived plugin families are absent from active config", () => {
+  const text = JSON.stringify(globalConfig)
+  expect(text).not.toMatch(/supermemory|mem0|goal-plugin/i)
 })
 
 test("setup delegates approved installs to the manifest maintainer", () => {
@@ -47,44 +44,9 @@ test("setup delegates approved installs to the manifest maintainer", () => {
   expect(setupScript).toContain('Copy-Tree "$RepoDir\\commands"')
 })
 
-test("goal and token commands are tracked locally", () => {
-  const goal = readFileSync(new URL("../commands/goal.md", import.meta.url), "utf8")
+test("token command is tracked locally", () => {
   const tokens = readFileSync(new URL("../commands/tokens.md", import.meta.url), "utf8")
-  expect(goal).toContain("$ARGUMENTS")
-  expect(goal).toContain("create_goal")
   expect(tokens).toContain("/tokens")
-})
-
-test("maintainer removes retired local adapters during deployment", () => {
-  expect(maintainerScript).toContain('"goal.ts"')
-  expect(maintainerScript).toContain("Remove-Item")
-})
-
-test("legacy raw goal command migration preserves other config", () => {
-  const directory = mkdtempSync(join(tmpdir(), "opencode-goal-command-"))
-  const configPath = join(directory, "opencode.jsonc")
-  const original = `{
-  // keep
-  "provider": { "demo": { "options": { "apiKey": "keep-secret" } } },
-  "command": {
-    "goal": { "description": "legacy", "template": "$ARGUMENTS", "agent": "build" },
-    "other": { "template": "keep-other" }
-  }
-}`
-  try {
-    writeFileSync(configPath, original)
-    const result = Bun.spawnSync([
-      "pwsh", "-NoProfile", "-File", removeLegacyGoalScript, "-Path", configPath,
-    ])
-    expect(result.exitCode).toBe(0)
-    const updated = readFileSync(configPath, "utf8")
-    expect(updated).toContain("// keep")
-    expect(updated).toContain("keep-secret")
-    expect(updated).toContain("keep-other")
-    expect(updated).not.toContain('"goal"')
-  } finally {
-    rmSync(directory, { recursive: true, force: true })
-  }
 })
 
 test("Headroom native plugin installer is tracked", () => {
@@ -203,10 +165,9 @@ test("Headroom cleanup defaults to dual config and deletes empty leftover JSON",
   }
 })
 
-test("retired notifier is removed from manifest and config", () => {
+test("runtime update notifier is absent", () => {
   const manifest = JSON.parse(readFileSync(new URL("../config/components.json", import.meta.url), "utf8"))
   expect(manifest.components.some((item: any) => item.id === "update-notifier")).toBe(false)
-  expect(manifest.retired.npmLocal).toContain("opencode-update-notifier")
   expect(globalConfig.plugin ?? []).not.toContain("opencode-update-notifier@0.3.3")
 })
 
@@ -282,8 +243,6 @@ test("credential restore updates only provider.9router.options", () => {
     writeFileSync(credentialsPath, JSON.stringify({
       router_api_key: "new-key",
       router_base_url: "https://new.invalid",
-      supermemory_api_key: "memory-key",
-      supermemory_base_url: "https://memory.invalid",
       openrouter_api_key: "openrouter-key",
     }))
 
@@ -307,7 +266,7 @@ test("credential restore updates only provider.9router.options", () => {
   }
 })
 
-test("credential export collects populated 9router, Supermemory, and OpenRouter values", () => {
+test("credential export collects populated 9router and OpenRouter values", () => {
   const directory = mkdtempSync(join(tmpdir(), "opencode-export-credentials-"))
   const configDirectory = join(directory, ".config", "opencode")
   const outputPath = join(directory, "my-opencode-credentials.json")
@@ -321,10 +280,6 @@ test("credential export collects populated 9router, Supermemory, and OpenRouter 
     "other": { "options": { "apiKey": "keep-key" } },
     "9router": { "options": { "baseURL": "https://router.invalid/v1", "apiKey": "router-key" } }
   }
-}`)
-    writeFileSync(join(configDirectory, "supermemory.jsonc"), `{
-  "apiKey": "memory-key",
-  "baseUrl": "https://memory.invalid"
 }`)
     writeFileSync(authPath, JSON.stringify({
       openrouter: { type: "api", key: "openrouter-key" },
@@ -343,12 +298,9 @@ test("credential export collects populated 9router, Supermemory, and OpenRouter 
     expect(JSON.parse(readFileSync(outputPath, "utf8"))).toEqual({
       router_api_key: "router-key",
       router_base_url: "https://router.invalid/v1",
-      supermemory_api_key: "memory-key",
-      supermemory_base_url: "https://memory.invalid",
       openrouter_api_key: "openrouter-key",
     })
     expect(result.stdout.toString()).not.toContain("router-key")
-    expect(result.stdout.toString()).not.toContain("memory-key")
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
@@ -363,15 +315,13 @@ test("credential export and restore share the same private default file", () => 
 describe("JSONC plugin pinning", () => {
   test("manifest maintainer owns exact config pin synchronization", () => {
     expect(maintainerScript).toContain("Sync-ConfigPins")
-    expect(maintainerScript).toContain("@prevalentware/opencode-goal-plugin/tui")
-    expect(maintainerScript).toContain('-Name "@prevalentware/opencode-goal-plugin/server" -Remove')
-    expect(maintainerScript).toContain('name = "@prevalentware/opencode-goal-plugin"; add = $true')
+    expect(maintainerScript).toContain('name = "oh-my-opencode-slim"')
+    expect(maintainerScript).not.toMatch(/supermemory|mem0|goal/i)
   })
 
-  test("TUI does not load disabled Goal package", () => {
+  test("TUI loads only exact OMO package", () => {
     const tui = JSON.parse(readFileSync(new URL("../config/tui.json", import.meta.url), "utf8"))
-    expect(tui.plugin).not.toContain("@prevalentware/opencode-goal-plugin@0.1.24")
-    expect(tui.plugin.some((item: string) => item.includes("/tui@"))).toBe(false)
+    expect(tui.plugin).toEqual(["oh-my-opencode-slim@2.2.6"])
   })
 
   test("pins only the plugin array and preserves credentials", () => {
@@ -466,6 +416,37 @@ describe("JSONC plugin pinning", () => {
       expect(readFileSync(configPath, "utf8")).toBe(
         '{"plugin":["oh-my-opencode-slim@2.1.1","other@1"],"examples":["oh-my-opencode-slim"]}',
       )
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test("pins OMO managed tuple without adding a duplicate plugin", () => {
+    const directory = mkdtempSync(join(tmpdir(), "opencode-pin-omo-tuple-"))
+    const configPath = join(directory, "opencode.jsonc")
+    const original = `{
+  "plugin": [
+    [
+      "oh-my-opencode-slim@2.2.6",
+      { "__ohMyOpencodeSlimManagedByInstaller": true }
+    ],
+    "oh-my-opencode-slim@latest"
+  ]
+}`
+
+    try {
+      writeFileSync(configPath, original)
+      const result = Bun.spawnSync([
+        "rtk", "proxy", "pwsh", "-NoProfile", "-File", pinPluginScript,
+        "-Path", configPath, "-Name", "oh-my-opencode-slim", "-Version", "latest", "-Add",
+      ])
+
+      expect(result.exitCode).toBe(0)
+      const plugins = JSON.parse(readFileSync(configPath, "utf8")).plugin
+      expect(plugins).toEqual([[
+        "oh-my-opencode-slim@latest",
+        { __ohMyOpencodeSlimManagedByInstaller: true },
+      ]])
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

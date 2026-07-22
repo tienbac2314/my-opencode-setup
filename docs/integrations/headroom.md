@@ -63,7 +63,7 @@ Headroom memory is a second persistent-memory system. With `--memory`, Headroom 
 - retrieve relevant memories into system context;
 - enable `--learn`, which extracts patterns and can write agent-native memory files.
 
-It stays disabled here because Supermemory is the single owner of cross-session memory. Enabling both would create two stores, two retrieval paths, duplicate tools, and potentially duplicate or conflicting injected context.
+It stays disabled so Headroom remains a transport-only service and does not inject memory tools or context.
 
 Responsibility split:
 
@@ -72,7 +72,7 @@ Responsibility split:
 | Provider/model identity | OpenCode and 9router config |
 | Transport compression, caching, rate limits | Headroom |
 | Shell command rewriting | Local RTK OpenCode plugin |
-| Cross-session memory | Supermemory |
+| Cross-session memory | None |
 
 ## Why the official wrapper is not used
 

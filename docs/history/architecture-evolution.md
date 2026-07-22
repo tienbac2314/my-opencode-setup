@@ -88,7 +88,7 @@ OpenViking was evaluated as shared hierarchical context for OpenCode and Hermes.
 
 ### Current boundary
 
-Supermemory alone owns persistent memory. Headroom memory/learning is disabled. OpenViking is not active.
+Persistent-memory plugins were removed from the lean setup on 2026-07-22. Headroom memory/learning remains disabled so its proxy stays transport-only. OpenViking is not active.
 
 ## Headroom
 

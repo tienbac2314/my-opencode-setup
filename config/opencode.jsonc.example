@@ -69,9 +69,7 @@
   "formatter": false,
   "lsp": true,
   "plugin": [
-    "oh-my-opencode-slim@latest"
-    // Goal plugin disabled: OpenCode Goal tool and TUI integration remains broken.
-    // "@prevalentware/opencode-goal-plugin@0.1.24"
+    "oh-my-opencode-slim@2.2.6"
   ],
   "experimental": {
     "mcp_timeout": 60000

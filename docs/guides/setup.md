@@ -4,7 +4,7 @@ Purpose: install this repository on a new machine, restore private credentials, 
 
 ## 1. Prerequisites
 
-Install Git, PowerShell 7, Node.js, npm, Python `uv`, and ripgrep. `setup.ps1` automatically installs official Bun when `bun` or `bunx` is missing because vanilla OMO Slim updates invoke `bun install`. Keep user binary directory on `PATH`:
+Install Git, PowerShell 7, Node.js, npm, Python `uv`, and ripgrep. `setup.ps1` automatically installs official Bun when vanilla OMO Slim cannot spawn `bun.exe`; npm-created `bun.ps1` or `bun.cmd` shims alone do not count. Keep user binary directory on `PATH`:
 
 ```powershell
 $bin = "$HOME\.local\bin"
@@ -41,7 +41,7 @@ pwsh ./setup.ps1 -SkipTests
 pwsh ./setup.ps1 -SkipEnvironment
 ```
 
-`setup.ps1` copies repository-controlled files, deploys `config/AGENTS.md` as global policy while leaving root `AGENTS.md` repository-only, installs manifest-approved components, applies package patches, configures CodeGraph/RTK, skips skills already discovered under `~/.agents` or `~/.claude`, and runs verification. Existing `opencode.jsonc` and `supermemory.jsonc` credentials are preserved.
+`setup.ps1` copies repository-controlled files, deploys `config/AGENTS.md` as global policy while leaving root `AGENTS.md` repository-only, installs manifest-approved components, applies package patches, configures CodeGraph/RTK, skips skills already discovered under `~/.agents` or `~/.claude`, and runs verification. Existing `opencode.jsonc` credentials are preserved.
 
 Optional components such as Headroom are not installed by default.
 
@@ -55,7 +55,7 @@ The repository includes a safe inverse of the restore script. On the fully confi
 pwsh ./scripts/export-credentials.ps1
 ```
 
-Export and restore share the default private file `~/.config/opencode/credentials.json`. The output is JSON rather than `.ps1` so secrets cannot be executed accidentally. It contains only the managed 9router, Supermemory, and optional OpenRouter values. The script refuses to overwrite an existing file unless `-Force` is explicit, restricts the Windows ACL to the current user, and never prints credential values.
+Export and restore share the default private file `~/.config/opencode/credentials.json`. The output is JSON rather than `.ps1` so secrets cannot be executed accidentally. It contains only the managed 9router and optional OpenRouter values. The script refuses to overwrite an existing file unless `-Force` is explicit, restricts the Windows ACL to the current user, and never prints credential values.
 
 Copy that private file to the target PC through a trusted channel, restore it with `set-credentials.ps1`, verify the target, then remove unnecessary copies. Never place it inside this repository, cloud-synced Desktop storage, chat, or shell history.
 
@@ -67,8 +67,6 @@ Create an ignored private JSON file:
 {
   "router_api_key": "",
   "router_base_url": "",
-  "supermemory_api_key": "",
-  "supermemory_base_url": "",
   "openrouter_api_key": ""
 }
 ```
@@ -79,11 +77,9 @@ Restore it after setup:
 pwsh ./scripts/set-credentials.ps1
 ```
 
-Required fields are `router_api_key`, `router_base_url`, `supermemory_api_key`, and `supermemory_base_url`; `openrouter_api_key` is optional. Script updates only 9router options, Supermemory config, optional OpenRouter auth, and these user variables:
+Required fields are `router_api_key` and `router_base_url`; `openrouter_api_key` is optional. Script updates only 9router options, optional OpenRouter auth, and this user variable:
 
 ```text
-SUPERMEMORY_API_KEY
-SUPERMEMORY_BASE_URL
 OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS
 ```
 
@@ -97,13 +93,10 @@ Files remain ignored and machine-local:
 
 ```text
 ~/.config/opencode/opencode.jsonc
-~/.config/opencode/supermemory.jsonc
 ~/.local/share/opencode/auth.json
 ```
 
 Never commit keys. Restrict credential file permissions to current user.
-
-After a self-hosted Supermemory data-directory change, its server generates a new API key. Rotate the Nginx-side key, `SUPERMEMORY_API_KEY`, and `supermemory.jsonc` together. Fully close and reopen Desktop/TUI afterward; already-running processes retain the old environment value and continue returning 401 even when files and user environment are correct.
 
 ## 4. Normal verification
 
@@ -118,14 +111,11 @@ Expected: manifest-approved packages, configured plugin count equal to manifest,
 Live smoke tests:
 
 1. Start TUI and App. Open status/plugin panels.
-2. Confirm Goal plugin and `/goal` command are absent. They remain disabled while OpenCode integration is broken.
-3. Run `/tokens` after model request.
-4. Run `ping all agents` and one bounded child-agent task.
-5. In indexed project, use CodeGraph; outside indexed project, confirm no startup error.
-6. Add/search/list/forget disposable Supermemory marker.
-   Automated verifier: `bun ./scripts/verify-supermemory.ts "$HOME/.config/opencode"`.
-7. Run RTK rewrite: `rtk rewrite "git status"`.
-8. Select a vision-capable 9router model, attach a disposable image, and confirm the model analyzes it directly without injected `@observer` delegation text.
+2. Run `/tokens` after model request.
+3. Run `ping all agents` and one bounded child-agent task.
+4. In an indexed project, use CodeGraph; elsewhere, use normal search.
+5. Run RTK rewrite: `rtk rewrite "git status"`.
+6. Select a vision-capable 9router model, attach a disposable image, and confirm the model analyzes it directly without injected `@observer` delegation text.
 
 Tracked `config/oh-my-opencode-slim.json` sets `image_routing: direct`; setup deploys it to `~/.config/opencode/oh-my-opencode-slim.json`. This preserves original image parts for OpenCode/provider delivery. It does not add vision to text-only models, and explicit `@observer` delegation remains available. A project-local OMO config or global `oh-my-opencode-slim.jsonc` takes precedence and can override this managed JSON setting.
 
@@ -145,7 +135,7 @@ pwsh ./maintain.ps1 plan
 
 Review `.state/update-plan.md`. To approve a target, edit only its `target` in `config/components.json`, review the upstream diff and [local patches](../reference/patches.md), then apply that component.
 
-Latest versions are reported, never auto-approved. Targets remain exact because package patches, copied forks, and runtime contracts require review before each version change. OMO Slim is the deliberate exception: its tested fresh-install baseline remains exact in `config/components.json`, while Desktop and TUI load `oh-my-opencode-slim@latest` so OMO's vanilla same-major auto-updater is authorized.
+Latest versions are reported, never auto-approved. Targets remain exact because package patches, copied forks, and runtime contracts require review before each version change. OMO Slim follows the same rule: fresh setups, Desktop, and TUI load the tested version from `config/components.json`. To update it, review the upstream diff, change that exact target, then run `apply` and `verify`.
 
 On Windows, OpenCode cannot replace its running `opencode.exe`; built-in npm upgrade fails with `EBUSY` (shown as exit code 14). Queue update, then close all OpenCode windows:
 
@@ -181,7 +171,7 @@ pwsh ./scripts/manage-headroom-proxy.ps1 status
 opencode models 9router
 ```
 
-The manager installs a hidden current-user login task that keeps `headroom proxy` independent of OpenCode. The task uses `scripts/run-headroom-proxy.ps1` to suppress the console and write a two-file rolling log under `~/.local/state/opencode-headroom`. Auto-discovered `plugins/headroom.ts` gives both Desktop and CLI the same transport. It activates only when the login-task marker exists and `/livez` identifies a healthy Headroom service; otherwise four short health attempts fail open to direct provider traffic. Normal use is opening Desktop or running `opencode`—no wrapper command or profile function is required. Dashboard and statistics remain available while the service runs. Headroom memory and learning remain disabled because Supermemory owns persistent memory; RTK remains enabled for shell-output compression and Headroom only reads its savings counters.
+The manager installs a hidden current-user login task that keeps `headroom proxy` independent of OpenCode. The task uses `scripts/run-headroom-proxy.ps1` to suppress the console and write a two-file rolling log under `~/.local/state/opencode-headroom`. Auto-discovered `plugins/headroom.ts` gives both Desktop and CLI the same transport. It activates only when the login-task marker exists and `/livez` identifies a healthy Headroom service; otherwise four short health attempts fail open to direct provider traffic. Normal use is opening Desktop or running `opencode`—no wrapper command or profile function is required. Dashboard and statistics remain available while the service runs. Headroom memory and learning remain disabled so the proxy stays transport-only; RTK remains enabled for shell-output compression and Headroom only reads its savings counters.
 
 Do not use `headroom wrap opencode` with this configuration. Headroom 0.31.0 adds synthetic `anthropic`, `openai`, and `headroom` providers, a hardcoded Claude/OpenAI model catalog, and persistent Headroom/Serena MCP entries. This can hide dynamically discovered 9router models in TUI and pollute App model lists. The cleanup script removes only those recognized Headroom-owned entries while preserving 9router credentials and unrelated config. Default cleanup targets both `opencode.jsonc` and leftover `opencode.json`, then deletes empty leftover JSON shells so dual-config merge cannot reintroduce Headroom/Serena MCP.
 
@@ -196,7 +186,7 @@ pwsh ./maintain.ps1 verify
 
 Setup is safe to rerun. It restores tracked files, tested package baselines, and the OMO latest-channel exception without replacing private credential files.
 
-Setup also removes retired npm packages and retired skill copies from active config. It does not replace executables outside repository-managed install locations. Use [troubleshooting](troubleshooting.md) when `check` still reports executable drift.
+Setup does not replace executables outside repository-managed install locations. Use [troubleshooting](troubleshooting.md) when `check` still reports executable drift.
 
 ## 8. Linux setup differences
 
@@ -222,4 +212,4 @@ Differences:
 - Apply `chmod 600` to private credential files.
 - App availability depends on OpenCode Linux desktop support; TUI and web are baseline.
 
-Supported first target: current Ubuntu LTS. Verify same package targets, plugin origins, lazy loading, RTK, CodeGraph, Supermemory, OMO, and Headroom before claiming another distro supported.
+Supported first target: current Ubuntu LTS. Verify same package targets, plugin origins, lazy loading, RTK, CodeGraph, OMO, and Headroom before claiming another distro supported.

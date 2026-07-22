@@ -16,9 +16,73 @@ For any non-trivial architecture, integration, migration, or rejected approach, 
 
 Record conclusions and evidence, not internal deliberation. Never include credentials, full resolved config, personal data, private prompts, or unredacted logs. When a decision changes, mark the old entry superseded and link the replacement; do not silently erase history.
 
-## 2026-07-20: Vanilla OMO Slim auto-update prerequisites
+## 2026-07-22: Lean setup archives memory, Goal, and CodeGraph helper layers
 
 Status: active.
+
+Problem: setup carried disabled or patched systems that no longer served the desired daily runtime: Supermemory and older Mem0 migration machinery, Goal integration, and a local CodeGraph workspace helper. Their packages, patches, credentials, commands, cleanup paths, tests, and current docs expanded every setup and update. Goal works in `tienbac2314/opencode-goal-plugin`, but the desired OpenCode core integration remains unreliable. The CodeGraph helper was originally added after a real uninitialized-project error; later search interception and process-global tool discovery caused subagent failures.
+
+Alternatives: keep dormant artifacts in the manifest, move source into a tracked archive directory, or remove active artifacts and rely on Git plus existing history documents. Dormant entries keep setup complex; a copied archive duplicates Git history.
+
+Decision: keep global CodeGraph 1.4.1 and remove only the helper. CodeGraph now reports an uninitialized directory cleanly; agent policy uses it only when `.codegraph/codegraph.db` exists and falls back to normal search. Remove Supermemory, Goal, and Mem0 runtime/setup artifacts completely. Remove the generic `retired` manifest and maintenance paths. Preserve their engineering record only in `docs/history/` and Git history; current README, setup, troubleshooting, patch, upstream, and agent flows describe only active components.
+
+Implementation: component manifest/schema, setup and maintenance scripts, credential import/export, runtime plugins and commands, package patches, verifiers, current docs, and deployment tests.
+
+Evidence: installed CodeGraph 1.4.1 returns `Not initialized` without crashing in an empty directory; upstream documents global installation plus per-project initialization. Lean-setup regression requires removed components and files to be absent and forbids retirement machinery in setup/maintenance. Full repository verification and resolved App/TUI plugin-origin checks must pass after active cleanup.
+
+Supersede only when one archived capability is intentionally reintroduced as a newly reviewed active component with its own live lifecycle proof.
+
+## 2026-07-22: Lazy-loaded MCP name discovery
+
+Status: superseded by the request-scoped MCP discovery decision below.
+
+Problem: lazy loading removed MCP tools from the provider request and deliberately omitted their names from the gateway catalog. OpenCode namespaced CodeGraph as `codegraph_codegraph_explore`, while prompt text also mentioned the alternate-client name `codegraph_explore`. Models knew CodeGraph was required but could not discover the callable OpenCode name, then repeated blocked `glob` calls or narrated guesses.
+
+Alternatives: eagerly expose full MCP schemas, rely on prose in `AGENTS.md`, remove the CodeGraph guard, or expose names only. Full schemas lose most token savings; prose can disagree with runtime naming; removing the guard restores broad-search drift.
+
+Decision: include exact request-captured MCP names in `load_tool`'s pointer list while keeping descriptions and schemas lazy. CodeGraph guard errors give the exact `load_tool` then `codegraph_codegraph_explore` sequence and forbid retrying broad search first.
+
+Implementation: `plugins/opencode-lazy-load.ts`, `plugins/codegraph-helper.ts`, focused regressions, and patch reference.
+
+Evidence: regression request containing namespaced CodeGraph now shows `codegraph_codegraph_explore` in the only provider-visible gateway description. Guard regression requires the exact sequence and remains session-scoped.
+
+Superseded because process-global MCP discovery leaked orchestrator-only tools into subagents, while the hard search guard required those unavailable tools.
+
+## 2026-07-22: Request-scoped MCP discovery and soft CodeGraph policy
+
+Status: active.
+
+Problem: the lazy loader stored MCP names and schemas in process-global maps. After an orchestrator exposed CodeGraph, subagents configured with `mcps: []` still saw `codegraph_codegraph_explore`; OpenCode then rejected the call as unavailable. The helper also blocked each subagent's first `glob` or `grep` because its attempt state was session-scoped.
+
+Alternatives: give CodeGraph to every subagent, share a successful attempt across sessions, remove MCP discovery, or scope discovery to each request and stop enforcing search order in a hook. Broader MCP access violates agent configuration; shared state hides availability differences; removing discovery breaks valid orchestrator use.
+
+Decision: snapshot MCP names, descriptions, and schemas from each provider request and use only that session's snapshot for gateway discovery, `load_tool`, and call rewriting. Remove all search interception from the CodeGraph helper. Keep only bidirectional `.codegraph/codegraph.db` availability control; agent instructions express CodeGraph-first as a soft policy with normal search fallback.
+
+Implementation: `plugins/opencode-lazy-load.ts`, `plugins/codegraph-helper.ts`, agent policy, troubleshooting, patch reference, and focused regressions.
+
+Evidence: regression first captures CodeGraph for an orchestrator, then starts a subagent request without it. The subagent gateway omits CodeGraph and `load_tool` returns unknown. Helper regression proves indexed workspaces expose no `tool.execute.before` hook.
+
+Supersede when OpenCode provides native lazy tool discovery scoped to each agent request and workspace-aware CodeGraph activation.
+
+## 2026-07-22: OMO Slim 2.2.6 and native Bun validation
+
+Status: active; supersedes the Bun command-detection part of the 2026-07-20 decision.
+
+Problem: OMO Slim 2.2.6 installation still reported `spawn bun ENOENT`. PowerShell resolved npm-created `bun.ps1` and `bun.cmd` shims, so the prerequisite check treated Bun as installed, but OMO's Node child process could not spawn a standalone executable. The 2.2.6 installer also changed its config entry to a managed tuple; the string-only pin synchronizer appended a duplicate `@latest` entry. Finally, 2.2.6 exported `minimumExpectedToolCount` beside its default plugin. OpenCode invoked both exported functions as plugins, so the helper received plugin context and failed on `disabledTools.filter` while the default export still initialized.
+
+Alternatives: patch OMO, accept shell shims, or require official `bun.exe`. Patching remains unnecessary; shell shims cannot satisfy the upstream process contract.
+
+Decision: on Windows, prerequisite validation requires runnable `bun.exe`. OMO maintenance prioritizes `$BUN_INSTALL/bin/bun.exe` or `~/.bun/bin/bun.exe` before fallback paths. Pin synchronization preserves OMO's managed tuple, updates its first item, and removes duplicate string entries. A one-line package patch removes the non-plugin helper export from installed, exact-cache, and `@latest` cache copies. Keep runtime entries on `@latest`; advance the reviewed install baseline to 2.2.6.
+
+Implementation: `scripts/ensure-bun.ps1`, `maintain.ps1`, `config/components.json`, focused regressions, setup guidance, and troubleshooting guidance.
+
+Evidence: a direct 2.2.6 installer run reproduced cache warm-up failure with shim-only PATH. After official Bun installation and PATH prioritization, the same installer warmed `oh-my-opencode-slim@2.2.6`; active npm state resolved 2.2.6 while tracked tailored OMO and TUI files were restored. Resolved config then reported eight plugins and eight origins with one OMO managed tuple. Before the export patch, fresh runs logged both successful default-plugin health and `disabledTools.filter` failure; afterward runtime module exports only `default` and a fresh health check reports seven agents, five tools, and three MCPs without load error.
+
+Supersede when OMO no longer spawns external Bun or its child-process launcher supports Windows shell shims.
+
+## 2026-07-20: Vanilla OMO Slim auto-update prerequisites
+
+Status: superseded by the 2026-07-22 exact OMO Slim runtime pin decision below.
 
 Problem: OMO Slim 2.2.1 detected 2.2.4 but failed installation with `spawn bun ENOENT` in OpenCode Desktop. Its updater directly invokes `bun install`; OpenCode's internal runtime does not place a standalone Bun executable on process PATH. Upstream also deliberately skips installation when plugin config contains an exact version.
 
@@ -30,7 +94,23 @@ Implementation: `scripts/ensure-bun.ps1`, `setup.ps1`, OMO manifest runtime targ
 
 Evidence: upstream OMO code classifies exact versions as pinned and calls `bun install` only for plain or `@latest` entries. Regression tests cover existing, broken, missing, and `-WhatIf` Bun paths without network access, exact baseline installation, latest-channel synchronization, and exact targets for other components. Full verification passed 125 tests with 638 assertions; active package/config checks showed baseline 2.2.4 plus `@latest` in Desktop and TUI, a fresh user-PATH process resolved Bun/Bunx 1.3.14, and OMO initialized with its health check passing and no new `spawn bun ENOENT` log.
 
-Supersede when OMO no longer requires an external Bun executable or OpenCode guarantees it in Desktop and TUI PATH; remove latest-channel exception if OMO removes its pinned-version guard.
+Superseded because later OMO releases required local compatibility patches and repeated update failures made an unreviewed runtime channel unsafe.
+
+## 2026-07-22: Exact OMO Slim runtime pin
+
+Status: active; search-enforcement wording superseded by the 2026-07-22 soft CodeGraph policy.
+
+Problem: fresh setups loaded `oh-my-opencode-slim@latest` even though the repository tested, patched, and installed an exact version. A new upstream release could therefore bypass review, miss the matching local patch, or behave differently between new and existing machines.
+
+Alternatives: keep `@latest`, pin only fresh setups, or use one exact manifest target everywhere. Keeping two policies preserves drift; `@latest` preserves first-launch risk.
+
+Decision: use the exact OMO Slim `target` from `config/components.json` in fresh setup, Desktop, TUI, package installation, cache patching, and verification. Update OMO only by reviewing its upstream diff, changing the manifest target, applying the matching patch, and running full verification.
+
+Implementation: remove OMO's `runtimeTarget`; synchronize and verify only `target`; pin both config templates and the schema URL; update setup and troubleshooting guidance.
+
+Evidence: regression tests require the same exact OMO version in manifest, Desktop, and TUI. Repository verification covers package state, config synchronization, patch application, resolved plugin count, and test suite.
+
+Supersede when OMO updates are proven compatible without version-specific patches and the repository has a pre-activation compatibility gate.
 
 ## 2026-07-20: Conservative 9router capability discovery
 
@@ -50,7 +130,7 @@ Supersede when OpenCode provides native custom-provider discovery with equivalen
 
 ## 2026-07-20: Lazy-load maintained fork authority
 
-Status: active.
+Status: superseded in part by the 2026-07-22 MCP name-discovery delta.
 
 Problem: dotfiles carried an early local compatibility patch while component authority still identified original upstream commit `11ee174`. The independently reviewed fork evolved those ideas into request-local gateway state, conservative schema normalization, strict streamed DSML conversion, preserved MCP routing, stable finish/index ordering, and 37 behavioral regressions. Keeping a divergent local copy made updates and provenance ambiguous.
 
@@ -70,11 +150,11 @@ Problem: the global CodeGraph MCP fails during startup outside indexed repositor
 
 Alternatives: remove dynamic disabling, add a session-aware MCP proxy, or make the existing config hook assign both enabled and disabled states. Removing the hook restores the original unindexed startup error/freeze; a proxy duplicates OpenCode and CodeGraph lifecycle machinery.
 
-Decision: preserve the global MCP entry and let the helper own `codegraph.enabled`, setting it to the current plugin instance's `.codegraph/codegraph.db` result on every config hook. Search enforcement remains inert in unindexed workspaces and session-scoped in indexed workspaces. OpenCode exposes one mutable config property rather than a per-session MCP switch; if a host shares that live object across concurrently initialized workspaces, the most recent config hook wins. The sequential Desktop transition reported here is covered; true concurrent isolation requires an upstream workspace-scoped MCP API.
+Decision: preserve the global MCP entry and let the helper own `codegraph.enabled`, setting it to the current plugin instance's `.codegraph/codegraph.db` result on every config hook. OpenCode exposes one mutable config property rather than a per-session MCP switch; if a host shares that live object across concurrently initialized workspaces, the most recent config hook wins. The sequential Desktop transition reported here is covered; true concurrent isolation requires an upstream workspace-scoped MCP API.
 
 Implementation: `plugins/codegraph-helper.ts`, `tests/codegraph-helper.test.ts`, troubleshooting, and local-patch reference.
 
-Evidence: commit `a55c657` records the original unindexed startup failure and disable-only mitigation. The regression passes one shared config through unindexed then indexed plugin instances; it fails with stale `false` before the fix and passes with bidirectional assignment. Focused and full repository tests verify existing metadata-only, session-isolation, and search-fallback behavior.
+Evidence: commit `a55c657` records the original unindexed startup failure and disable-only mitigation. The regression passes one shared config through unindexed then indexed plugin instances; it fails with stale `false` before the fix and passes with bidirectional assignment. Focused and full repository tests verify metadata-only and bidirectional workspace behavior.
 
 Supersede when OpenCode provides workspace-scoped MCP configuration without shared mutable state, or CodeGraph starts safely outside indexed repositories.
 

@@ -3,7 +3,7 @@
   Export populated OpenCode credentials to one private JSON file.
 
 .DESCRIPTION
-  Reads only the managed 9router, Supermemory, and optional OpenRouter fields.
+  Reads only the managed 9router and optional OpenRouter fields.
   Values are never written to stdout. Keep the output outside Git.
 
 .EXAMPLE
@@ -96,12 +96,9 @@ function Get-JsoncString([string]$Path, [string[]]$PropertyPath) {
 }
 
 $configFile = Join-Path $ConfigDir "opencode.jsonc"
-$supermemoryFile = Join-Path $ConfigDir "supermemory.jsonc"
 $credentials = [ordered]@{
   router_api_key = Get-JsoncString $configFile @("provider", "9router", "options", "apiKey")
   router_base_url = Get-JsoncString $configFile @("provider", "9router", "options", "baseURL")
-  supermemory_api_key = Get-JsoncString $supermemoryFile @("apiKey")
-  supermemory_base_url = Get-JsoncString $supermemoryFile @("baseUrl")
   openrouter_api_key = ""
 }
 
@@ -110,7 +107,7 @@ if (Test-Path -LiteralPath $AuthFile) {
   if ($auth.openrouter.type -eq "api") { $credentials.openrouter_api_key = [string]$auth.openrouter.key }
 }
 
-foreach ($name in "router_api_key", "router_base_url", "supermemory_api_key", "supermemory_base_url") {
+foreach ($name in "router_api_key", "router_base_url") {
   if ([string]::IsNullOrWhiteSpace([string]$credentials[$name])) { throw "Credential is empty: $name" }
 }
 if ((Test-Path -LiteralPath $OutputFile) -and -not $Force) {

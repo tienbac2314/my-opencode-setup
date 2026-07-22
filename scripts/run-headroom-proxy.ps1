@@ -5,7 +5,7 @@
 .DESCRIPTION
   Hosts the pinned Headroom proxy for the current-user scheduled task. Standard
   output and error are merged into a bounded machine-local rolling log. Persistent
-  Headroom memory and learning remain disabled because Supermemory owns memory.
+  Headroom memory and learning remain disabled so this service stays transport-only.
 
 .EXAMPLE
   pwsh ./scripts/run-headroom-proxy.ps1 -Port 8787 -HeadroomExecutable "$HOME/.local/bin/headroom.exe"

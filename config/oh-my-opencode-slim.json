@@ -1,10 +1,11 @@
 {
-  "$schema": "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json",
+  "$schema": "https://unpkg.com/oh-my-opencode-slim@2.2.6/oh-my-opencode-slim.schema.json",
   "setDefaultAgent": false,
   "image_routing": "direct",
   "disabled_agents": [
     "explorer"
   ],
+  "disabled_tools": [],
   "preset": "9router",
   "presets": {
     "9router": {

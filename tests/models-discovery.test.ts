@@ -46,6 +46,7 @@ describe("9router model discovery fallback", () => {
     )
 
     expect(config.image_routing).toBe("direct")
+    expect(config.disabled_tools).toEqual([])
   })
 
   test("uses native OpenCode model for OMO runtime roles", () => {

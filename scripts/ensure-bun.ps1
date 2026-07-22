@@ -16,6 +16,9 @@ function Test-BunCommands {
     $command = Get-Command $name -CommandType Application,ExternalScript -ErrorAction SilentlyContinue |
       Select-Object -First 1
     if (-not $command) { return $false }
+    if ($IsWindows -and $name -eq "bun" -and [IO.Path]::GetExtension($command.Source) -ne ".exe") {
+      return $false
+    }
     try {
       & $command.Source --version *> $null
       if (-not $? -or $LASTEXITCODE -ne 0) { return $false }

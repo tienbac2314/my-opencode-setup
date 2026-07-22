@@ -79,7 +79,7 @@ Desktop App and normal `opencode` launches use the same auto-discovered bridge a
 
 ### CodeGraph and RTK
 
-CodeGraph already watches indexed files, so the redundant post-edit reindex hook was removed. The local guard acts only when `.codegraph/codegraph.db` exists and does nothing in unindexed workspaces.
+CodeGraph already watches indexed files, so the redundant post-edit reindex hook was removed. The local helper only enables or disables the MCP from `.codegraph/codegraph.db`; it never intercepts search tools.
 
 RTK installs under `~/.local/bin` and resolves through `PATH`. Local wrapper only supports Desktop-shaped hook input without an injected shell.
 

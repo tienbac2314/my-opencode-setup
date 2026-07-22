@@ -10,6 +10,11 @@ type NativeTool = {
 }
 
 type PluginHooks = {
+  tool: {
+    load_tool: {
+      execute: (args: { name: string }, context: { sessionID: string }) => Promise<{ title: string; output: string }>
+    }
+  }
   "tool.definition": (
     input: { toolID: string },
     output: { description: string; jsonSchema?: unknown },
@@ -128,7 +133,7 @@ async function startRequest(sessionID: string, tools: NativeTool[], upstreamSSE:
 
 mock.module("@opencode-ai/plugin", () => ({
   tool: Object.assign(
-    () => ({}),
+    (definition: unknown) => definition,
     { schema: { string: () => ({ describe: () => ({}) }) } },
   ),
 }))
@@ -230,6 +235,14 @@ const codegraphTool: NativeTool = {
   },
 }
 
+const namespacedCodegraphTool: NativeTool = {
+  ...codegraphTool,
+  function: {
+    ...codegraphTool.function,
+    name: "codegraph_codegraph_explore",
+  },
+}
+
 const uppercaseReadMcpTool: NativeTool = {
   type: "function",
   function: {
@@ -303,6 +316,37 @@ test("passes a request-captured MCP tool through directly", async () => {
 
   expect(toolNames(output)).toEqual(["codegraph_explore"])
   expect(toolArguments(output)).toEqual([{ query: "tool call compatibility", limit: 5 }])
+})
+
+test("lists exact MCP runtime names in the gateway catalog", async () => {
+  const { providerRequest } = await runRequest(
+    "mcp-pointer-name",
+    [loadTool, namespacedCodegraphTool],
+    finish() + "data: [DONE]\n\n",
+  )
+
+  expect(providerRequest.tools?.[0]?.function.description).toContain("- codegraph_codegraph_explore")
+})
+
+test("does not leak an MCP tool into a subagent session without that tool", async () => {
+  await runRequest(
+    "orchestrator-with-codegraph",
+    [loadTool, namespacedCodegraphTool],
+    finish() + "data: [DONE]\n\n",
+  )
+
+  const { providerRequest } = await runRequest(
+    "subagent-without-codegraph",
+    [loadTool, readTool],
+    finish() + "data: [DONE]\n\n",
+  )
+  const loaded = await hooks.tool.load_tool.execute(
+    { name: "codegraph_codegraph_explore" },
+    { sessionID: "subagent-without-codegraph" },
+  )
+
+  expect(providerRequest.tools?.[0]?.function.description).not.toContain("codegraph_codegraph_explore")
+  expect(loaded.title).toBe("Unknown tool: codegraph_codegraph_explore")
 })
 
 test("captures an MCP schema even when its description is missing", async () => {

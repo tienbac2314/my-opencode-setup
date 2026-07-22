@@ -64,7 +64,7 @@
 **Use runtime names and loaded schemas. Do not guess how integrations work.**
 
 * **Lazy loading:** Tools may be hidden until loaded. Call `load_tool` with exact name shown by current client, then call tool.
-* **CodeGraph:** If `.codegraph/` exists, use CodeGraph before grep/find for code discovery. OpenCode exposes `codegraph_codegraph_explore`; other clients may expose `codegraph_explore`; shell uses `codegraph explore`.
+* **CodeGraph:** If `.codegraph/codegraph.db` exists and current agent exposes CodeGraph, use it before grep/find for code discovery. OpenCode exposes `codegraph_codegraph_explore`; other clients may expose `codegraph_explore`; shell uses `codegraph explore`. If unavailable, use normal search without retrying it.
 * **RTK:** Prefix supported shell commands with `rtk`. Hooks can rewrite commands or output. If command succeeds, treat output as final and follow user's requested output shape; do not rerun raw command. Use user PATH.
 * **Memory:** Read loaded schema before use; never guess fields or print credentials.
 * **Agents/skills:** Runtime agent and skill lists are authoritative. Read matching `SKILL.md`; invoke only agent types exposed by current client.

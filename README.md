@@ -27,7 +27,7 @@ tests/                   behavior and maintenance contracts
 
 Private credentials stay outside this repository under `~/.config/opencode`.
 
-Flow: `setup.ps1` reads the component manifest and delegates installs to `maintain.ps1`; maintainer converges package pins, tracked runtime files, patches, and retired artifacts; OpenCode auto-discovers local files under `plugins/`; tests encode integration contracts. Read [engineering decisions](docs/history/decisions.md) before changing ownership boundaries.
+Flow: `setup.ps1` reads the component manifest and delegates installs to `maintain.ps1`; maintainer converges package pins, tracked runtime files, and patches; OpenCode auto-discovers local files under `plugins/`; tests encode integration contracts. Read [engineering decisions](docs/history/decisions.md) before changing ownership boundaries.
 
 ## Components
 
@@ -39,11 +39,9 @@ Purpose: show what this setup loads and where each part comes from.
 | Vercel AI SDK | [`vercel/ai`](https://github.com/vercel/ai) | OpenAI-compatible provider used by configured transports |
 | 9router model discovery | Local `models-discovery.js` | Adds available models with OpenCode modalities, reasoning, tools, and limits |
 | Oh My OpenCode Slim | [`alvinunreal/oh-my-opencode-slim`](https://github.com/alvinunreal/oh-my-opencode-slim) | Orchestrator plus specialist agents; vanilla updates use `@latest` and standalone Bun |
-| Goal (disabled) | [`prevalentWare/opencode-goal-plugin`](https://github.com/prevalentWare/opencode-goal-plugin) | Retained for investigation; setup does not install or load it while OpenCode integration remains broken |
-| Supermemory | [`supermemoryai/opencode-supermemory`](https://github.com/supermemoryai/opencode-supermemory) | Self-hosted memory across sessions |
 | Lazy loading | [`tienbac2314/opencode-lazy-loading`](https://github.com/tienbac2314/opencode-lazy-loading) | Maintained fork; loads tool schemas only when the model asks for them |
 | Token source | [`omarwaly-ai/OpenCode-tokens-source`](https://github.com/omarwaly-ai/OpenCode-tokens-source) | `/tokens` breakdown by prompt, tool, and message source |
-| CodeGraph | [`colbymchenry/codegraph`](https://github.com/colbymchenry/codegraph) plus local guard | Code search for indexed projects; no action elsewhere |
+| CodeGraph | [`colbymchenry/codegraph`](https://github.com/colbymchenry/codegraph) | Code search for indexed projects |
 | RTK | [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk) plus local OpenCode hook | Shorter shell output and Windows-safe command rewriting |
 | Deep Research | [`Weizhena/Deep-Research-skills`](https://github.com/Weizhena/Deep-Research-skills) | Research workflow without exposing strategy files as agents |
 | Superpowers skills | [`obra/superpowers`](https://github.com/obra/superpowers) | Bundled planning, debugging, testing, review, and execution workflows |
@@ -68,14 +66,12 @@ pwsh ./maintain.ps1 verify
 - Project `.opencode/opencode.json` does not define `plugin`; global plugin origins remain authoritative.
 - OMO Slim uses direct image routing so vision-capable models receive original attachments; Observer remains available only when explicitly delegated.
 - Headroom is opt-in. Its hidden login task and auto-discovered bridge serve Desktop and TUI without taking ownership of providers, models, MCP, RTK, or memory. See [Headroom integration](docs/integrations/headroom.md).
-- CodeGraph runs only when project has `.codegraph/codegraph.db`.
-- Goal package, patch, and command remain tracked but are not installed or loaded. `components.json` records the temporary disable reason.
+- Use CodeGraph only when the project has `.codegraph/codegraph.db`; normal search remains available elsewhere.
 - Update checks come from `maintain.ps1`; no runtime notifier plugin is needed.
-- Browser automation, DevTools debugger, and docs-fetcher MCP skills are retired; MCP ownership stays in explicit OpenCode/OMO configuration.
-- Supermemory is the single persistent-memory owner. Headroom memory and learning remain disabled.
+- MCP ownership stays in explicit OpenCode/OMO configuration.
+- Headroom memory and learning remain disabled; this setup has no persistent-memory plugin.
 - RTK is installed under `~/.local/bin`; executable replacement and removal of stale copies elsewhere on `PATH` remain user-managed.
 - `npm ls --depth=0` and `opencode debug config` are authoritative. `bun pm ls` can show stale lock metadata after npm installs.
-- `.opencode/goals/` is user/runtime state and remains untracked.
 
 ## Expected verification
 
@@ -88,6 +84,6 @@ pwsh ./maintain.ps1 verify
 - full Bun test suite;
 - production dependency audit at high severity or above when online.
 
-Live checks still matter for provider traffic, App rendering, agent orchestration, and Supermemory CRUD.
+Live checks still matter for provider traffic, App rendering, and agent orchestration.
 
-Credential migration uses `scripts/export-credentials.ps1` on the configured Windows PC and `scripts/set-credentials.ps1` on the target; both default to `~/.config/opencode/credentials.json`. Keep the exported JSON outside Git and restart OpenCode after restore or Supermemory key rotation.
+Credential migration uses `scripts/export-credentials.ps1` on the configured Windows PC and `scripts/set-credentials.ps1` on the target; both default to `~/.config/opencode/credentials.json`. Keep the exported JSON outside Git and restart OpenCode after restore.

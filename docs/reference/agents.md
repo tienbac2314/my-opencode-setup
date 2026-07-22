@@ -37,7 +37,7 @@ Do not duplicate OMO role details elsewhere when exact models change; link to tr
 
 `agents/web-search.md` is a real subagent. Strategy Markdown stays under `data/` so OpenCode does not expose reference documents as fake agents.
 
-Browser automation, DevTools debugger, and docs-fetcher skills from an older lazy-load MCP design are retired. Do not restore skill-local `mcp:` blocks; MCP ownership belongs to explicit OpenCode or OMO configuration.
+Do not add skill-local `mcp:` blocks; MCP ownership belongs to explicit OpenCode or OMO configuration.
 
 ## Debug checks
 
@@ -47,6 +47,6 @@ Browser automation, DevTools debugger, and docs-fetcher skills from an older laz
 4. Strategy file appears as agent: remove stale active agent-module copy and rerun setup.
 5. OMO role has wrong model/tools: compare active `oh-my-opencode-slim.json` with tracked config, then apply only `omo-slim` and verify.
 6. Vision model cannot see attachment: confirm effective OMO config has `image_routing: direct`; project-local config and global `oh-my-opencode-slim.jsonc` can take precedence over managed global JSON.
-7. Duplicate skill warning: compare active skills with external roots; setup preserves user-owned external roots and removes retired active copies.
+7. Duplicate skill warning: compare active skills with external roots; setup preserves user-owned external roots.
 
 See [troubleshooting](../guides/troubleshooting.md) for runtime symptoms and [maintenance refactor](../history/maintenance-refactor.md) for design history.

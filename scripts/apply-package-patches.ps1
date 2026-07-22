@@ -18,17 +18,20 @@ foreach ($item in $components | Where-Object { $_.patch -and -not $_.disabled })
   $targets = [Collections.Generic.List[string]]::new()
   $targets.Add((Join-Path (Join-Path $ConfigDir "node_modules") $item.package))
   if ($item.tuiCache) {
-    $cacheRoot = Join-Path (Join-Path $CacheDir "packages") "$($item.package)@$($item.target)"
-    $cachePackage = Join-Path (Join-Path $cacheRoot "node_modules") $item.package
-    if (-not (Test-Path -LiteralPath $cachePackage -PathType Container) -and -not $Check) {
-      New-Item -ItemType Directory -Path $cacheRoot -Force | Out-Null
-      if (-not (Test-Path -LiteralPath (Join-Path $cacheRoot "package.json"))) {
-        @{ dependencies = @{ $item.package = $item.target } } | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $cacheRoot "package.json") -Encoding utf8
+    $cacheVersions = @($item.target)
+    foreach ($cacheVersion in $cacheVersions) {
+      $cacheRoot = Join-Path (Join-Path $CacheDir "packages") "$($item.package)@$cacheVersion"
+      $cachePackage = Join-Path (Join-Path $cacheRoot "node_modules") $item.package
+      if (-not (Test-Path -LiteralPath $cachePackage -PathType Container) -and -not $Check) {
+        New-Item -ItemType Directory -Path $cacheRoot -Force | Out-Null
+        if (-not (Test-Path -LiteralPath (Join-Path $cacheRoot "package.json"))) {
+          @{ dependencies = @{ $item.package = $cacheVersion } } | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $cacheRoot "package.json") -Encoding utf8
+        }
+        Push-Location $cacheRoot
+        try { & npm install --save-exact "$($item.package)@$cacheVersion"; if ($LASTEXITCODE -ne 0) { throw "$($item.id): TUI cache install failed" } } finally { Pop-Location }
       }
-      Push-Location $cacheRoot
-      try { & npm install --save-exact "$($item.package)@$($item.target)"; if ($LASTEXITCODE -ne 0) { throw "$($item.id): TUI cache install failed" } } finally { Pop-Location }
+      $targets.Add($cachePackage)
     }
-    $targets.Add($cachePackage)
   }
 
   foreach ($packageDir in $targets) {

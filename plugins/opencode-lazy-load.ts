@@ -54,8 +54,8 @@ const originalSchemas = new Map<string, any>()
  * body.tools that's NOT in `originals` (built-in) and NOT `load_tool`.
  * Saves their description + schema before removing them from the HTTP body.
  */
-const mcpOriginals = new Map<string, string>()
-const mcpSchemas = new Map<string, any>()
+type McpTool = { description: string; schema?: any }
+const sessionMcpTools = new Map<string, Map<string, McpTool>>()
 
 /**
  * Per-turn loaded-tools tracking. Keyed by sessionID. Persists across
@@ -91,19 +91,18 @@ function briefOf(description: string): string {
  * Build the pointer list for load_tool's description.
  * Format: "- toolname - brief description"
  */
-function buildPointerList(): string {
+function buildPointerList(mcpTools: Map<string, McpTool>): string {
   const pointers: string[] = []
   for (const [name, desc] of originals) {
     if (isLoadToolName(name)) continue
     const brief = briefOf(desc)
     pointers.push(brief ? `- ${name} - ${brief}` : `- ${name}`)
   }
-  // MCP tools are deliberately EXCLUDED from the pointer list.
-  // They are still callable directly (the SSE transform passes them through
-  // untouched), but they do NOT appear in load_tool's description.
-  // This keeps load_tool's token footprint minimal — MCP tools add zero
-  // tokens to the tools array. The LLM discovers MCP tools through other
-  // channels (system prompt, etc.) and can call them directly.
+  // MCP names must remain discoverable because OpenCode namespaces them at
+  // runtime. Keep descriptions and schemas lazy; names alone are sufficient.
+  for (const name of mcpTools.keys()) {
+    pointers.push(`- ${name}`)
+  }
   return pointers.sort().join("\n")
 }
 
@@ -167,20 +166,20 @@ function parseDSMLCalls(block: string): Array<{ name: string; arguments: string 
 
 type KnownTool = { name: string; kind: "built-in" | "mcp" }
 
-function resolveKnownTool(name: string): KnownTool | undefined {
+function resolveKnownTool(name: string, mcpTools: Map<string, McpTool>): KnownTool | undefined {
   if (originals.has(name)) return { name, kind: "built-in" }
-  if (mcpOriginals.has(name)) return { name, kind: "mcp" }
+  if (mcpTools.has(name)) return { name, kind: "mcp" }
 
   const lowerName = name.toLowerCase()
   const foldedNames = new Set([
     ...Array.from(originals.keys()).filter((knownName) => knownName.toLowerCase() === lowerName),
-    ...Array.from(mcpOriginals.keys()).filter((knownName) => knownName.toLowerCase() === lowerName),
+    ...Array.from(mcpTools.keys()).filter((knownName) => knownName.toLowerCase() === lowerName),
   ])
   if (foldedNames.size !== 1) return undefined
 
   const [resolvedName] = foldedNames
   if (originals.has(resolvedName)) return { name: resolvedName, kind: "built-in" }
-  if (mcpOriginals.has(resolvedName)) return { name: resolvedName, kind: "mcp" }
+  if (mcpTools.has(resolvedName)) return { name: resolvedName, kind: "mcp" }
   return undefined
 }
 
@@ -301,6 +300,7 @@ function wrapFetch(): void {
       sessionID = `__req_${Date.now()}_${Math.random().toString(36).slice(2)}__`
     }
     let loadToolName = "load_tool"
+    const requestMcpTools = new Map<string, McpTool>()
 
     // ── Request-side: remove ALL tools except load_tool ──
     // The LLM only sees load_tool. Pointers go into load_tool's description.
@@ -341,13 +341,9 @@ function wrapFetch(): void {
               }
               const desc = fn?.description || t?.description || ""
               const params = fn?.parameters || t?.parameters
-              if (!mcpOriginals.has(name)) {
-                mcpOriginals.set(name, desc)
-              }
-              if (params && !mcpSchemas.has(name)) {
-                mcpSchemas.set(name, params)
-              }
+              requestMcpTools.set(name, { description: desc, schema: params })
             }
+            sessionMcpTools.set(sessionID, requestMcpTools)
 
             // Keep ONLY load_tool in the tools array
             body.tools = body.tools.filter((t: any) => {
@@ -420,7 +416,7 @@ function wrapFetch(): void {
             }
 
             // Append pointer list to load_tool's description
-            const pointerList = buildPointerList()
+            const pointerList = buildPointerList(requestMcpTools)
             if (pointerList) {
               for (const t of body.tools) {
                 const fn = t?.function
@@ -454,7 +450,7 @@ function wrapFetch(): void {
     const contentType = response.headers.get("content-type") || ""
     if (!contentType.includes("text/event-stream") || !response.body) return response
 
-    const transformed = response.body.pipeThrough(createSSETransform(sessionID, loadToolName))
+    const transformed = response.body.pipeThrough(createSSETransform(sessionID, loadToolName, requestMcpTools))
     return new Response(transformed, {
       status: response.status,
       statusText: response.statusText,
@@ -482,7 +478,11 @@ function wrapFetch(): void {
  *   - Line 826: subsequent chunks APPEND to toolCalls[index].function.arguments
  *   - Line 833: when accumulated args become parseable JSON, emits tool-call
  */
-function createSSETransform(sessionID: string, loadToolName: string): TransformStream<Uint8Array, Uint8Array> {
+function createSSETransform(
+  sessionID: string,
+  loadToolName: string,
+  mcpTools: Map<string, McpTool>,
+): TransformStream<Uint8Array, Uint8Array> {
   const decoder = new TextDecoder()
   const encoder = new TextEncoder()
   let buffer = ""
@@ -551,7 +551,7 @@ function createSSETransform(sessionID: string, loadToolName: string): TransformS
 
     if (isLoadToolName(name)) {
       const requestedName = typeof callArgs?.name === "string" ? callArgs.name : ""
-      const resolvedName = resolveKnownTool(requestedName)?.name || requestedName
+      const resolvedName = resolveKnownTool(requestedName, mcpTools)?.name || requestedName
       if (resolvedName) getTurnLoaded().add(resolvedName)
       return toolCall(
         index,
@@ -563,7 +563,7 @@ function createSSETransform(sessionID: string, loadToolName: string): TransformS
       )
     }
 
-    const knownTool = resolveKnownTool(name)
+    const knownTool = resolveKnownTool(name, mcpTools)
     if (knownTool?.kind === "built-in") {
       if (getTurnLoaded().has(knownTool.name)) {
         return toolCall(
@@ -583,7 +583,7 @@ function createSSETransform(sessionID: string, loadToolName: string): TransformS
       index,
       id,
       mcpName || name,
-      mcpName ? normalizeToolArguments(argumentsJson, mcpSchemas.get(mcpName)) : argumentsJson,
+      mcpName ? normalizeToolArguments(argumentsJson, mcpTools.get(mcpName)?.schema) : argumentsJson,
     )
   }
 
@@ -939,11 +939,13 @@ const LazyLoadPlugin: Plugin = async (_input, _options) => {
             .describe("Tool name to load instructions for"),
         },
         async execute(args, context) {
-          const full = originals.get(args.name) || mcpOriginals.get(args.name)
-          const schema = originalSchemas.get(args.name) || mcpSchemas.get(args.name)
+          const mcpTools = sessionMcpTools.get(context.sessionID) || new Map<string, McpTool>()
+          const mcp = mcpTools.get(args.name)
+          const full = originals.get(args.name) || mcp?.description
+          const schema = originalSchemas.get(args.name) || mcp?.schema
 
           if (!full) {
-            const allKnown = Array.from(new Set([...originals.keys(), ...mcpOriginals.keys()])).sort()
+            const allKnown = Array.from(new Set([...originals.keys(), ...mcpTools.keys()])).sort()
             return {
               title: `Unknown tool: ${args.name}`,
               output: `No instructions found for "${args.name}". Available tools: ${allKnown.join(", ")}`,

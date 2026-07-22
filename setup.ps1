@@ -5,9 +5,8 @@
 .DESCRIPTION
   Copies tracked configuration, agents, data, commands, plugins, and skills into
   the selected global config directory. Delegates approved component installs to
-  maintain.ps1, removes retired artifacts, configures optional machine integration,
-  and runs verification unless skipped. Existing private OpenCode and Supermemory
-  credential files are preserved.
+  maintain.ps1, configures optional machine integration, and runs verification
+  unless skipped. Existing private OpenCode credentials are preserved.
 
 .EXAMPLE
   pwsh ./setup.ps1
@@ -51,9 +50,6 @@ function Set-BackgroundAgentEnvironment {
 function Copy-UniqueSkills {
   $destination = Join-Path $ConfigDir "skills"
   New-Item -ItemType Directory -Path $destination -Force | Out-Null
-  foreach ($name in @($manifest.retired.skills)) {
-    Remove-Item -LiteralPath (Join-Path $destination $name) -Recurse -Force -ErrorAction SilentlyContinue
-  }
   $external = @(
     (Join-Path $HOME ".agents\skills"),
     (Join-Path $HOME ".claude\skills")
@@ -100,17 +96,6 @@ if (Test-Path -LiteralPath $legacyJson -PathType Leaf) {
 Copy-Tree "$RepoDir\agents" (Join-Path $ConfigDir "agents")
 Copy-Tree "$RepoDir\data" (Join-Path $ConfigDir "data")
 Copy-Tree "$RepoDir\commands" (Join-Path $ConfigDir "commands")
-
-$supermemory = Join-Path $ConfigDir "supermemory.jsonc"
-if (-not (Test-Path -LiteralPath $supermemory)) {
-  Copy-Item "$RepoDir\config\supermemory.jsonc.example" $supermemory
-}
-
-foreach ($legacy in @("lazy-load.ts", "tokens-source.ts", "mem0-selfhost-patch.ts")) {
-  Remove-Item (Join-Path $ConfigDir "plugins\$legacy") -Force -ErrorAction SilentlyContinue
-}
-Remove-Item (Join-Path $ConfigDir "mem0-selfhost-patch.ts") -Force -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $ConfigDir "verify-patch.ts") -Force -ErrorAction SilentlyContinue
 
 $excluded = @()
 if ($SkipRtk) { $excluded += "rtk" }

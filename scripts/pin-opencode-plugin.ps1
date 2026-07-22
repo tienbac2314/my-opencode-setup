@@ -74,6 +74,7 @@ for ($index = 0; $index -lt $content.Length;) {
 }
 
 $target = $null
+$matches = [Collections.Generic.List[object]]::new()
 $arrayEnd = $null
 $arrayHasEntries = $false
 $containerDepth = 0
@@ -95,20 +96,30 @@ for ($index = 0; $index + 2 -lt $tokens.Count; $index++) {
   $depth = 0
   for ($cursor = $index + 2; $cursor -lt $tokens.Count; $cursor++) {
     $token = $tokens[$cursor]
-    if ($token.Kind -eq 'Symbol' -and $token.Text -in '[', '{') { $depth++ }
+    if ($token.Kind -eq 'Symbol' -and $token.Text -in '[', '{') {
+      if ($depth -eq 1 -and $token.Text -eq '[') { $arrayHasEntries = $true }
+      $depth++
+    }
     elseif ($token.Kind -eq 'Symbol' -and $token.Text -in ']', '}') {
       $depth--
       if ($depth -eq 0) { $arrayEnd = $token; break }
     }
-    elseif ($depth -eq 1 -and $token.Kind -eq 'String' -and
+    elseif ($token.Kind -eq 'String' -and
+      ($depth -eq 1 -or ($depth -eq 2 -and $tokens[$cursor - 1].Text -eq '[')) -and
       ($token.Text -eq $Name -or $token.Text.StartsWith("$Name@"))) {
-      $target = $token
+      $matches.Add([pscustomobject]@{ Token = $token; IsTuple = ($depth -eq 2) })
       $arrayHasEntries = $true
     } elseif ($depth -eq 1 -and $token.Kind -eq 'String') {
       $arrayHasEntries = $true
     }
   }
   break
+}
+
+if ($matches.Count -gt 0) {
+  $selected = $matches | Where-Object IsTuple | Select-Object -First 1
+  if (-not $selected) { $selected = $matches[0] }
+  $target = $selected.Token
 }
 
 $updated = $content
@@ -126,7 +137,23 @@ if ($null -ne $target) {
     $updated = $content.Substring(0, $start) + $content.Substring($end)
   } else {
     $replacement = '"' + $Name + '@' + $Version + '"'
-    $updated = $content.Substring(0, $target.Start) + $replacement + $content.Substring($target.End)
+    $edits = @([pscustomobject]@{ Start = $target.Start; End = $target.End; Text = $replacement })
+    foreach ($match in $matches) {
+      if ($match.Token.Start -eq $target.Start) { continue }
+      $start = $match.Token.Start
+      $end = $match.Token.End
+      while ($end -lt $content.Length -and [char]::IsWhiteSpace($content[$end])) { $end++ }
+      if ($end -lt $content.Length -and $content[$end] -eq ',') {
+        $end++
+      } else {
+        while ($start -gt 0 -and [char]::IsWhiteSpace($content[$start - 1])) { $start-- }
+        if ($start -gt 0 -and $content[$start - 1] -eq ',') { $start-- }
+      }
+      $edits += [pscustomobject]@{ Start = $start; End = $end; Text = '' }
+    }
+    foreach ($edit in $edits | Sort-Object Start -Descending) {
+      $updated = $updated.Substring(0, $edit.Start) + $edit.Text + $updated.Substring($edit.End)
+    }
   }
 } elseif ($Add -and $null -ne $arrayEnd) {
   $entry = '"' + $Name + '@' + $Version + '"'

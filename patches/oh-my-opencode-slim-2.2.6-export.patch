@@ -1,0 +1,8 @@
+diff --git a/dist/index.js b/dist/index.js
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -40371,4 +40371,3 @@ var src_default = OhMyOpenCodeLite;
+ export {
+-  minimumExpectedToolCount,
+   src_default as default
+ };
