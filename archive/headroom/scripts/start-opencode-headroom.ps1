@@ -12,7 +12,7 @@
   pwsh ./scripts/start-opencode-headroom.ps1 models 9router
 
 .EXAMPLE
-  pwsh ./scripts/start-opencode-headroom.ps1 run --model 9router/oc/deepseek-v4-flash-free "Return HEADROOM_OK"
+  pwsh ./scripts/start-opencode-headroom.ps1 run --model 9router/ag/gemini-3.7-flash-medium "Return HEADROOM_OK"
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(

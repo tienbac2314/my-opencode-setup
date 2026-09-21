@@ -4,13 +4,8 @@ import { join } from "node:path"
 import { ModelDiscovery } from "../plugins/models-discovery.js"
 
 const originalFetch = globalThis.fetch
-const transportState = Symbol.for("headroom.opencode.transport")
-const originalTransportState = (globalThis as any)[transportState]
-
 afterEach(() => {
   globalThis.fetch = originalFetch
-  if (originalTransportState === undefined) delete (globalThis as any)[transportState]
-  else (globalThis as any)[transportState] = originalTransportState
 })
 
 describe("9router model discovery fallback", () => {
@@ -49,14 +44,19 @@ describe("9router model discovery fallback", () => {
     expect(config.disabled_tools).toEqual([])
   })
 
-  test("uses native OpenCode model for OMO runtime roles", () => {
-    const preset = JSON.parse(
+  test("maps OMO 9router roles to Gemini 3.8 effort models", () => {
+    const config = JSON.parse(
       readFileSync(join(import.meta.dir, "..", "config", "oh-my-opencode-slim.json"), "utf8"),
-    ).presets["9router"]
+    )
+    const preset = config.presets["9router"]
 
-    for (const role of Object.values(preset) as any[]) {
-      expect(role.model).toBe("opencode/deepseek-v4-flash-free")
-    }
+    expect(preset.orchestrator.model).toBe("9router/ag/gemini-3.8-flash-medium")
+    expect(preset.oracle.model).toBe("9router/ag/gemini-3.8-flash-high")
+    expect(preset.librarian.model).toBe("9router/ag/gemini-3.8-flash-low")
+    expect(preset.explorer.model).toBe("9router/ag/gemini-3.8-flash-low")
+    expect(preset.designer.model).toBe("9router/ag/gemini-3.8-flash-medium")
+    expect(preset.fixer.model).toBe("9router/ag/gemini-3.8-flash-medium")
+    expect(config.presets["opencode-go"].librarian.model).toBe("opencode-go/deepseek-v4-flash")
   })
 
   test("keeps configured agent models valid when discovery fails", async () => {
@@ -84,17 +84,13 @@ describe("9router model discovery fallback", () => {
 
     expect(config.provider["9router"].models["ag/gemini-3.5-flash-low"]).toBeUndefined()
     expect(config.provider["9router"].models["ag/claude-opus-4-6-thinking"]).toBeDefined()
+    expect(config.provider["9router"].models["oc/deepseek-v4-flash-free"]).toBeUndefined()
   })
 
-  test("bypasses Headroom transport for model inventory", async () => {
-    globalThis.fetch = async () => {
-      throw new Error("transport should not receive model discovery")
-    }
-    ;(globalThis as any)[transportState] = {
-      originalFetch: async () => Response.json({
-        data: [{ id: "ag/live-model", capabilities: { vision: false } }],
-      }),
-    }
+  test("uses direct provider fetch for model inventory", async () => {
+    globalThis.fetch = async () => Response.json({
+      data: [{ id: "ag/direct-model", capabilities: { vision: false } }],
+    })
 
     const config: any = {
       provider: {
@@ -114,7 +110,7 @@ describe("9router model discovery fallback", () => {
 
     await hooks.config(config)
 
-    expect(config.provider["9router"].models["ag/live-model"]).toBeDefined()
+    expect(config.provider["9router"].models["ag/direct-model"]).toBeDefined()
   })
 
   test("maps every OpenCode-supported capability from a full 9router model", async () => {

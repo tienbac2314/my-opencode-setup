@@ -9,7 +9,6 @@ Purpose: record only differences this repository must preserve. Versions and sou
 | Token source | `0-` filename prefix and `export const` TokensSourcePlugin | Must load before lazy loader for correct fetch wrapping order; named export for repeated-init test | `/tokens`, repeated-init test | Upstream preserves sort-order contract or provides equivalent init-order guarantee |
 | RTK | Child-process fallback | Desktop may omit injected shell | bootstrap RTK tests, live rewrite | Upstream generated hook supports Desktop input without injected shell |
 | Models discovery | Custom local plugin | 9router inventory, response-shape normalization, OpenCode capability mapping, manual override precedence, and fallback models | `tests/models-discovery.test.ts` | Replaced by supported provider discovery with equivalent metadata coverage |
-| Headroom bridge and transport | Auto-discovered `plugins/headroom.ts`, hidden login proxy task, pinned source transport | `headroom-ai` 0.31.0 does not ship transparent transport for custom providers; official wrapper injects synthetic providers/models and persistent MCP entries | bridge fail-open tests, Desktop/CLI provider-model parity, service health, custom-provider live proof | Upstream ships a provider-neutral Desktop/CLI integration without config mutation |
 | Deep Research | OpenCode metadata and strategy files outside agent discovery | Prevent strategy modules becoming fake `@` agents | research workflow and autocomplete check | Upstream supports OpenCode layout |
 
 ## Update rule

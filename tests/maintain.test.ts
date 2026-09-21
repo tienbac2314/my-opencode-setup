@@ -17,7 +17,6 @@ const activeDocs = [
   "docs/README.md",
   "docs/guides/setup.md",
   "docs/guides/troubleshooting.md",
-  "docs/integrations/headroom.md",
   "docs/reference/agents.md",
   "docs/reference/patches.md",
   "docs/reference/upstream.md",
@@ -60,7 +59,7 @@ function fixture() {
 test("component manifest is unique and complete", () => {
   const components = repositoryManifest.components as Array<Record<string, unknown>>
   expect(new Set(components.map((item) => item.id)).size).toBe(components.length)
-  expect(repositoryManifest.expectedServerPlugins).toBe(6)
+  expect(repositoryManifest.expectedServerPlugins).toBe(5)
   expect(repositoryManifest.components.find((item: any) => item.id === "opencode")?.target).toBe("1.18.1")
   expect(repositoryManifest.components.find((item: any) => item.id === "opencode-plugin")?.target).toBe("1.18.1")
   const omo = repositoryManifest.components.find((item: any) => item.id === "omo-slim")
@@ -111,8 +110,9 @@ test("active instructions match current manifest and retained operations", () =>
   expect(agents).not.toContain("notifier checks npm packages")
   expect(setup).toContain("scripts/set-credentials.ps1")
   expect(setup).toContain("router_api_key")
-  expect(setup).toContain("Microsoft.VisualStudio.Workload.VCTools")
-  expect(setup).toContain('headroom-ai[all]==0.31.0')
+  expect(setup).toContain("pwsh ./setup.ps1")
+  expect(setup).not.toMatch(/headroom/i)
+  expect(maintainer).not.toMatch(/headroom/i)
   expect(setup).toContain("does not replace another `rtk.exe`")
   expect(setup).toContain("Latest versions are reported, never auto-approved")
   expect(decisions).toContain("Record conclusions and evidence, not internal deliberation")
@@ -120,7 +120,7 @@ test("active instructions match current manifest and retained operations", () =>
 })
 
 test("operator scripts expose comment-based help", () => {
-  for (const file of ["setup.ps1", "maintain.ps1", "scripts/update-opencode.ps1", "scripts/install-headroom-plugin.ps1"]) {
+  for (const file of ["setup.ps1", "maintain.ps1", "scripts/update-opencode.ps1"]) {
     const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8")
     expect(source).toContain(".SYNOPSIS")
     expect(source).toContain(".DESCRIPTION")
@@ -335,43 +335,12 @@ test("OMO installer honors custom OpenCode config directory", () => {
   }
 })
 
-test("Headroom installer reads commit from component manifest", () => {
-  const source = readFileSync(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url), "utf8")
-  expect(source).toContain("components.json")
-  expect(source).toContain("headroom-source")
-  expect(source).not.toContain("versions.env")
-})
-
-test("Headroom uses auto-loaded bridge and independent proxy", () => {
-  const setup = readFileSync(new URL("../docs/guides/setup.md", import.meta.url), "utf8")
-  const patches = readFileSync(new URL("../docs/reference/patches.md", import.meta.url), "utf8")
-  const headroomDocs = readFileSync(new URL("../docs/integrations/headroom.md", import.meta.url), "utf8")
-  const bridge = readFileSync(new URL("../plugins/headroom.ts", import.meta.url), "utf8")
-  const manager = readFileSync(new URL("../scripts/manage-headroom-proxy.ps1", import.meta.url), "utf8")
-  const runner = readFileSync(new URL("../scripts/run-headroom-proxy.ps1", import.meta.url), "utf8")
-  const maintain = readFileSync(new URL("../maintain.ps1", import.meta.url), "utf8")
-  const source = repositoryManifest.components.find((item: any) => item.id === "headroom-source")
-
-  expect(existsSync(new URL("../plugins/headroom.ts", import.meta.url))).toBe(true)
-  expect(existsSync(new URL("../scripts/manage-headroom-proxy.ps1", import.meta.url))).toBe(true)
-  expect(existsSync(new URL("../scripts/run-headroom-proxy.ps1", import.meta.url))).toBe(true)
-  expect(existsSync(new URL("../scripts/remove-headroom-opencode-pollution.ps1", import.meta.url))).toBe(true)
-  expect(existsSync(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))).toBe(true)
-  expect(setup).toContain("scripts/manage-headroom-proxy.ps1 install")
-  expect(setup).toContain("scripts/remove-headroom-opencode-pollution.ps1")
-  expect(bridge).toContain("waitForHealthyHeadroomProxy")
-  expect(bridge).toContain("headroom-proxy.url")
-  expect(manager).toContain("New-ScheduledTaskTrigger -AtLogOn")
-  expect(manager).toContain("-WindowStyle Hidden")
-  expect(runner).toContain("--no-memory-tools")
-  expect(runner).toContain("LITELLM_SUPPRESS_DEBUG_INFO")
-  expect(runner).toContain("--no-learn")
-  expect(maintain).toContain("Headroom proxy task convergence failed")
-  expect(setup).not.toContain("headroom wrap opencode --no-context-tool --")
-  expect(patches).toContain("Auto-discovered `plugins/headroom.ts`")
-  expect(headroomDocs).toContain("Bare `headroom proxy`")
-  expect(headroomDocs).toContain("transport-only service")
-  expect(source.removeWhen).toContain("without provider, model, or MCP mutation")
+test("Headroom stays in the reference archive only", () => {
+  const archive = readFileSync(new URL("../archive/headroom/README.md", import.meta.url), "utf8")
+  expect(archive).toContain("reference-only")
+  expect(existsSync(new URL("../docs/integrations/headroom.md", import.meta.url))).toBe(false)
+  expect(existsSync(new URL("../plugins/headroom.ts", import.meta.url))).toBe(false)
+  expect(existsSync(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))).toBe(false)
 })
 
 test("lean setup excludes archived runtime families and retirement machinery", () => {
@@ -613,7 +582,9 @@ test("verification checks exact active TUI plugin pins", () => {
       "-Manifest", manifest, "-ConfigDir", configDir, "-CacheDir", cacheDir,
     ], { env: { ...process.env, Path: `${bin};${process.env.Path}` } })
     expect(result.exitCode).not.toBe(0)
-    expect(result.stderr.toString()).toContain("active tui.json is missing exact plugin pin: oh-my-opencode-slim@2.2.1")
+    const stderr = result.stderr.toString()
+    expect(stderr).toContain("active tui.json is missing exact plugin pin:")
+    expect(stderr).toContain("oh-my-opencode-slim@2.2.1")
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -672,16 +643,6 @@ test("setup converges isolated config without machine integration", () => {
   try {
     mkdirSync(bin)
     mkdirSync(configDir)
-    writeFileSync(join(configDir, "opencode.json"), JSON.stringify({
-      $schema: "https://opencode.ai/config.json",
-      provider: {
-        headroom: { name: "Headroom Proxy", options: { baseURL: "http://127.0.0.1:8787/v1" } },
-      },
-      mcp: {
-        headroom: { command: ["headroom.exe", "mcp", "serve"] },
-        serena: { command: ["uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "agent", "--open-web-dashboard", "False"] },
-      },
-    }))
     writeFileSync(join(configDir, "package.json"), JSON.stringify({ dependencies: {} }))
     writeFileSync(join(bin, "npm.cmd"), `@echo npm %*>>"${log}"\r\n@exit /b 0\r\n`)
     writeFileSync(join(bin, "bunx.cmd"), `@echo bunx %*>>"${log}"\r\n@exit /b 0\r\n`)

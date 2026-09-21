@@ -10,7 +10,7 @@
   "presets": {
     "9router": {
       "orchestrator": {
-        "model": "opencode/deepseek-v4-flash-free",
+        "model": "9router/ag/gemini-3.8-flash-medium",
         "skills": [
           "*"
         ],
@@ -20,14 +20,14 @@
         ]
       },
       "oracle": {
-        "model": "opencode/deepseek-v4-flash-free",
+        "model": "9router/ag/gemini-3.8-flash-high",
         "skills": [
           "simplify"
         ],
         "mcps": []
       },
       "librarian": {
-        "model": "opencode/deepseek-v4-flash-free",
+        "model": "9router/ag/gemini-3.8-flash-low",
         "skills": [],
         "mcps": [
           "websearch",
@@ -36,17 +36,17 @@
         ]
       },
       "explorer": {
-        "model": "opencode/deepseek-v4-flash-free",
+        "model": "9router/ag/gemini-3.8-flash-low",
         "skills": [],
         "mcps": []
       },
       "designer": {
-        "model": "opencode/deepseek-v4-flash-free",
+        "model": "9router/ag/gemini-3.8-flash-medium",
         "skills": [],
         "mcps": []
       },
       "fixer": {
-        "model": "opencode/deepseek-v4-flash-free",
+        "model": "9router/ag/gemini-3.8-flash-medium",
         "skills": [],
         "mcps": []
       }

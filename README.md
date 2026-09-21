@@ -45,7 +45,6 @@ Purpose: show what this setup loads and where each part comes from.
 | RTK | [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk) plus local OpenCode hook | Shorter shell output and Windows-safe command rewriting |
 | Deep Research | [`Weizhena/Deep-Research-skills`](https://github.com/Weizhena/Deep-Research-skills) | Research workflow without exposing strategy files as agents |
 | Superpowers skills | [`obra/superpowers`](https://github.com/obra/superpowers) | Bundled planning, debugging, testing, review, and execution workflows |
-| Headroom | [`headroomlabs-ai/headroom`](https://github.com/headroomlabs-ai/headroom) plus local bridge | Optional persistent proxy plus auto-discovered Desktop/CLI transport bridge |
 
 Exact versions and source commits for managed components live only in `config/components.json`. Superpowers is vendored skill content, not a manifest-installed runtime component. Current Codex Security and VibeShell skill files do not retain a verifiable upstream URL, so this catalog does not guess one.
 
@@ -65,11 +64,9 @@ pwsh ./maintain.ps1 verify
 
 - Project `.opencode/opencode.json` does not define `plugin`; global plugin origins remain authoritative.
 - OMO Slim uses direct image routing so vision-capable models receive original attachments; Observer remains available only when explicitly delegated.
-- Headroom is opt-in. Its hidden login task and auto-discovered bridge serve Desktop and TUI without taking ownership of providers, models, MCP, RTK, or memory. See [Headroom integration](docs/integrations/headroom.md).
 - Use CodeGraph only when the project has `.codegraph/codegraph.db`; normal search remains available elsewhere.
 - Update checks come from `maintain.ps1`; no runtime notifier plugin is needed.
 - MCP ownership stays in explicit OpenCode/OMO configuration.
-- Headroom memory and learning remain disabled; this setup has no persistent-memory plugin.
 - RTK is installed under `~/.local/bin`; executable replacement and removal of stale copies elsewhere on `PATH` remain user-managed.
 - `npm ls --depth=0` and `opencode debug config` are authoritative. `bun pm ls` can show stale lock metadata after npm installs.
 

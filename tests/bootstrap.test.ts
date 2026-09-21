@@ -12,11 +12,7 @@ const setCredentialsScript = fileURLToPath(new URL("../scripts/set-credentials.p
 const exportCredentialsScript = fileURLToPath(new URL("../scripts/export-credentials.ps1", import.meta.url))
 const setCredentialsSource = readFileSync(setCredentialsScript, "utf8")
 const exportCredentialsSource = readFileSync(exportCredentialsScript, "utf8")
-const installHeadroomScript = fileURLToPath(new URL("../scripts/install-headroom-plugin.ps1", import.meta.url))
-const launchHeadroomScript = fileURLToPath(new URL("../scripts/start-opencode-headroom.ps1", import.meta.url))
-const manageHeadroomScript = fileURLToPath(new URL("../scripts/manage-headroom-proxy.ps1", import.meta.url))
-const runHeadroomScript = fileURLToPath(new URL("../scripts/run-headroom-proxy.ps1", import.meta.url))
-const cleanupHeadroomScript = fileURLToPath(new URL("../scripts/remove-headroom-opencode-pollution.ps1", import.meta.url))
+const webSearchAgent = readFileSync(new URL("../agents/web-search.md", import.meta.url), "utf8")
 const projectConfig = JSON.parse(readFileSync(new URL("../.opencode/opencode.json", import.meta.url), "utf8"))
 const globalConfig = JSON.parse(readFileSync(new URL("../config/opencode.jsonc.example", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""))
 
@@ -24,15 +20,27 @@ test("project config does not override global plugins", () => {
   expect(projectConfig).not.toHaveProperty("plugin")
 })
 
-test("Headroom stays out of tracked global config", () => {
+test("Headroom is absent from active setup", () => {
   expect(globalConfig.provider?.headroom).toBeUndefined()
   expect(globalConfig.plugin ?? []).not.toContain("headroom-opencode")
   expect(globalConfig.mcp?.headroom).toBeUndefined()
+  expect(setupScript).not.toMatch(/headroom/i)
+  expect(maintainerScript).not.toMatch(/headroom/i)
 })
 
 test("archived plugin families are absent from active config", () => {
   const text = JSON.stringify(globalConfig)
   expect(text).not.toMatch(/supermemory|mem0|goal-plugin/i)
+})
+
+test("global agents use Gemini 3.8 effort defaults", () => {
+  expect(globalConfig.model).toBe("9router/ag/gemini-3.8-flash-medium")
+  expect(globalConfig.agent.build.model).toBe("9router/ag/gemini-3.8-flash-medium")
+  expect(globalConfig.agent.general.model).toBe("9router/ag/gemini-3.8-flash-low")
+  expect(globalConfig.agent.explore.model).toBe("9router/ag/gemini-3.8-flash-low")
+  expect(globalConfig.agent.compaction.model).toBe("9router/ag/claude-opus-4-6-thinking")
+  expect(webSearchAgent).toContain("model: 9router/ag/gemini-3.8-flash-low")
+  expect(webSearchAgent).not.toContain("deepseek-v4-flash-free")
 })
 
 test("setup delegates approved installs to the manifest maintainer", () => {
@@ -49,120 +57,10 @@ test("token command is tracked locally", () => {
   expect(tokens).toContain("/tokens")
 })
 
-test("Headroom native plugin installer is tracked", () => {
-  expect(existsSync(installHeadroomScript)).toBe(true)
-  expect(existsSync(launchHeadroomScript)).toBe(true)
-  expect(existsSync(manageHeadroomScript)).toBe(true)
-  expect(existsSync(runHeadroomScript)).toBe(true)
-})
-
-test("Headroom service and fallback launcher preserve provider ownership", () => {
-  const source = readFileSync(launchHeadroomScript, "utf8")
-  const manager = readFileSync(manageHeadroomScript, "utf8")
-  const runner = readFileSync(runHeadroomScript, "utf8")
-  expect(source).toContain('headroom -CommandType Application,ExternalScript')
-  expect(source).toContain('$startInfo.ArgumentList.Add("proxy")')
-  expect(source).toContain("PositionalBinding = $false")
-  expect(source).toContain("Position = 0, ValueFromRemainingArguments")
-  expect(source).toContain("HEADROOM_PROXY_URL")
-  expect(manager).toContain("New-ScheduledTaskTrigger -AtLogOn")
-  expect(manager).toContain("New-ScheduledTaskPrincipal")
-  expect(manager).toContain("headroom-proxy.url")
-  expect(manager).toContain("-Hidden")
-  expect(manager).toContain("Headroom version drift")
-  expect(manager).toContain("restartOwnedTask")
-  expect(manager).toContain("-WindowStyle Hidden")
-  expect(manager).toContain("run-headroom-proxy.ps1")
-  expect(runner).toContain("LITELLM_SUPPRESS_DEBUG_INFO")
-  expect(runner).toContain("--no-memory-tools")
-  expect(runner).toContain("--no-memory-context")
-  expect(runner).toContain("proxy.log")
-  expect(runner).toContain("Write-BoundedLogLine")
-  expect(runner).toContain("ForEach-Object")
-  expect(source).toContain('$startInfo.ArgumentList.Add("--no-memory-tools")')
-  expect(source).toContain('$startInfo.ArgumentList.Add("--no-memory-context")')
-  expect(source).toContain('$startInfo.ArgumentList.Add("--no-learn")')
-  expect(source).toContain('$startInfo.ArgumentList.Add("--no-telemetry")')
-  expect(source).not.toContain("wrap opencode")
-  expect(source).not.toContain("provider =")
-  expect(source).not.toContain("mcp =")
-  expect(manager).not.toContain('"provider"')
-  expect(manager).not.toContain('"mcp"')
-})
-
-test("Headroom cleanup preserves unrelated JSONC configuration", () => {
-  const directory = mkdtempSync(join(tmpdir(), "opencode-headroom-cleanup-"))
-  const configPath = join(directory, "opencode.jsonc")
-  const original = `{
-  // keep this comment
-  "provider": {
-    "9router": { "options": { "apiKey": "keep-secret" } },
-    "headroom": { "name": "Headroom Proxy", "options": { "baseURL": "http://127.0.0.1:8787/v1" } }
-  },
-  "mcp": {
-    "codegraph": { "command": ["codegraph", "serve", "--mcp"] },
-    "headroom": { "command": ["headroom.exe", "mcp", "serve"] },
-    "serena": { "command": ["uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "agent", "--open-web-dashboard", "False"] }
-  }
-}`
-  try {
-    writeFileSync(configPath, original)
-    const result = Bun.spawnSync(["pwsh", "-NoProfile", "-File", cleanupHeadroomScript, "-ConfigFile", configPath])
-    expect(result.exitCode).toBe(0)
-    const updated = readFileSync(configPath, "utf8")
-    expect(updated).toContain("// keep this comment")
-    expect(updated).toContain("keep-secret")
-    expect(updated).toContain("codegraph")
-    expect(updated).not.toContain('"headroom"')
-    expect(updated).not.toContain('"serena"')
-  } finally {
-    rmSync(directory, { recursive: true, force: true })
-  }
-})
-
-test("Headroom cleanup defaults to dual config and deletes empty leftover JSON", () => {
-  const directory = mkdtempSync(join(tmpdir(), "opencode-headroom-dual-"))
-  const home = join(directory, "home")
-  const configDir = join(home, ".config", "opencode")
-  const jsoncPath = join(configDir, "opencode.jsonc")
-  const jsonPath = join(configDir, "opencode.json")
-  try {
-    mkdirSync(configDir, { recursive: true })
-    writeFileSync(jsoncPath, `{
-  // keep this comment
-  "provider": {
-    "9router": { "options": { "apiKey": "keep-secret" } },
-    "headroom": { "name": "Headroom Proxy", "options": { "baseURL": "http://127.0.0.1:8787/v1" } }
-  },
-  "mcp": {
-    "codegraph": { "command": ["codegraph", "serve", "--mcp"] },
-    "headroom": { "command": ["headroom.exe", "mcp", "serve"] }
-  }
-}`)
-    writeFileSync(jsonPath, JSON.stringify({
-      $schema: "https://opencode.ai/config.json",
-      provider: {
-        headroom: { name: "Headroom Proxy", options: { baseURL: "http://127.0.0.1:8787/v1" } },
-      },
-      mcp: {
-        headroom: { command: ["headroom.exe", "mcp", "serve"] },
-        serena: { command: ["uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "agent", "--open-web-dashboard", "False"] },
-      },
-    }))
-    const result = Bun.spawnSync(["pwsh", "-NoProfile", "-File", cleanupHeadroomScript], {
-      env: { ...process.env, HOME: home, USERPROFILE: home },
-    })
-    expect(result.exitCode).toBe(0)
-    const updated = readFileSync(jsoncPath, "utf8")
-    expect(updated).toContain("// keep this comment")
-    expect(updated).toContain("keep-secret")
-    expect(updated).toContain("codegraph")
-    expect(updated).not.toContain('"headroom"')
-    expect(updated).not.toContain('"serena"')
-    expect(existsSync(jsonPath)).toBe(false)
-  } finally {
-    rmSync(directory, { recursive: true, force: true })
-  }
+test("Headroom runtime files remain available only in archive", () => {
+  expect(existsSync(new URL("../archive/headroom/README.md", import.meta.url))).toBe(true)
+  expect(existsSync(new URL("../plugins/headroom.ts", import.meta.url))).toBe(false)
+  expect(existsSync(new URL("../scripts/manage-headroom-proxy.ps1", import.meta.url))).toBe(false)
 })
 
 test("runtime update notifier is absent", () => {

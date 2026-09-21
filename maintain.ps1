@@ -248,7 +248,7 @@ function Install-Rtk($Item) {
 
 function Apply-Components($ManifestValue) {
   $selected = Select-Components $ManifestValue
-  $installKinds = @("npm-global", "npm-local", "omo", "pypi", "github-release", "github-commit")
+  $installKinds = @("npm-global", "npm-local", "omo", "pypi", "github-release")
   $pending = @($selected | Where-Object { $_.kind -in $installKinds -and -not (Test-TargetCurrent $_) })
   foreach ($item in $selected | Where-Object { $_.kind -in $installKinds -and $_.id -notin $pending.id }) {
     Write-Output "CURRENT $($item.id): $($item.target) already installed."
@@ -269,13 +269,6 @@ function Apply-Components($ManifestValue) {
         }
       }
       "github-release" { Install-Rtk $item }
-      "github-commit" {
-        if ($item.id -eq "headroom-source") {
-          if ($PSCmdlet.ShouldProcess($item.repository, "build commit $($item.target)")) {
-            & "$RepoDir\scripts\install-headroom-plugin.ps1" -Commit $item.target
-          }
-        }
-      }
       { $_ -in "github-file", "github-copy" } {
         Write-Output "REVIEW $($item.id): local changes are never overwritten automatically. Reconcile upstream, then update manifest target."
       }
@@ -321,11 +314,6 @@ function Apply-Components($ManifestValue) {
     $activeCommands = Join-Path $ConfigDir "commands"
     New-Item -ItemType Directory -Path $activeCommands -Force | Out-Null
     Copy-Item "$RepoDir\commands\*" $activeCommands -Force
-  }
-  $headroomUpdated = @($pending | Where-Object id -in "headroom-python", "headroom-source")
-  if ($IsWindows -and $headroomUpdated -and (Get-ScheduledTask -TaskName "OpenCode Headroom Proxy" -ErrorAction SilentlyContinue)) {
-    & "$RepoDir\scripts\manage-headroom-proxy.ps1" install -Manifest $Manifest
-    if ($LASTEXITCODE -ne 0) { throw "Headroom proxy task convergence failed" }
   }
   & "$RepoDir\scripts\apply-package-patches.ps1" -ConfigDir $ConfigDir -CacheDir $CacheDir -Manifest $Manifest
   Sync-ConfigPins $ManifestValue

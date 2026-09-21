@@ -7,10 +7,6 @@ Current behavior is documented by purpose. Start with the smallest guide that an
 - [Setup and recovery](guides/setup.md): install, credentials, updates, verification, and platform notes.
 - [Troubleshooting](guides/troubleshooting.md): symptom-first diagnosis and safe recovery.
 
-## Integrations
-
-- [Headroom](integrations/headroom.md): Desktop/TUI transport, proxy service, RTK boundary, memory policy, logs, and validation.
-
 ## Reference
 
 - [Agents](reference/agents.md): primary agents, subagents, OMO roles, and discovery paths.

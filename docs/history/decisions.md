@@ -16,6 +16,48 @@ For any non-trivial architecture, integration, migration, or rejected approach, 
 
 Record conclusions and evidence, not internal deliberation. Never include credentials, full resolved config, personal data, private prompts, or unredacted logs. When a decision changes, mark the old entry superseded and link the replacement; do not silently erase history.
 
+## 2026-09-21: Archive Headroom and use direct provider calls
+
+Status: active.
+
+Problem: Headroom added no useful behavior for this setup and could rewrite
+OpenCode Zen requests, causing the free-tier policy error mid-session.
+
+Alternatives: keep Headroom with CCR disabled, pin an unmerged upstream fix, or
+remove the proxy. Keeping a proxy adds another failure boundary without a user
+benefit; an unmerged pin adds maintenance risk.
+
+Decision: remove Headroom from active setup and call configured providers
+directly. Preserve its bridge, scripts, tests, and integration notes under
+`archive/headroom/` for read-only reference. RTK remains the only shell hook.
+
+Implementation: remove Headroom manifest entries and setup/maintenance wiring,
+make model discovery use direct `fetch`, remove the active integration docs, and
+clean the Windows task/marker and optional Python tool.
+
+Evidence: direct 9router inventory exposes verified Gemini 3.8 Flash IDs; the
+Headroom task was active before removal; focused tests cover archive-only state
+and direct model discovery.
+
+Supersede only if Headroom proves a provider-neutral path that adds a required
+capability without changing OpenCode request semantics.
+
+## 2026-08-26: Gemini 3.7 Flash effort defaults
+
+Status: superseded by the 2026-09-21 Gemini 3.8 default decision.
+
+Problem: `opencode/deepseek-v4-flash-free` disappeared, leaving global OpenCode agents and the active OMO 9router preset with invalid defaults. Model discovery also injected the removed `oc/deepseek-v4-flash-free` fallback.
+
+Alternatives: use one Gemini effort for every role, map effort by role workload, or change every provider preset. One effort wastes capacity or weakens hard roles; changing dormant provider presets mixes unrelated provider ownership.
+
+Decision: use `9router/ag/gemini-3.7-flash-medium` for global/build, orchestrator, designer, and fixer; high for oracle; low for general, explore, librarian, and OMO explorer. Keep Claude compaction and dormant `opencode-go` preset unchanged. Remove the gone DeepSeek discovery fallback.
+
+Implementation: global config template, OMO Slim config, model-discovery fallback, focused mapping tests, and deployment to active global configuration.
+
+Evidence: focused regressions fail on old DeepSeek values and pass only with exact low/medium/high mapping. Runtime-only offline verification and active safe-field inspection confirm deployed models without exposing credentials.
+
+Superseded because verified 9router Gemini 3.8 Flash effort IDs replaced the 3.7 defaults.
+
 ## 2026-07-22: Lean setup archives memory, Goal, and CodeGraph helper layers
 
 Status: active.
@@ -124,7 +166,7 @@ Decision: map only fields supported by OpenCode's current custom-model schema: i
 
 Implementation: `plugins/models-discovery.js`, `tests/models-discovery.test.ts`, component verification text, troubleshooting, and patch reference.
 
-Evidence: official OpenCode model documentation and `packages/opencode/src/provider/models.ts` define the supported fields. Exact Gemini and Kimi fixtures cover all supplied attributes; tests also cover legacy thinking, unsupported metadata isolation, response shapes, manual precedence, fallback preservation, and Headroom bypass.
+Evidence: official OpenCode model documentation and `packages/opencode/src/provider/models.ts` define the supported fields. Exact Gemini and Kimi fixtures cover all supplied attributes; tests also cover legacy thinking, unsupported metadata isolation, response shapes, manual precedence, fallback preservation, and direct provider discovery.
 
 Supersede when OpenCode provides native custom-provider discovery with equivalent response normalization, capability mapping, override precedence, and safe unsupported-metadata handling.
 
@@ -190,7 +232,7 @@ Supersede only with a history format that preserves equivalent graph coverage, d
 
 ## 2026-07-16: Headroom service and OpenCode transport
 
-Status: active.
+Status: superseded by the 2026-09-21 archive decision.
 
 Problem: Headroom had to serve both Desktop and TUI while preserving dynamic 9router providers/models. Its official OpenCode wrapper introduced synthetic providers and persistent MCP state, and a direct scheduled console action remained visible.
 
@@ -211,7 +253,7 @@ Supersede when upstream ships provider-neutral Desktop/TUI transport and a no-mu
 
 ## 2026-07-16: RTK ownership with Headroom
 
-Status: active.
+Status: superseded by the 2026-09-21 archive decision; local RTK remains active.
 
 Problem: Headroom's banner says `Context Tool: rtk`, which can imply bare proxy performs shell rewriting.
 

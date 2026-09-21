@@ -34,13 +34,13 @@ Token source loads before lazy-load, wraps fetch once, and returns hooks on ever
 
 ## Models and providers
 
-`models-discovery.js` began as 9router inventory discovery. It gained bounded retries, fallback preservation, namespace filtering, capability repair, module-shape fixes, and Headroom transport bypass for inventory calls.
+`models-discovery.js` began as 9router inventory discovery. It gained bounded retries, fallback preservation, namespace filtering, capability repair, and module-shape fixes. The old Headroom bypass is archived; inventory now uses direct provider fetch.
 
 Current rules:
 
 - preserve configured OMO fallback models when discovery fails;
 - reject polluted `9router/opencode/*` aliases;
-- discover through original provider fetch, not Headroom chat transport;
+- discover through the configured provider fetch;
 - keep provider/model identity owned by OpenCode and 9router config.
 
 ## Agents, skills, and MCP ownership
@@ -88,7 +88,7 @@ OpenViking was evaluated as shared hierarchical context for OpenCode and Hermes.
 
 ### Current boundary
 
-Persistent-memory plugins were removed from the lean setup on 2026-07-22. Headroom memory/learning remains disabled so its proxy stays transport-only. OpenViking is not active.
+Persistent-memory plugins were removed from the lean setup on 2026-07-22. Headroom was archived on 2026-09-21 and no longer runs. OpenViking is not active.
 
 ## Headroom
 
@@ -97,7 +97,7 @@ Headroom passed through four designs:
 1. Persistent `headroom` provider: simple but required special model namespace and did not own proxy lifecycle.
 2. Isolated launcher: provider-neutral and config-safe, but CLI-only.
 3. Official wrapper: upstream lifecycle, but synthetic providers/models, Headroom/Serena MCP state, and Desktop mismatch.
-4. Shared hidden proxy plus auto-discovered bridge: current design; Desktop/TUI parity, fail-open, no config mutation.
+4. Shared hidden proxy plus auto-discovered bridge: archived after adding no required capability and changing OpenCode Zen request behavior.
 
 ## Goal
 

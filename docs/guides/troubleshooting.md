@@ -25,16 +25,6 @@ rtk --version
 
 If another directory wins PATH, update/remove that copy yourself or prepend `~/.local/bin`; repository scripts must not mutate System32.
 
-## Headroom install or build fails
-
-Windows `headroom-ai[all]` native dependencies require Visual Studio 2022 Build Tools, C++ workload, and Windows SDK. Install command lives in [setup](setup.md#6-headroom-desktop-and-cli-proxy-optional). Restart terminal, install pinned Python tool, then build pinned transport.
-
-Run `pwsh ./scripts/manage-headroom-proxy.ps1 status`. Expected: installed task and healthy `http://127.0.0.1:8787/livez`. The auto-discovered bridge makes four short health attempts and then fails open when the proxy is unavailable, so OpenCode still works but traffic bypasses Headroom. Re-run `install` after changing the pinned Headroom executable. Combined proxy output rolls between `proxy.log` and `proxy.log.previous` under `~/.local/state/opencode-headroom`; a visible Headroom terminal means the task still uses the obsolete direct executable action and should be reinstalled.
-
-`Context Tool: rtk` does not mean bare proxy rewrites OpenCode commands. `plugins/rtk.ts` owns OpenCode command rewriting; `headroom proxy` reads `rtk gain` for statistics. Headroom memory stays disabled so the proxy remains transport-only. See [Headroom integration](../integrations/headroom.md) for exact ownership boundaries.
-
-Do not use `headroom wrap opencode`: the pinned release injects synthetic providers/models and persistent Headroom/Serena MCP entries. Run `pwsh ./scripts/remove-headroom-opencode-pollution.ps1` once after migrating. Default cleanup scrubs both `opencode.jsonc` and leftover `opencode.json`; empty leftover JSON shells are deleted. Restart every OpenCode session after cleanup, including IntelliJ terminals that loaded the old dual config.
-
 ## CodeGraph is not initialized
 
 This is normal outside indexed projects. Use normal search, or run `codegraph init -i` when the project should be indexed. If an indexed project cannot call CodeGraph, confirm `.codegraph/codegraph.db` exists and `load_tool` lists `codegraph_codegraph_explore` for that agent. MCP names are request-scoped: subagents configured without CodeGraph must not see it.
@@ -79,7 +69,8 @@ OMO 2.2.6 also exports a test helper that OpenCode mistakes for another plugin e
 
 ## OpenCode free-tier quota appears unexpectedly
 
-If `Free usage exceeded` appears before a tool call, verify the selected model belongs to `9router`, not OpenCode Zen with a similar display name. Start a fresh session and select the explicit 9router entry before diagnosing plugins or Headroom.
+If `Free usage exceeded` appears before a tool call, verify the selected model belongs to `9router`, not OpenCode Zen with a similar display name. Start a fresh session and select the explicit 9router entry before diagnosing provider configuration.
+
 
 ## Native Windows opens a WSL installation prompt
 

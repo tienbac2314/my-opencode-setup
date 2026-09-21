@@ -54,5 +54,4 @@ No upstream PR target:
 
 - `plugins/models-discovery.js` unless published as standalone project;
 - `plugins/codegraph-helper.ts` unless proposed as new CodeGraph integration;
-- Headroom pinned source transport until the wheel ships its OpenCode transport;
 - manifest/maintainer/setup scripts.

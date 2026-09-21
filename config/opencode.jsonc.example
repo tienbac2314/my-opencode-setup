@@ -21,18 +21,18 @@
       "models": {}
     }
   },
-  "model": "opencode/deepseek-v4-flash-free",
+  "model": "9router/ag/gemini-3.8-flash-medium",
   "default_agent": "build",
   "agent": {
     "build": {
-      "model": "opencode/deepseek-v4-flash-free"
+      "model": "9router/ag/gemini-3.8-flash-medium"
     },
     "general": {
-      "model": "opencode/deepseek-v4-flash-free",
+      "model": "9router/ag/gemini-3.8-flash-low",
       "disable": true
     },
     "explore": {
-      "model": "opencode/deepseek-v4-flash-free",
+      "model": "9router/ag/gemini-3.8-flash-low",
       "disable": true
     },
     "compaction": {

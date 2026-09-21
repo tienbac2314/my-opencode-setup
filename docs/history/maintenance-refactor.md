@@ -71,11 +71,10 @@ OMO also copied skills already visible under `~/.agents` or `~/.claude`. Setup n
 
 ### Headroom
 
-Headroom remains optional. A hidden current-user login task owns the proxy independently of OpenCode. Auto-discovered `plugins/headroom.ts` activates the pinned transparent transport for Desktop and CLI only after the local health endpoint identifies a real Headroom proxy; otherwise it fails open to direct provider traffic.
-
-The `headroom-ai` 0.31.0 wheel does not ship the transparent OpenCode transport. Repository keeps a pinned source build so custom providers such as 9router are intercepted without changing provider identity or model inventory. Official `headroom wrap opencode` was rejected here because it injects synthetic `anthropic`, `openai`, and `headroom` providers and persists Headroom/Serena MCP entries; those mutations hid dynamically discovered 9router models in TUI and polluted App config.
-
-Desktop App and normal `opencode` launches use the same auto-discovered bridge and persistent proxy. No shell profile wrapper is required. App and TUI retain identical configured providers and model selection while both traverse Headroom when the service is healthy.
+Headroom was archived on 2026-09-21. The old hidden proxy task and
+auto-discovered bridge remain under `archive/headroom/` for reference only.
+Active App/TUI requests now go directly to configured providers because the
+proxy added no required capability and could change OpenCode Zen request shape.
 
 ### CodeGraph and RTK
 
@@ -101,7 +100,7 @@ RTK installs under `~/.local/bin` and resolves through `PATH`. Local wrapper onl
 - OMO Slim: Oracle, Librarian, Designer, and Fixer task lifecycles passed; Explorer is intentionally disabled.
 - Token source: saved `/tokens` report showed real API usage after a model turn.
 - Supermemory: add/search/profile/list/forget passed with disposable-marker cleanup.
-- Headroom: native and 9router markers passed, both upstreams were logged, config stayed unchanged, and port cleanup passed.
+- Headroom: historical proxy/task checks passed before the integration was archived; current setup has no Headroom runtime.
 - CodeGraph: indexed exploration and unindexed startup passed.
 - Deep Research skill loaded; strategy modules remain hidden from agent autocomplete.
 - App: local web UI returned HTTP 200 and rendered through headless Chrome without plugin/server errors.

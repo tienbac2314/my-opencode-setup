@@ -1,7 +1,7 @@
 {
   "$schema": "./components.schema.json",
   "schemaVersion": 1,
-  "expectedServerPlugins": 6,
+  "expectedServerPlugins": 5,
   "components": [
     {
       "id": "opencode",
@@ -65,37 +65,6 @@
       "verify": "rtk rewrite and Desktop-shaped plugin test"
     },
     {
-      "id": "headroom-python",
-      "name": "Headroom Python proxy",
-      "kind": "pypi",
-      "optional": true,
-      "package": "headroom-ai",
-      "target": "0.31.0",
-      "command": "headroom",
-      "repository": "https://github.com/headroomlabs-ai/headroom",
-      "verify": "headroom --version"
-    },
-    {
-      "id": "headroom-source",
-      "name": "Headroom OpenCode transport",
-      "kind": "github-commit",
-      "optional": true,
-      "target": "a0699794660132313446e8c52c588d6ead05af21",
-      "branch": "main",
-      "cache": "~/.cache/opencode-headroom/source",
-      "repository": "https://github.com/headroomlabs-ai/headroom",
-      "removeWhen": "Remove pinned source build when headroom-ai wheel ships transparent OpenCode transport and supports launch without provider, model, or MCP mutation.",
-      "verify": "9router and native OpenCode interception"
-    },
-    {
-      "id": "headroom-bridge",
-      "name": "Headroom Desktop and CLI bridge",
-      "kind": "local",
-      "target": "local",
-      "localFile": "plugins/headroom.ts",
-      "verify": "Desktop and CLI provider/model parity with fail-open proxy health check"
-    },
-    {
       "id": "lazy-load",
       "name": "Lazy loading fork",
       "kind": "github-file",
@@ -133,7 +102,7 @@
       "kind": "local",
       "target": "local",
       "localFile": "plugins/models-discovery.js",
-      "verify": "tests/models-discovery.test.ts: response shapes, capabilities, overrides, fallback, and Headroom bypass"
+      "verify": "tests/models-discovery.test.ts: response shapes, capabilities, overrides, and fallback"
     }
   ]
 }

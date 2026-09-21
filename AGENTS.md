@@ -17,13 +17,17 @@ Global behavior and runtime policy deploys from `config/AGENTS.md`. This file co
 * `docs/history/decisions.md`: architectural decisions, implementation evidence, and supersession conditions.
 * `docs/reference/upstream.md`: upstream ownership; repository policy stays local.
 
-Current boundaries: Headroom uses an optional independent proxy plus an auto-discovered fail-open bridge; local plugins are auto-discovered. Compare repository files with active `~/.config/opencode` before diagnosing drift. Never print full resolved config or credential values.
+Current boundaries: local plugins are auto-discovered and provider requests go directly to configured endpoints. Compare repository files with active `~/.config/opencode` before diagnosing drift. Never print full resolved config or credential values.
 
 Repository runtime rules:
 
 * `/tokens` reports token sources; model discovery builds 9router entries; update checks belong to `maintain.ps1`.
 * Local plugins auto-discover. Never list local file paths or set `"plugin": []`.
 * Use CodeGraph only when `.codegraph/codegraph.db` exists; use normal search when unavailable.
+
+## Commit policy
+
+Repository commit subjects and bodies use English. Keep conventional subjects under 50 characters and describe changes, not debugging history.
 
 ## Engineering history
 

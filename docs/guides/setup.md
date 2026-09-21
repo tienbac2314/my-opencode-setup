@@ -43,8 +43,6 @@ pwsh ./setup.ps1 -SkipEnvironment
 
 `setup.ps1` copies repository-controlled files, deploys `config/AGENTS.md` as global policy while leaving root `AGENTS.md` repository-only, installs manifest-approved components, applies package patches, configures CodeGraph/RTK, skips skills already discovered under `~/.agents` or `~/.claude`, and runs verification. Existing `opencode.jsonc` credentials are preserved.
 
-Optional components such as Headroom are not installed by default.
-
 ## 3. Private credentials
 
 ### Export from an already configured Windows PC
@@ -152,32 +150,7 @@ pwsh ./maintain.ps1 verify
 
 Use `-All` only after every target in manifest has been reviewed. Maintainer stops rather than overwriting copied upstream forks.
 
-## 6. Headroom Desktop and CLI proxy (optional)
-
-Windows Python dependencies require Visual Studio 2022 Build Tools with C++ workload. Run from Administrator PowerShell, then restart terminal:
-
-```powershell
-winget install Microsoft.VisualStudio.2022.BuildTools --silent --accept-package-agreements --accept-source-agreements --override "--add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.Windows11SDK.22000 --includeRecommended --quiet --wait"
-```
-
-Install pinned Python proxy and build pinned OpenCode transport. The `headroom-ai` 0.31.0 wheel does not ship `entry.opencode.js`, so custom providers such as 9router still need the pinned source build:
-
-```powershell
-uv tool install --force "headroom-ai[all]==0.31.0"
-pwsh ./scripts/install-headroom-plugin.ps1
-pwsh ./scripts/remove-headroom-opencode-pollution.ps1
-pwsh ./scripts/manage-headroom-proxy.ps1 install
-pwsh ./scripts/manage-headroom-proxy.ps1 status
-opencode models 9router
-```
-
-The manager installs a hidden current-user login task that keeps `headroom proxy` independent of OpenCode. The task uses `scripts/run-headroom-proxy.ps1` to suppress the console and write a two-file rolling log under `~/.local/state/opencode-headroom`. Auto-discovered `plugins/headroom.ts` gives both Desktop and CLI the same transport. It activates only when the login-task marker exists and `/livez` identifies a healthy Headroom service; otherwise four short health attempts fail open to direct provider traffic. Normal use is opening Desktop or running `opencode`—no wrapper command or profile function is required. Dashboard and statistics remain available while the service runs. Headroom memory and learning remain disabled so the proxy stays transport-only; RTK remains enabled for shell-output compression and Headroom only reads its savings counters.
-
-Do not use `headroom wrap opencode` with this configuration. Headroom 0.31.0 adds synthetic `anthropic`, `openai`, and `headroom` providers, a hardcoded Claude/OpenAI model catalog, and persistent Headroom/Serena MCP entries. This can hide dynamically discovered 9router models in TUI and pollute App model lists. The cleanup script removes only those recognized Headroom-owned entries while preserving 9router credentials and unrelated config. Default cleanup targets both `opencode.jsonc` and leftover `opencode.json`, then deletes empty leftover JSON shells so dual-config merge cannot reintroduce Headroom/Serena MCP.
-
-`scripts/start-opencode-headroom.ps1` remains a diagnostic fallback that starts a temporary proxy before launching CLI OpenCode. It is not needed for normal Desktop or CLI use.
-
-## 7. Recovery
+## 6. Recovery
 
 ```powershell
 pwsh ./setup.ps1
@@ -188,7 +161,7 @@ Setup is safe to rerun. It restores tracked files, tested package baselines, and
 
 Setup does not replace executables outside repository-managed install locations. Use [troubleshooting](troubleshooting.md) when `check` still reports executable drift.
 
-## 8. Linux setup differences
+## 7. Linux setup differences
 
 Linux support uses same PowerShell scripts; do not maintain duplicate shell installers.
 
@@ -208,8 +181,7 @@ Differences:
 - Background-agent environment is written to `~/.config/environment.d/opencode.conf`; export it in current shell or log in again.
 - RTK uses Linux release archive and executable bit.
 - Native Bash skill scripts work directly; PowerShell launchers remain available.
-- Windows Headroom uses the current-user login task. On Linux, run `headroom proxy --port 8787` from the user service manager and set `HEADROOM_PROXY_URL` for the OpenCode process until equivalent service installation is implemented.
 - Apply `chmod 600` to private credential files.
 - App availability depends on OpenCode Linux desktop support; TUI and web are baseline.
 
-Supported first target: current Ubuntu LTS. Verify same package targets, plugin origins, lazy loading, RTK, CodeGraph, OMO, and Headroom before claiming another distro supported.
+Supported first target: current Ubuntu LTS. Verify same package targets, plugin origins, lazy loading, RTK, CodeGraph, and OMO before claiming another distro supported.
